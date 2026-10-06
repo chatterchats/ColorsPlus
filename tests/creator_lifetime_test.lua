@@ -99,4 +99,47 @@ assert(table.concat(logs,"\n"):find("CREATOR BIND | REFUSED",1,true))
 local broken=factory.new(a,function() error("logger failure") end)
 assert(broken.bind(page.full).master==master.full)
 stack.WidgetList={bank}; refused(function() broken.bind(page.full) end,"Creator removed")
-print("Creator lifetime: verified stack membership, radial round-trip, cache/replacement, boundaries and fail-closed reads passed")
+-- In-game (hub) editor, as traced: GameLayer_Stack holds the hub's tabbed
+-- menu and the item page; the customization master page is the menu's
+-- active tab and stays activated while the item page is on top.
+local tabs=widget("WBP_CentralUITabs_C",host .. ".WBP_CentralUITabs_C_7")
+local tab_stack=widget("BitReactorActivatableWidgetTabStack",host .. ".WBP_CentralUITabs_C_7.WidgetTree_8.TabStack")
+local hub_master=widget("WBP_Customization_MasterPage_C",host .. ".WBP_CentralUITabs_C_7.WidgetTree_8.WBP_Customization_MasterPage_C_9")
+local armory=widget("WBP_TabbedMenu_Armory_C",host .. ".WBP_CentralUITabs_C_7.WidgetTree_8.WBP_TabbedMenu_Armory_C_10")
+local foreign_tab=widget("WBP_Customization_MasterPage_C",host .. ".WBP_Other_C_11.WidgetTree_12.WBP_Customization_MasterPage_C_13")
+tabs.TabStack=tab_stack
+function tab_stack:GetActiveWidget() return self.top end
+local function hub()
+    reset(); tabs.active=false; tabs.invalid=nil; tabs.TabStack=tab_stack
+    tab_stack.top=hub_master; tab_stack.invalid=nil; hub_master.active=true; hub_master.invalid=nil
+    stack.WidgetList={tabs,page}; stack.top=page
+end
+hub()
+local hub_binding=life.bind(page.full)
+assert(hub_binding.master==tabs.full and hub_binding.tab==hub_master.full and life.active(hub_binding))
+assert(life.page_active(hub_binding,page.full))
+for _,v in pairs(hub_binding) do assert(type(v)=="string","scalar identities only") end
+assert(table.concat(logs,"\n"):find("tab=" .. hub_master.full,1,true))
+-- Back out to the master page (the item page pops; the menu activates) and in.
+stack.WidgetList={tabs}; stack.top=tabs; tabs.active=true; page.active=false
+assert(life.active(hub_binding) and not life.page_active(hub_binding,page.full))
+hub(); assert(life.active(hub_binding) and life.page_active(hub_binding,page.full))
+-- Another hub tab, a menu without its tab stack and a closed menu end the visit.
+hub(); tab_stack.top=armory
+refused(function() life.active(hub_binding) end,"Creator removed")
+refused(function() life.bind(page.full) end,"Creator removed")
+hub(); tab_stack.top=foreign_tab; refused(function() life.active(hub_binding) end,"Creator removed")
+hub(); tab_stack.top=nil; refused(function() life.active(hub_binding) end,"Creator removed")
+hub(); tabs.TabStack=nil; refused(function() life.active(hub_binding) end,"Creator removed")
+hub(); stack.WidgetList={page}; refused(function() life.active(hub_binding) end,"Creator removed")
+-- A rebuilt master page is a new visit; an inactive one is not current.
+local rebuilt_tab=widget("WBP_Customization_MasterPage_C",host .. ".WBP_CentralUITabs_C_7.WidgetTree_8.WBP_Customization_MasterPage_C_14")
+hub(); tab_stack.top=rebuilt_tab; refused(function() life.active(hub_binding) end,"Creator replaced")
+hub(); hub_master.active=false; assert(not life.active(hub_binding))
+refused(function() life.bind(page.full) end,"Active item page")
+-- The main-menu binding never accepts the hub menu, nor the reverse.
+hub(); refused(function() life.active(binding) end,"Creator replaced")
+reset(); refused(function() life.active(hub_binding) end,"Creator replaced")
+-- Both editors at once is ambiguous.
+hub(); stack.WidgetList={master,tabs,page}; refused(function() life.bind(page.full) end,"Ambiguous creators")
+print("Creator lifetime: verified stack membership, radial round-trip, cache/replacement, boundaries, fail-closed reads and the hub editor passed")

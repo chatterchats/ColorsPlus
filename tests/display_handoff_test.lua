@@ -7,7 +7,7 @@ local world="/Game/Game/Maps/MainMenu/MainMenu.MainMenu:PersistentLevel."
 local display_world="/Game/Game/Maps/StoryMissions/MM_01_010_TheSerolonisJob/MM_01_010_TheSerolonisJob_HawksCustomization.MM_01_010_TheSerolonisJob_HawksCustomization:PersistentLevel."
 local data,source=obj("Actor /data"),obj("Actor /source")
 local preview=obj("Instance /preview",{GetOwner=function() return data end})
-local owner=obj("Instance /owner",{GetOwner=function() return source end,GetPreviewCustomizationInstance=function() return preview end})
+local owner=obj("CustomizationInstance " .. world .. "Char_Hero_Humanoid_C_0.CustomizationInstance",{GetOwner=function() return source end,GetPreviewCustomizationInstance=function() return preview end})
 local display=obj("BP_CustomCharacter_CustomizationProxy_C " .. display_world .. "BP_HawksCustomizationProxyCharacter_C_0",{ClonedFromCharacter=source})
 local instance=obj("Instance /display",{GetOwner=function() return display end})
 display.CustomizationInstance=instance
@@ -58,4 +58,25 @@ container.invalid=false
 handoff.verify(session,owner,preview)
 container.IsPreviewing=false; display.ClonedFromCharacter=source; inventory={container,container}
 assert(not pcall(handoff.prepare,{owner=owner,part={AssetId={}}},preview),"Fresh open must still reject ambiguity")
+-- The hub editor: its own container and display, linked the same way.
+local hub="/Game/Game/Maps/Hub/HUB_Root.HUB_Root:PersistentLevel."
+local hub_display=obj("BP_CustomizationProxyCharacter_C " .. hub .. "BP_CustomizationProxyCharacter_C_0",{ClonedFromCharacter=source})
+local hub_instance=obj("Instance /hub_display",{GetOwner=function() return hub_display end})
+hub_display.CustomizationInstance=hub_instance
+local hub_container=obj("BP_CustomizationPreviewProxyContainer_C " .. hub .. "BP_CustomizationPreviewProxyContainer_C_2",
+    {ProxyDataStorage=data,ProxyCharacter=hub_display,IsPreviewing=false})
+local hub_owner=obj("CustomizationInstance " .. hub .. "Char_Hero_HAWKS_Control_C_0.CustomizationInstance",
+    {GetOwner=function() return source end,GetPreviewCustomizationInstance=function() return preview end})
+inventory={hub_container}
+local hub_record=handoff.prepare({owner=hub_owner,part={AssetId={}}},preview)
+assert(hub_record.container==hub_container.n and hub_record.display==hub_display.n)
+-- Never across editors: a main-menu character with the hub's container, a
+-- hub container showing the main-menu display, or the reverse record.
+assert(not pcall(handoff.prepare,{owner=owner,part={AssetId={}}},preview),"Cross-editor owner/container")
+hub_container.ProxyCharacter=display
+assert(not pcall(handoff.prepare,{owner=hub_owner,part={AssetId={}}},preview),"Cross-editor container/display")
+hub_container.ProxyCharacter=hub_display
+assert(module.valid_record(hub_container.n,hub_display.n) and not module.valid_record(hub_container.n,display.n)
+    and not module.valid_record(container.n,hub_display.n))
+print("Display handoff: hub editor links and cross-editor refusal passed")
 print("Display handoff: exact lookup, fresh links, fallback, replacement refusal, mesh/color checks and unique opening passed")

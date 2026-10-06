@@ -6,7 +6,6 @@ local M={}
 local VM="^BitReactorCustomizationSlotViewModel /Engine/Transient%.GameEngine_%d+:BP_BrunoGameInstance_C_%d+%.BitReactorCustomizationSlotViewModel_%d+$"
 local PART="^BitReactorCustomizationPartViewModel /Engine/Transient%.GameEngine_%d+:BP_BrunoGameInstance_C_%d+%.BitReactorCustomizationPartViewModel_%d+$"
 local EMPTY_PART="^BitReactorNoneCustomizationPartViewModel /Engine/Transient%.GameEngine_%d+:BP_BrunoGameInstance_C_%d+%.BitReactorNoneCustomizationPartViewModel_%d+$"
-local OWNER="^CustomizationInstance /Game/Game/Maps/MainMenu/MainMenu%.MainMenu:PersistentLevel%.Char_Hero_Humanoid_C_%d+%.CustomizationInstance$"
 local function outer(full) return full:match("^[^ ]+ (.+)%.BitReactorCustomization%w+ViewModel_%d+$")
     or full:match("^[^ ]+ (.+)%.BitReactorNoneCustomizationPartViewModel_%d+$") end
 function M.new(runtime,a,path,preview)
@@ -18,6 +17,7 @@ function M.new(runtime,a,path,preview)
     local targets=assert(loadfile(directory .. "color_target.lua"))().new(a,runtime.log)
     local rules=assert(loadfile(directory .. "color_rules.lua"))()
     local lifetime=assert(loadfile(directory .. "creator_lifetime.lua"))().new(a)
+    local worlds=assert(loadfile(directory .. "editor_worlds.lua"))()
     local function valid_tag(s) return type(s)=="string" and s:match("^br%.Customization%.Slot%.Character%.[%w_.]+$") end
     local function is_default(s) return s=="None:None" or s:match("_None$")~=nil end
     local function log(s) runtime.log("DEFAULT SELECTION | " .. s) end
@@ -220,7 +220,7 @@ function M.new(runtime,a,path,preview)
         local context=preview.read_context()
         assert(name(context.slot)==s.slot_vm and id(context.part.AssetId)==s.temp_part,"Temporary selection context changed")
         s.owner=name(context.owner); s.source_slot=name(context.source_slot)
-        assert(s.owner:match(OWNER),"Unsupported temporary selection owner")
+        assert(worlds.owner(s.owner),"Unsupported temporary selection owner")
         persist(s)
         return true
     end
@@ -256,7 +256,7 @@ function M.new(runtime,a,path,preview)
                         and v[5]:match("^CustomizationPartDefinition:[%w_]+$")
                         and rules.preview_asset(v[9],v[5]) and not is_default(v[5]),
                         "Malformed Default selection recovery")
-                    local bound=v[8]=="selected" and v[6]:match(OWNER)
+                    local bound=v[8]=="selected" and worlds.owner(v[6])
                         and v[7]:sub(1,#("CustomizationFragmentInstanceSlot " .. v[6]:match("^[^ ]+ (.+)$") .. "."))
                             =="CustomizationFragmentInstanceSlot " .. v[6]:match("^[^ ]+ (.+)$") .. "."
                     assert(bound or v[8]=="selecting" and v[6]=="unbound" and v[7]=="unbound","Invalid selection recovery phase/owner")

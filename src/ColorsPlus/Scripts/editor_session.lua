@@ -6,7 +6,7 @@ local M={}
 local directory=debug.getinfo(1,"S").source:gsub("^@",""):match("^(.*[/\\])")
 local rules=assert(loadfile(directory .. "color_rules.lua"))()
 local CLASS="Class /Script/BitReactorCore.CustomizationFragmentInstanceMaterialColor"
-local OWNER="^CustomizationInstance /Game/Game/Maps/MainMenu/MainMenu%.MainMenu:PersistentLevel%.Char_Hero_Humanoid_C_%d+%.CustomizationInstance$"
+local worlds=assert(loadfile(directory .. "editor_worlds.lua"))()
 local VM="^BitReactorCustomizationSlotViewModel /Engine/Transient%.GameEngine_%d+:BP_BrunoGameInstance_C_%d+%.BitReactorCustomizationSlotViewModel_%d+$"
 local function copy(c) return {R=c.R,G=c.G,B=c.B,A=c.A} end
 local function valid_color(c,p) return rules.color(c,p.slot,p.parameter) end
@@ -67,7 +67,7 @@ function M.new(runtime,a,path)
         return full:sub(1,#prefix)==prefix and not full:find("[\r\n]")
     end
     local function validate(s)
-        assert(s.owner:match(OWNER) and s.vm:match(VM)
+        assert(worlds.owner(s.owner) and s.vm:match(VM)
             and child(s.owner,s.slot,"CustomizationFragmentInstanceSlot")
             and child(s.owner,s.fragment,"CustomizationFragmentInstanceMaterialColor")
             and s.part:match("^CustomizationPartDefinition:[%w_]+$")

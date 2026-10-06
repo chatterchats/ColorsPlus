@@ -25,6 +25,7 @@ end
 function M.new(runtime,a,path)
     local directory=debug.getinfo(1,"S").source:gsub("^@",""):match("^(.*[/\\])")
     local codec=assert(loadfile(directory .. "color_bundle.lua"))()
+    local worlds=assert(loadfile(directory .. "editor_worlds.lua"))()
     local bundles=codec.new(a)
     local self={pending=nil,blocked=nil,busy=false,hold=false}
     local function log(s) runtime.log("ZABRAK CP SOURCE | " .. s) end
@@ -94,7 +95,7 @@ function M.new(runtime,a,path)
         return hex(description),description
     end
     local function validate(s)
-        assert(type(s.owner)=="string" and s.owner:match("^CustomizationInstance /Game/Game/Maps/MainMenu/MainMenu%.MainMenu:PersistentLevel%.Char_Hero_Humanoid_C_%d+%.CustomizationInstance$"),"Untrusted Zabrak owner")
+        assert(worlds.owner(s.owner),"Untrusted Zabrak owner")
         local root=s.owner:match("^[^ ]+ (.+)$") .. "."
         local function child(n,cls)
             local prefix=cls .. " " .. root

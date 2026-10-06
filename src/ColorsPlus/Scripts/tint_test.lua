@@ -11,6 +11,7 @@ function M.new(runtime, access, recovery_path)
     local directory=debug.getinfo(1,"S").source:gsub("^@",""):match("^(.*[/\\])")
     local target_module=assert(loadfile(directory .. "color_target.lua"))()
     local rules=assert(loadfile(directory .. "color_rules.lua"))()
+    local worlds=assert(loadfile(directory .. "editor_worlds.lua"))()
     local targets=target_module.new(a,runtime.log)
     local fragment_module=assert(loadfile(directory .. "color_fragments.lua"))()
     local fragments=fragment_module.new(a,runtime.log)
@@ -87,14 +88,6 @@ function M.new(runtime, access, recovery_path)
     end
     local function target(fragment,profile) return targets.target(fragment,profile) end
     local function single_color(array,profile,stock_preview) return fragments.read(array,profile,stock_preview) end
-    local function allowed_name(name)
-        return type(name) == "string" and not name:find("[\r\n]")
-            and name:match("^CustomizationInstance /Game/Game/Maps/MainMenu/MainMenu%.MainMenu:PersistentLevel%.Char_Hero_Humanoid_C_%d+%.CustomizationInstance$")
-            and not name:find("Default__", 1, true)
-    end
-    local function allowed_preview(name)
-        return type(name) == "string" and name:match("^CustomizationInstance /Game/Game/Maps/MainMenu/MainMenu%.MainMenu:PersistentLevel%.BP_CustomizationPreviewProxyCharacter_C_%d+%.CustomizationInstance$")
-    end
     local function clone_name_for(preview, fragment)
         local prefix = "CustomizationFragmentInstanceMaterialColor " .. preview:match("^[^ ]+ (.+)$") .. "."
         return fragment:sub(1, #prefix) == prefix and not fragment:find("[\r\n]")
@@ -141,7 +134,7 @@ function M.new(runtime, access, recovery_path)
             return single_color(slot:GetFragments(),{slot=tag(slot.SlotTag)})
         end)
         local owner = object(fragment:GetOwningCustomizationInstance())
-        assert(allowed_name(a.name(owner)), "First write test is restricted to the main-menu customization character")
+        assert(worlds.owner(a.name(owner)), "Not a supported character editor character")
         local source_slot = object(fragment:GetOwningCustomizationSlot())
         assert(tag(source_slot:GetSlotNameTag()) == tag(slot.SlotTag), "Fragment belongs to another slot")
         assert(a.name(object(owner:GetSlotInstance(slot.SlotTag))) == a.name(source_slot), "Slot owner mismatch")
@@ -176,7 +169,7 @@ function M.new(runtime, access, recovery_path)
     end
     local function resolve_proxy(c, blue, idle_baseline)
         local preview = object(c.owner:GetPreviewCustomizationInstance(), "linked preview instance")
-        assert(allowed_preview(a.name(preview)) and a.name(preview) ~= a.name(c.owner), "No verified linked customization preview proxy")
+        assert(worlds.same("owner",a.name(c.owner),"preview",a.name(preview)) and a.name(preview) ~= a.name(c.owner), "No verified linked customization preview proxy")
         local preview_slot = object(preview:GetSlotInstance(c.slot.SlotTag), "proxy color slot")
         assert(a.name(preview_slot) ~= a.name(c.source_slot), "Preview slot aliases the equipped slot")
         assert(tag(preview_slot:GetSlotNameTag()) == c.profile.slot, "Proxy slot changed")
@@ -357,7 +350,7 @@ function M.new(runtime, access, recovery_path)
         assert(ok, err)
     end
     local function lookup(name)
-        assert(allowed_name(name), "Untrusted recovery object name")
+        assert(worlds.owner(name), "Untrusted recovery object name")
         local path = name:match("^[^ ]+ (.+)$")
         local found = StaticFindObject(path)
         if a.live(found) and a.name(found) == name then return found end
@@ -692,7 +685,7 @@ function M.new(runtime, access, recovery_path)
             local handoff_record
             do
                 local preview = object(c.owner:GetPreviewCustomizationInstance())
-                assert(allowed_preview(a.name(preview)), "Unsupported preview proxy")
+                assert(worlds.same("owner",a.name(c.owner),"preview",a.name(preview)), "Unsupported preview proxy")
                 handoff_record = timed("open.settle", handoff.settle_selected, c, preview, function(instance)
                     local hovered=object(c.slot:PreviewedCustomizationPartViewModel(),"selected slot hover VM")
                     local found=false
@@ -979,8 +972,8 @@ function M.new(runtime, access, recovery_path)
                     and (fields[20]=="verified" or fields[20]=="pending" and fields[8]=="handoff")
                     and handoff_module.valid_record(fields[9],fields[10])
                     and (fields[8]=="handoff" or fields[8]=="prepared" or fields[8]=="installing" or fields[8]=="owned")
-                if #data <= 32768 and data:sub(-1) == "\n" and generic_ok and allowed_name(fields[2])
-                    and allowed_preview(fields[3]) and clone_name_for(fields[3], fields[4]) and count == 4
+                if #data <= 32768 and data:sub(-1) == "\n" and generic_ok and worlds.same("owner",fields[2],"preview",fields[3])
+                    and clone_name_for(fields[3], fields[4]) and count == 4
                     and fields[5]:match("^CustomizationPartDefinition:[%w_]+$") and rules.materials(fields[6]) then
                     self.pending = {owner=fields[2], preview=fields[3], fragment=fields[4], part=fields[5], materials=fields[6],
                         original=original, phase=fields[8], profile=profile,

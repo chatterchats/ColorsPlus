@@ -4,9 +4,7 @@
 local M={}
 local directory=debug.getinfo(1,"S").source:gsub("^@",""):match("^(.*[/\\])")
 local ROOT="^UserWidget .+%.ColorsPlusLauncher_Root_(%d+)$"
--- The game's own CommonUI button, as used by the picker's Apply/Cancel: its
--- HandleButtonClicked UFunction is hookable, so launches need no input poll.
-local BUTTON_CLASS="/Game/Game/UI/Strategy/Customization/Widgets/CharacterDatabank/WBP_CharacterDataBank_TopNavButton.WBP_CharacterDataBank_TopNavButton_C"
+local buttons=assert(loadfile(directory .. "button_class.lua"))()
 local button_clicks=assert(loadfile(directory .. "button_clicks.lua"))()
 local palette_layout=assert(loadfile(directory .. "palette_layout.lua"))()
 function M.new(runtime,a,tint)
@@ -356,7 +354,7 @@ function M.new(runtime,a,tint)
         -- A class default object: a.live() rejects Default__ names by design.
         local library=StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
         assert(library and library:IsValid()==true,"Color UI unavailable: widget library")
-        local class=obj(StaticFindObject(BUTTON_CLASS),"launcher button class")
+        local class=obj(buttons.find(log),"launcher button class")
         local button=obj(call("launcher.Create",function() return library:Create(pc,class,pc) end),"native launcher button")
         assert(name(button):match("^WBP_CharacterDataBank_TopNavButton_C /"),"Unexpected launcher button class")
         button:SetIsFocusable(false); button:SetIsSelectable(false); button:SetIsToggleable(false)

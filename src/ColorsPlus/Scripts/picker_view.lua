@@ -5,7 +5,8 @@ local directory=debug.getinfo(1,"S").source:gsub("^@",""):match("^(.*[/\\])")
 local hsv_controls=assert(loadfile(directory .. "hsv_controls.lua"))()
 local hsv_shift_controls=assert(loadfile(directory .. "hsv_shift_controls.lua"))()
 local button_clicks=assert(loadfile(directory .. "button_clicks.lua"))()
-local BUTTON_CLASS="/Game/Game/UI/Strategy/Customization/Widgets/CharacterDatabank/WBP_CharacterDataBank_TopNavButton.WBP_CharacterDataBank_TopNavButton_C"
+local buttons=assert(loadfile(directory .. "button_class.lua"))()
+local BUTTON_CLASS=buttons.PATH
 local ROOT = "^UserWidget .+%.ColorsPlusPicker_Root_(%d+)$"
 local HEADING_CLASS="/Game/Game/UI/Strategy/Customization/Widgets/New/WBP_Customization_SlotSubItemName.WBP_Customization_SlotSubItemName_C"
 function M.new(runtime)
@@ -56,7 +57,11 @@ function M.new(runtime)
         local value=frame and frame.classes[path]
         if value then return required(value,path) end
         value=timed("ui.build_resource_lookup",function()
-            return required(call("class.StaticFindObject " .. path,function() return StaticFindObject(path) end),path)
+            return required(call("class.StaticFindObject " .. path,function()
+                -- The button class may need loading (hub editor).
+                if path==BUTTON_CLASS then return buttons.find(runtime.log) end
+                return StaticFindObject(path)
+            end),path)
         end)
         if frame then frame.classes[path]=value end
         return value

@@ -51,6 +51,25 @@ the player-only package.
 - The widget library lookup uses a plain validity check: `a.live` rejects
   class default objects by design (caught by the launcher test).
 
+### In-game (hub) character editor (untested in game)
+
+- The hub's character editor is a separate editor with the same slots. A
+  survey there found the same item page and slot view models, but a
+  different host (`WBP_CentralUITabs_C` in the game stack, with
+  `WBP_Customization_MasterPage_C` as its active tab) and edits applied to
+  the selected squad member's live `HUB_Root` actor
+  (`Char_Hero_HAWKS_Control_C`, `Char_Hero_Humanoid_C` for a recruit).
+- `creator_lifetime` accepts that host: the hub menu counts as the creator
+  only while customization is its active tab; another tab, a rebuilt master
+  page or a closed menu ends the visit.
+- `editor_worlds` holds the creator and hub identity checks (owner, preview,
+  container, display) that were main-menu patterns in five modules. One
+  edit never mixes objects from both editors.
+- `button_class` loads the launcher/picker button class through UE4SS
+  `LoadAsset` when it is missing (the hub does not load it).
+- Dev tools: `colors_compat` surveys without a creator binding and logs the
+  preview links and button class; `colors_screens` traces the hub screens.
+
 ### Dev Panel integration removed; journals move to `Recovery/`
 
 - Removed the SWZC Dev Panel client, bridge and action catalog

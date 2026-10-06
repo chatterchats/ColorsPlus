@@ -1,12 +1,11 @@
 -- Stock-preview handoff through a palette donor's slot-VM hover. No direct Blueprint flag, actor-clone, equip,
 -- material or save writes. The tint module journals intent before activation.
 local M = {}
-local CONTAINER = "^BP_CustomizationPreviewProxyContainer_C /Game/Game/Maps/MainMenu/MainMenu%.MainMenu:PersistentLevel%.BP_CustomizationPreviewProxyContainer_C_%d+$"
-local DISPLAY = "^BP_CustomCharacter_CustomizationProxy_C /Game/Game/Maps/StoryMissions/MM_01_010_TheSerolonisJob/MM_01_010_TheSerolonisJob_HawksCustomization%.MM_01_010_TheSerolonisJob_HawksCustomization:PersistentLevel%.BP_HawksCustomizationProxyCharacter_C_%d+$"
+local directory = debug.getinfo(1, "S").source:gsub("^@", ""):match("^(.*[/\\])")
+local worlds = assert(loadfile(directory .. "editor_worlds.lua"))()
+-- Container and display must belong to the same editor.
 function M.valid_record(container, display)
-    return type(container) == "string" and container:match(CONTAINER)
-        and type(display) == "string" and display:match(DISPLAY)
-        and not (container .. display):find("[\r\n]")
+    return worlds.same("container", container, "display", display) ~= nil
 end
 function M.new(runtime, a, inspect_display, inspect_meshes)
     local self = {}
@@ -20,7 +19,7 @@ function M.new(runtime, a, inspect_display, inspect_meshes)
         local containers=a.values(FindAllOf("BP_CustomizationPreviewProxyContainer_C") or {})
         assert(#containers<=4096,"Handoff container scan limit")
         for _, container in ipairs(containers) do
-            if a.live(container) and a.name(container):match(CONTAINER) then
+            if a.live(container) and worlds.container(a.name(container)) then
                 local storage = a.unwrap(a.prop(container, "ProxyDataStorage"))
                 if a.live(storage) and a.name(storage) == a.name(data) then matches[#matches + 1] = container end
             end
@@ -45,7 +44,8 @@ function M.new(runtime, a, inspect_display, inspect_meshes)
         container=container or discover(data)
         assert(same(object(container).ProxyDataStorage,data),"Handoff storage link changed")
         local display = object(container.ProxyCharacter)
-        assert(M.valid_record(a.name(container), a.name(display)), "Unsupported handoff container/display")
+        assert(M.valid_record(a.name(container), a.name(display))
+            and worlds.same("owner", a.name(owner), "container", a.name(container)), "Unsupported handoff container/display")
         if record then
             assert(a.name(container) == record.container and a.name(display) == record.display,
                 "Handoff container/display replaced")
