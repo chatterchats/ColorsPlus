@@ -4,7 +4,6 @@ local M={}
 local COLOR="Class /Script/BitReactorCore.CustomizationFragmentInstanceMaterialColor"
 local SCALAR="Class /Script/BitReactorCore.CustomizationFragmentInstanceMaterialScalar"
 local TAGS="Class /Script/BitReactorCore.CustomizationFragmentInstanceGameplayTags"
-local PART="Class /Script/BitReactorGame.BitReactorCustomizationPartViewModel"
 local function scalar(v) return tostring(v):gsub("[\r\n\t]"," "):sub(1,1024) end
 function M.new(runtime,a)
     local self={}
@@ -21,60 +20,20 @@ function M.new(runtime,a)
     local function id(v)
         return a.text(a.prop(a.prop(v,"PrimaryAssetType"),"Name")) .. ":" .. a.text(a.prop(v,"PrimaryAssetName"))
     end
-    local function outer(full) return full:match("^[^ ]+ (.+)%.BitReactorCustomization%w+ViewModel_%d+$") end
     local function candidates(class,limit)
         local values=FindAllOf(class) or {}; assert(type(values)=="table","Unsupported " .. class .. " list")
         local n=0; for _ in pairs(values) do n=n+1; assert(n<=limit,"Scan limit: " .. class) end
         return values
     end
-    local function palette(vm,slot_tag,page)
-        if runtime.generic_colors then
-            local items,grid=targets.palette(vm,page)
-            log("PALETTE | grid=" .. grid .. " | count=" .. #items .. " | active-page discovery | donor not yet verified")
-            for i,item in ipairs(items) do
-                if i<=8 or item.name==name(vm.EquippedCustomizationPartViewModel) then
-                    log("PALETTE ITEM | index=" .. item.index .. " | asset=" .. item.asset)
-                end
-            end
-            return #items>1
-        end
-        local grids,seen={},{}
-        for _,widget in pairs(candidates("WBP_Customization_SelectionTiles_C",256)) do
-            if a.live(widget) and widget:IsVisible()==true
-                and a.text(a.prop(a.prop(widget,"CurrentSlotTag"),"TagName"))==slot_tag then
-                local grid=object(widget.PartsGridList); local full=name(grid)
-                if not seen[full] then seen[full]=true; grids[#grids+1]=grid end
+    local function palette(vm,page)
+        local items,grid=targets.palette(vm,page)
+        log("PALETTE | grid=" .. grid .. " | count=" .. #items .. " | active-page discovery | donor not yet verified")
+        for i,item in ipairs(items) do
+            if i<=8 or item.name==name(vm.EquippedCustomizationPartViewModel) then
+                log("PALETTE ITEM | index=" .. item.index .. " | asset=" .. item.asset)
             end
         end
-        assert(#grids==1,"Expected one visible palette for the selected slot; found " .. #grids)
-        local grid=grids[1]
-        local count=grid:GetNumItems()
-        assert(type(count)=="number" and count%1==0 and count>0 and count<=1024,"Unsupported palette size")
-        local current=name(vm.EquippedCustomizationPartViewModel)
-        local vm_outer=assert(outer(name(vm)),"Unsupported slot VM location")
-        local found,alternatives,blue=false,0,false
-        local rows={}
-        for i=0,count-1 do
-            local item=object(grid:GetItemAt(i)); local full=name(item)
-            assert(outer(full)==vm_outer and name(item:GetClass())==PART,"Palette VM ownership/class mismatch")
-            assert(grid:GetIndexForItem(item)==i,"Palette ordering changed")
-            local asset=id(item.AssetId)
-            assert(asset:match("^CustomizationPartDefinition:[%w_]+$"),"Unexpected palette asset")
-            local selected=full==current
-            found=found or selected
-            if not selected then alternatives=alternatives+1 end
-            blue=blue or asset=="CustomizationPartDefinition:CPD_H_Outfit_Color_Blue_14"
-            -- Names/membership are discovery only, not proof of donor fragments.
-            if i<8 or selected or asset=="CustomizationPartDefinition:CPD_H_Outfit_Color_Blue_14" then
-                rows[#rows+1]="PALETTE ITEM | index=" .. i .. " | selected=" .. tostring(selected)
-                    .. " | name=" .. scalar(a.text(item.DisplayName)) .. " | asset=" .. asset
-            end
-        end
-        assert(found,"Equipped VM is absent from the visible palette")
-        log("PALETTE | grid=" .. name(grid) .. " | count=" .. count .. " | alternatives=" .. alternatives
-            .. " | legacy_blue_present=" .. tostring(blue) .. " | donor not yet verified")
-        for _,row in ipairs(rows) do log(row) end
-        return alternatives>0
+        return #items>1
     end
     local function nested(values)
         local visited,total={},0
@@ -206,7 +165,7 @@ function M.new(runtime,a)
                 end
             end
             vm=object(vm)
-            if runtime.generic_colors then vm=targets.selected(vm,page,root) end
+            vm=targets.selected(vm,page,root)
             local slot_tag=a.text(vm.SlotTag.TagName)
             local equipped=object(vm.EquippedCustomizationPartViewModel)
             log("SELECTED | name=" .. scalar(a.text(vm.DisplayName)) .. " | tag=" .. scalar(slot_tag)
@@ -215,7 +174,7 @@ function M.new(runtime,a)
             log("FRAGMENTS | count=" .. #values)
             assert(#values<=16,"Fragment detail limit exceeded")
             local skin_race,skin_scalar,skin_candidate,description,primary_name,race_candidate
-            if runtime.generic_colors and bundles.parameter(slot_tag) then
+            if bundles.parameter(slot_tag) then
                 local checked,why=pcall(function()
                     local f,_,race,scalar,layout=bundle.new(a).read(values,{slot=slot_tag})
                     local profile=targets.read(f,slot_tag,object(f:GetOwningCustomizationInstance()),race,scalar,layout)
@@ -235,7 +194,7 @@ function M.new(runtime,a)
             end
             local nested_ok,nested_error=pcall(nested,values)
             if not nested_ok then log("NESTED GAP | " .. scalar(nested_error)) end
-            local palette_ok,alternatives=pcall(palette,vm,slot_tag,page)
+            local palette_ok,alternatives=pcall(palette,vm,page)
             if not palette_ok then log("PALETTE GAP | " .. scalar(alternatives)) end
             local status=#values==0 and "EMPTY/DEFAULT: needs reversible fallback"
                 or skin_candidate and palette_ok and alternatives and "CANDIDATE: human skin bundle; companions preserved; preview/write not verified"

@@ -1,4 +1,4 @@
--- Opt-in stock-preview handoff. No direct Blueprint flag, actor-clone, equip,
+-- Stock-preview handoff through a palette donor's slot-VM hover. No direct Blueprint flag, actor-clone, equip,
 -- material or save writes. The tint module journals intent before activation.
 local M = {}
 local CONTAINER = "^BP_CustomizationPreviewProxyContainer_C /Game/Game/Maps/MainMenu/MainMenu%.MainMenu:PersistentLevel%.BP_CustomizationPreviewProxyContainer_C_%d+$"
@@ -92,14 +92,9 @@ function M.new(runtime, a, inspect_display, inspect_meshes)
     function self.activate(session, c, preview, blue_vm)
         local container, display, _, source = linked(c.owner, preview, session.handoff)
         assert(not flag(container) and same(display.ClonedFromCharacter, source), "Handoff baseline changed")
-        if session.blue then
-            assert(blue_vm, "Validated blue view model required")
-            log("CALL | SlotVM.PreviewCustomizationPart | blue stock swatch; no equip")
-            c.slot:PreviewCustomizationPart(blue_vm)
-        else
-            log("CALL | PreviewPart | equipped stock swatch; no equip")
-            c.owner:PreviewPart(c.slot.SlotTag, c.part.AssetId)
-        end
+        assert(session.blue and blue_vm, "Validated palette donor required")
+        log("CALL | SlotVM.PreviewCustomizationPart | palette donor; no equip")
+        c.slot:PreviewCustomizationPart(blue_vm)
         self.verify(session, c.owner, preview)
         log("ACTIVE | IsPreviewing=true | display follows preview-data")
     end
@@ -109,14 +104,14 @@ function M.new(runtime, a, inspect_display, inspect_meshes)
         local container, display, instance, _, data = linked(owner, preview, session.handoff,true)
         assert(flag(container) and same(display.ClonedFromCharacter, data),
             "Stock preview did not switch display to preview-data")
-        if session.profile and session.profile.targets then
+        if session.profile.targets then
             assert(inspect_meshes,"Multi-mesh handoff verifier unavailable")(instance,session.profile)
         end
         if expected_color then
             -- Donor baseline only. Owned custom display checks never inherit
             -- the stock scalar-layout exception, including after recovery.
             local skin_stock=session.phase=="handoff" and session.blue~=nil
-                and session.profile and (session.profile.skin_race~=nil or session.profile.bundle~=nil)
+                and (session.profile.skin_race~=nil or session.profile.bundle~=nil)
             inspect_display(instance, expected_color, materials, part,session.profile,skin_stock and true or nil,
                 session.phase=="owned")
             log("DISPLAY COLOR VERIFIED | fragment/target/armor match; visual confirmation still required")
@@ -132,13 +127,9 @@ function M.new(runtime, a, inspect_display, inspect_meshes)
             log("Preview changed externally; no reset of current game preview"); return
         end
         assert(flag(container) and same(display.ClonedFromCharacter, data), "Unexpected display link; recovery retained")
-        if session.blue then
-            log("CALL | SlotVM.ResetPreviewedPart | owned blue handoff")
-            reset_slot()
-        else
-            log("CALL | ResetPreview | owned handoff")
-            owner:ResetPreview()
-        end
+        assert(session.blue, "Owned handoff without a palette donor")
+        log("CALL | SlotVM.ResetPreviewedPart | owned donor handoff")
+        reset_slot()
         container, display, instance, source = linked(owner, preview, session.handoff)
         assert(not flag(container) and same(display.ClonedFromCharacter, source),
             "ResetPreview did not restore display link; recovery retained")

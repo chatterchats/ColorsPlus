@@ -207,7 +207,7 @@ io.open=function(p,mode)
 end
 os.rename=function(from,to) assert(files[from] and not files[to]); files[to],files[from]=files[from],nil; return true end
 os.remove=function(p) assert(files[p]); files[p]=nil; return true end
-local runtime={generic_colors=true,log=function(s) logs[#logs+1]=s end}
+local runtime={log=function(s) logs[#logs+1]=s end}
 function runtime:after(k,delay,fn) jobs[k]={fn=fn,delay=delay} end
 function runtime:cancel(k) jobs[k]=nil end
 local function run(k) local job=assert(jobs[k],k); jobs[k]=nil; job.fn() end

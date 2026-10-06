@@ -38,7 +38,14 @@ function slot:GetFragments() return current()==default and {} or {fragment} end
 function source:GetFragmentInstances() return slot:GetFragments() end
 function source:GetCustomizationPartPrimaryAssetId() return current().AssetId end
 function owner:GetSlotInstance(t) assert(t.TagName==ACCENT); return source end
-local page=object("WBP_Customization_ItemPage_C /Game/Test.Page",{IsActivated=function(self) return not self.inactive end})
+-- The live creator layout: item page above the creator master in the game's
+-- layer stack (what generic discovery and creator binding verify).
+local LAYOUT=VM_OUTER .. "WBP_OverallUILayout_C_15.WidgetTree_16."
+local page=object("WBP_Customization_ItemPage_C " .. LAYOUT .. "WBP_Customization_ItemPage_C_19",{IsActivated=function(self) return not self.inactive end})
+local master=object("WBP_CustomCharacter_Master_C " .. LAYOUT .. "WBP_CustomCharacter_Master_C_18",{IsActivated=function() return true end})
+local stack_parent=object("Panel /Game/Test.StackParent")
+object("BitReactorActivatableWidgetStack " .. LAYOUT .. "GameLayer_Stack",
+    {WidgetList={master,page},GetActiveWidget=function() return page end,GetParent=function() return stack_parent end})
 local aux=object("CustomizationAuxVM_C /Game/Test.Aux",{CurrentCustomizationSlotVM=slot})
 local palette={default,white,red,blue}
 local grid=object("BitReactorTileView /Game/Test.Grid",{
@@ -50,6 +57,12 @@ local widget=object("WBP_Customization_SelectionTiles_C /Game/Test.Tiles",{
     CurrentSlotTag={TagName=ACCENT},PartsGridList=grid,IsVisible=function(self) return not self.hidden end,
 })
 local lists={widget}
+function widget:GetParent() return page end
+local panel=object("WBP_CustomizationSlotPanel_C " .. LAYOUT .. "WBP_Customization_ItemPage_C_19.Panel",
+    {WBP_Customization_SelectionTiles=widget,IsVisible=function() return true end})
+page.WBP_CustomizationSlotPanel=panel
+page.SlotWidgetSwitcher=object("CommonActivatableWidgetSwitcher " .. LAYOUT .. "WBP_Customization_ItemPage_C_19.Switcher",
+    {GetActiveWidget=function() return panel end})
 function FindAllOf(c)
     if c=="CustomizationAuxVM_C" then return {aux} end
     if c=="WBP_Customization_ItemPage_C" then return {page} end
@@ -65,7 +78,7 @@ io.open=function(p,mode)
     if mode=="w" and fail_write then return nil end
     if mode=="w" then files[p]="" end
     return {read=function() return files[p] end,write=function(self,s)
-        if fail_bound_write and s:match("\nselected\n$") then fail_bound_write=false; error("bound journal failed") end
+        if fail_bound_write and s:find("\nselected\n",1,true) then fail_bound_write=false; error("bound journal failed") end
         if fail_clear and s=="" then error("clear failed") end
         files[p]=s; return self
     end,flush=function() return true end,close=function() return true end}
@@ -109,14 +122,13 @@ local function boot()
             runtime:after("tint:recovery",1,function() b.restore("reload") end)
         end
     end
-    function b.apply() return "regular" end
-    b.apply_rgb=b.apply; b.cycle_rgb=b.apply; b.inspect=b.apply
+    function b.inspect() return "regular" end
     local w=module.wrap(runtime,a,"selection",b,b)
     base,wrapped=b,w; return w
 end
 function slot:EquipCustomizationPart(p)
     if p~=default then
-        assert(files.selection and files.selection:match("^selection%-v1\n"),"Journal must precede temporary equip")
+        assert(files.selection and files.selection:match("^selection%-v2\n"),"Journal must precede temporary equip")
     end
     if p==default then
         assert(not base.pending and files.tint~="RGB pending","Restore RGB before Default")
@@ -145,7 +157,7 @@ local function restored()
     assert(current()==default and not wrapped.pending and files.selection=="" and files.tint=="")
 end
 clean(); local s=begin(); assert(s.perf_selection=="Default"); assert(wrapped.update_live(s,{})); assert(wrapped.check_live(s))
-assert(wrapped.apply()==false and wrapped.cycle_rgb()==false)
+assert(wrapped.inspect()==false,"Inspection waits for the temporary selection to end")
 assert(wrapped.restore("Cancel")); restored()
 assert(has("RESTORED | equipped Default"))
 begin(); assert(base.restore("external backend restore")); restored() -- internal base.restore must reach adapter
@@ -159,9 +171,11 @@ begin(); assert(wrapped.restore("missing roots")); restored()
 -- List order, not asset sort order / FindAllOf order, determines first swatch.
 clean(); palette={default,red,white,blue}; assert(wrapped.begin_live()); assert(current()==red)
 assert(wrapped.restore("order")); restored()
-clean(); palette={default,blue,white}; assert(not wrapped.begin_live() and current()==default and #equips==0)
+-- Any non-Default stock swatch may be the temporary selection on the generic
+-- path (the retired Clone 8 test reserved Blue as its handoff donor).
+clean(); palette={default,blue,white}; assert(wrapped.begin_live() and current()==blue)
+assert(wrapped.restore("blue first")); restored()
 clean(); widget.hidden=true; assert(not wrapped.begin_live() and current()==default and #equips==0)
-clean(); lists={widget,widget}; assert(not wrapped.begin_live() and current()==default and #equips==0)
 clean(); palette={white,red}; assert(not wrapped.begin_live() and current()==default and #equips==0)
 clean(); fail_write=true; assert(not wrapped.begin_live() and current()==default and #equips==0)
 for _,mode in ipairs({"before","after"}) do
@@ -197,7 +211,7 @@ run("tint:recovery"); restored(); run("selection:recovery"); restored()
 clean(); begin(); files.tint=""; boot(); wrapped.start(); run("selection:recovery"); restored()
 -- A crash between equip and owner binding cannot authorize a guessed owner.
 clean(); begin(); local selected_record=files.selection
-files.selection=selected_record:gsub("[^\n]+\n[^\n]+\nselected\n$","unbound\nunbound\nselecting\n")
+files.selection=selected_record:gsub("[^\n]+\n[^\n]+\nselected\n","unbound\nunbound\nselecting\n")
 files.tint=""; boot(); wrapped.start(); run("selection:recovery")
 assert(wrapped.pending and current()==white and has("Unbound selection recovery"))
 slot.EquippedCustomizationPartViewModel=default

@@ -134,7 +134,7 @@ local function boot()
         assert(vm.EquippedCustomizationPartViewModel~=none)
         return {owner=owner,source_slot=slot,slot=vm,part=vm.EquippedCustomizationPartViewModel,
             fragment=fragment,page=page.name,materials=table.concat(fragment.MaterialTarget.MaterialSlotNames,","),original=copy(source_rgb),
-            profile=runtime.generic_colors and targets.read(fragment,ACCENT,owner) or nil}
+            profile=targets.read(fragment,ACCENT,owner)}
     end
     function b.restore()
         if fail_preview_restore then return false end
@@ -143,7 +143,7 @@ local function boot()
     end
     function b.begin_live()
         local c=b.read_context(); assert(not b.pending)
-        b.pending={live=true,test_color=copy(orange),original=c.original}; files.tint="preview"
+        b.pending={live=true,test_color=copy(orange),original=c.original,profile=c.profile}; files.tint="preview"
         return b.pending
     end
     function b.check_live(s) return s==b.pending and s and s.live,"inactive preview" end
@@ -157,8 +157,6 @@ local function boot()
             b.pending={live=false}; runtime:after("tint:recovery",1,function() b.restore("recovery") end)
         end
     end
-    function b.apply() error("legacy actions must be blocked while applied") end
-    b.apply_rgb=b.apply; b.cycle_rgb=b.apply
     local d=defaults.wrap(runtime,a,"selection",b,b)
     local s=editor.wrap(runtime,a,"editor",d)
     base,selection,session=b,d,s; return s
@@ -190,7 +188,6 @@ local function apply(c)
 end
 for _,default in ipairs({false,true}) do
     clean(default); apply()
-    assert(not session.apply_rgb())
     -- Applied state retains its creator watcher.
     run("editor:watch"); assert(equal(source_rgb,orange))
     aux.CurrentCustomizationSlotVM=obj("BitReactorCustomizationSlotViewModel /Game/Test.Other")
@@ -300,7 +297,6 @@ files["editor.previous"]=recovery; files.editor=nil; boot(); session.start()
 assert(session.blocked and files["editor.previous"]==recovery and not session.begin_live())
 -- Dynamic target journals retain the exact zone through Apply, reopen, timeout,
 -- Default restoration, cold Lua reload and a changed UI selection.
-runtime.generic_colors=true
 for _,case in ipairs({
     {"br.Customization.Slot.Character.Outfit.Legs.Color.Visor","br.Customization.Slot.Character.Outfit.Legs.Mesh","Color 04","MI_LEGS"},
     {"br.Customization.Slot.Character.Hair.Hair.Color.Primary","br.Customization.Slot.Character.Hair.Hair.Mesh","Tip Color","MI_Hair"},
@@ -363,7 +359,7 @@ end
 -- Scheduling policy is offered for every supported picker profile; a receipt
 -- requires both the validated base update and skin companion sync to succeed.
 do
-    clean(); local ordinary=assert(session.begin_live()); assert(not ordinary.preview_policy)
+    clean(); local ordinary=assert(session.begin_live()); assert(ordinary.preview_policy=="color")
     assert(session.cancel_live("ordinary cadence"))
     local begin=base.begin_live
     base.begin_live=function()

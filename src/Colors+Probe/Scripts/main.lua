@@ -40,7 +40,6 @@ bootstrap_log.write("STARTUP | RUNTIME START RETURN | ok=" .. tostring(started))
 bootstrap_log.close()
 assert(started,runtime)
 runtime.version = VERSION
-runtime.generic_colors = true
 local log = module("logging").new(directory .. "../colors_plus_probe.log", runtime.generation)
 runtime.log = log.write
 local perf_log = module("logging").new(directory .. "../colors_plus_performance.log", runtime.generation,{mirror=false})

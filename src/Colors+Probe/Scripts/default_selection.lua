@@ -2,9 +2,6 @@
 -- the regular RGB preview. Restore the preview BEFORE re-equipping Default.
 -- No save APIs; two independent journals preserve the two cleanup obligations.
 local M={}
-local ACCENT="br.Customization.Slot.Character.Outfit.Torso.Color.Secondary"
-local NONE="CustomizationPartDefinition:CPD_H_Outfit_Color_None"
-local BLUE="CustomizationPartDefinition:CPD_H_Outfit_Color_Blue_14"
 local VM="^BitReactorCustomizationSlotViewModel /Engine/Transient%.GameEngine_%d+:BP_BrunoGameInstance_C_%d+%.BitReactorCustomizationSlotViewModel_%d+$"
 local PART="^BitReactorCustomizationPartViewModel /Engine/Transient%.GameEngine_%d+:BP_BrunoGameInstance_C_%d+%.BitReactorCustomizationPartViewModel_%d+$"
 local EMPTY_PART="^BitReactorNoneCustomizationPartViewModel /Engine/Transient%.GameEngine_%d+:BP_BrunoGameInstance_C_%d+%.BitReactorNoneCustomizationPartViewModel_%d+$"
@@ -18,7 +15,7 @@ function M.wrap(runtime,a,path,regular,base)
     local rules=assert(loadfile(directory .. "color_rules.lua"))()
     local lifetime=assert(loadfile(directory .. "creator_lifetime.lua"))().new(a)
     local function valid_tag(s) return type(s)=="string" and s:match("^br%.Customization%.Slot%.Character%.[%w_.]+$") end
-    local function is_default(s) return s==NONE or runtime.generic_colors and (s=="None:None" or s:match("_None$")~=nil) end
+    local function is_default(s) return s=="None:None" or s:match("_None$")~=nil end
     local self=setmetatable({}, {__index=function(_,key)
         if key=="pending" then return base.pending or (not held and selection) end
         if key=="blocked" then return blocked or base.blocked end
@@ -42,7 +39,7 @@ function M.wrap(runtime,a,path,regular,base)
         if a.live(value) and name(value)==full then return value end
         local class=full:match("^([^ ]+) ")
         assert(class=="BitReactorCustomizationSlotViewModel" or class=="BitReactorCustomizationPartViewModel"
-            or runtime.generic_colors and class=="BitReactorNoneCustomizationPartViewModel"
+            or class=="BitReactorNoneCustomizationPartViewModel"
             or class=="CustomizationInstance","Unsupported recovery class")
         for _,v in pairs(candidates(class,4096)) do
             if a.live(v) and name(v)==full then return v end
@@ -53,7 +50,7 @@ function M.wrap(runtime,a,path,regular,base)
     local lookup_revision=0
     local function selected()
         local revision=lookup_revision
-        if runtime.generic_colors and lookup_route then
+        if lookup_route then
             local route=lookup_route
             local ok,value=pcall(function()
                 assert(lifetime.page_active(route.creator,route.page),"Selected page changed")
@@ -79,7 +76,6 @@ function M.wrap(runtime,a,path,regular,base)
             end
         end
         found=object(found,"current customization slot")
-        if not runtime.generic_colors then return found end
         local active_page=page()
         local selected=targets.selected(found,active_page,root)
         local route={page=active_page,aux=aux_name,vm=name(found),tag=a.text(found.SlotTag.TagName),
@@ -97,57 +93,27 @@ function M.wrap(runtime,a,path,regular,base)
     end
     local function part(v,vm)
         v=object(v,"palette swatch")
-        local empty=runtime.generic_colors and name(v):match(EMPTY_PART) and id(v.AssetId)=="None:None"
+        local empty=name(v):match(EMPTY_PART) and id(v.AssetId)=="None:None"
             and name(v:GetClass())=="Class /Script/BitReactorGame.BitReactorNoneCustomizationPartViewModel"
         assert((name(v):match(PART) or empty) and outer(name(v))==outer(name(vm)),"Swatch game-instance mismatch")
         assert(empty or name(v:GetClass())=="Class /Script/BitReactorGame.BitReactorCustomizationPartViewModel","Unexpected swatch class")
         return v
     end
     local function first_swatch(vm)
-        if runtime.generic_colors then
-            local items,grid=targets.palette(vm,page())
-            for _,item in ipairs(items) do
-                if not is_default(item.asset) and rules.preview_asset(a.text(vm.SlotTag.TagName),item.asset) then
-                    return item.object,grid,item.index
-                end
-            end
-            error("No non-Default fallback swatch")
-        end
-        local found,grid_name,index
-        for _,widget in pairs(candidates("WBP_Customization_SelectionTiles_C",256)) do
-            if a.live(widget) and widget:IsVisible()
-                and a.text(a.prop(a.prop(widget,"CurrentSlotTag"),"TagName"))==ACCENT then
-                local grid=object(widget.PartsGridList,"stock swatch list")
-                local count=grid:GetNumItems()
-                assert(type(count)=="number" and count%1==0 and count>=0 and count<=1024,"Invalid swatch-list size")
-                local first,at,has_default
-                for i=0,count-1 do
-                    local item=part(grid:GetItemAt(i),vm)
-                    assert(grid:GetIndexForItem(item)==i,"Swatch-list ordering changed")
-                    local asset=id(item.AssetId)
-                    assert(asset:match("^CustomizationPartDefinition:CPD_H_Outfit_Color_[%w_]+$"),"Not an outfit-color palette")
-                    if asset==NONE then
-                        has_default=has_default or name(item)==name(vm.EquippedCustomizationPartViewModel)
-                    elseif not first then first,at=item,i end
-                end
-                if first and has_default then
-                    assert(not found,"Ambiguous active accent palette")
-                    found,grid_name,index=first,name(grid),at
-                end
+        local items,grid=targets.palette(vm,page())
+        for _,item in ipairs(items) do
+            if not is_default(item.asset) and rules.preview_asset(a.text(vm.SlotTag.TagName),item.asset) then
+                return item.object,grid,item.index
             end
         end
-        assert(found,"No verified Primary Accent swatch list with Default")
-        -- The regular path needs a different equipped swatch for its Blue_14
-        -- handoff. Refuse this unusual order rather than silently skip a color.
-        assert(id(found.AssetId)~=BLUE,"First stock swatch is the reserved Blue_14 preview donor")
-        return found,grid_name,index
+        error("No non-Default fallback swatch")
     end
     local function persist(s)
         local data=""
         if s then
-            local fields={s.tag and "selection-v2" or "selection-v1",s.slot_vm,s.default_vm,s.temp_vm,s.temp_part,
-                s.owner or "unbound",s.source_slot or "unbound",s.owner and "selected" or "selecting"}
-            if s.tag then assert(valid_tag(s.tag),"Invalid Default recovery tag"); fields[9]=s.tag end
+            assert(valid_tag(s.tag),"Invalid Default recovery tag")
+            local fields={"selection-v2",s.slot_vm,s.default_vm,s.temp_vm,s.temp_part,
+                s.owner or "unbound",s.source_slot or "unbound",s.owner and "selected" or "selecting",s.tag}
             data=table.concat(fields,"\n") .. "\n"
         end
         local f=assert(io.open(path,"w"),"Cannot write Default selection recovery")
@@ -155,7 +121,7 @@ function M.wrap(runtime,a,path,regular,base)
         local closed=f:close(); assert(ok,err); assert(closed~=false,"Cannot close Default selection recovery")
     end
     local function source_slot(owner,s)
-        return object(owner:GetSlotInstance({TagName=FName(s.tag or ACCENT)}),"source color slot")
+        return object(owner:GetSlotInstance({TagName=FName(s.tag)}),"source color slot")
     end
     local function verify_bound(s,vm)
         local owner=find(s.owner); local slot=source_slot(owner,s)
@@ -166,7 +132,7 @@ function M.wrap(runtime,a,path,regular,base)
         if #fragments==1 then f=object(fragments[1])
         else
             local bundle=assert(loadfile(directory .. "color_fragments.lua"))().new(a)
-            local primary=bundle.read(fragments,s.tag and {slot=s.tag} or nil)
+            local primary=bundle.read(fragments,{slot=s.tag})
             f=object(primary)
         end
         assert(name(f:GetOwningCustomizationInstance())==s.owner and name(f:GetOwningCustomizationSlot())==s.source_slot,
@@ -179,7 +145,7 @@ function M.wrap(runtime,a,path,regular,base)
         local ok,err=pcall(function()
             assert(not blocked and not base.blocked and not base.pending,"Finish RGB/legacy recovery before restoring Default")
             local vm=find(s.slot_vm)
-            assert(a.text(vm.SlotTag.TagName)==(s.tag or ACCENT),"Recorded Default slot changed")
+            assert(a.text(vm.SlotTag.TagName)==s.tag,"Recorded Default slot changed")
             local current=equipped(vm)
             local original=part(find(s.default_vm),vm)
             local default_asset=id(original.AssetId)
@@ -253,14 +219,14 @@ function M.wrap(runtime,a,path,regular,base)
             if not is_default(equipped(vm)) then session=base.begin_live(); return end
             local active_page=page()
             local slot_tag=a.text(vm.SlotTag.TagName)
-            assert(name(vm):match(VM) and (runtime.generic_colors and valid_tag(slot_tag) or slot_tag==ACCENT),"Select a color slot")
+            assert(name(vm):match(VM) and valid_tag(slot_tag),"Select a color slot")
             assert(equipped(vm)~="None:None" or rules.empty_editable_slot(slot_tag),"Empty slot is not a supported color zone")
-            if runtime.generic_colors then lifetime.bind(active_page) end
+            lifetime.bind(active_page)
             assert(#a.values(vm:GetFragments())==0,"Default has unexpected fragments")
             local original=part(vm.EquippedCustomizationPartViewModel,vm)
             local chosen,grid,index=first_swatch(vm)
             local s={slot_vm=name(vm),default_vm=name(original),temp_vm=name(chosen),temp_part=id(chosen.AssetId),
-                page=active_page,opening=true,tag=runtime.generic_colors and slot_tag or nil}
+                page=active_page,opening=true,tag=slot_tag}
             persist(s); selection=s -- durable intent BEFORE any editor mutation
             log("CALL | EquipCustomizationPart | temporary=" .. s.temp_part .. " | index=" .. index .. " | list=" .. grid)
             vm:EquipCustomizationPart(chosen)
@@ -304,21 +270,19 @@ function M.wrap(runtime,a,path,regular,base)
             if data~="" then
                 local ok,err=pcall(function()
                     local v={}; for line in data:gmatch("([^\n]*)\n") do v[#v+1]=line end
-                    local generic=#v==9 and v[1]=="selection-v2" and valid_tag(v[9])
-                    assert(#data<=16384 and data:sub(-1)=="\n" and (#v==8 and v[1]=="selection-v1" or generic)
-                        and v[2]:match(VM) and (v[3]:match(PART) or generic and v[3]:match(EMPTY_PART)
+                    assert(#data<=16384 and data:sub(-1)=="\n" and #v==9 and v[1]=="selection-v2" and valid_tag(v[9])
+                        and v[2]:match(VM) and (v[3]:match(PART) or v[3]:match(EMPTY_PART)
                             and rules.empty_editable_slot(v[9])) and v[4]:match(PART)
                         and outer(v[2])==outer(v[3]) and outer(v[2])==outer(v[4]) and v[3]~=v[4]
-                        and v[5]:match(generic and "^CustomizationPartDefinition:[%w_]+$" or "^CustomizationPartDefinition:CPD_H_Outfit_Color_[%w_]+$")
-                        and (not generic or rules.preview_asset(v[9],v[5]))
-                        and not is_default(v[5]) and (generic or v[5]~=BLUE),
+                        and v[5]:match("^CustomizationPartDefinition:[%w_]+$")
+                        and rules.preview_asset(v[9],v[5]) and not is_default(v[5]),
                         "Malformed Default selection recovery")
                     local bound=v[8]=="selected" and v[6]:match(OWNER)
                         and v[7]:sub(1,#("CustomizationFragmentInstanceSlot " .. v[6]:match("^[^ ]+ (.+)$") .. "."))
                             =="CustomizationFragmentInstanceSlot " .. v[6]:match("^[^ ]+ (.+)$") .. "."
                     assert(bound or v[8]=="selecting" and v[6]=="unbound" and v[7]=="unbound","Invalid selection recovery phase/owner")
                     selection={slot_vm=v[2],default_vm=v[3],temp_vm=v[4],temp_part=v[5],
-                        owner=bound and v[6] or nil,source_slot=bound and v[7] or nil,tag=generic and v[9] or nil}
+                        owner=bound and v[6] or nil,source_slot=bound and v[7] or nil,tag=v[9]}
                 end)
                 if not ok then blocked=tostring(err); log("RECOVERY BLOCKED | " .. blocked) end
             end
@@ -330,11 +294,9 @@ function M.wrap(runtime,a,path,regular,base)
             end)
         end
     end
-    for _,key in ipairs({"apply","apply_rgb","cycle_rgb","inspect"}) do
-        self[key]=function(...)
-            if selection or blocked then log("Finish Default selection recovery first"); return false end
-            return base[key](...)
-        end
+    function self.inspect(...)
+        if selection or blocked then log("Finish Default selection recovery first"); return false end
+        return base.inspect(...)
     end
     -- Inclusive per-layer opening time for the performance log; no behavior change.
     local timed_begin_live=self.begin_live

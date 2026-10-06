@@ -20,7 +20,7 @@ the player-only package.
   `open.clone`, `open.write_clone`, `open.install`, `open.verify_install`,
   `open.refresh`, `open.verify_refresh`, `open.verify_settled` and
   `open.journal`, plus inclusive per-layer `begin.zabrak`, `begin.editor`,
-  `begin.default_selection`, `begin.default_tint` and `begin.regular`.
+  `begin.default_selection` and `begin.regular`.
   Timing only; no behaviour change. The per-interval label budget is 192.
 - The Custom Color launcher is the game's CommonUI button (as used by the
   picker's Apply/Cancel) instead of a plain UMG Button polled for `IsPressed`
@@ -51,6 +51,29 @@ the player-only package.
 - The widget library lookup uses a plain validity check: `a.live` rejects
   class default objects by design (caught by the launcher test).
 
+### Flattening, steps 1-2: one code path — v0.3.0
+
+What players run is now the only path in the code and the tests (plan:
+`docs/flatten-plan.md`). About 1,000 production and 1,100 test lines removed.
+
+- Removed `default_tint`/`default_owner`, an unreachable Clone 8 "Default"
+  backend (`default_selection` always handled Default first).
+- Removed the `generic_colors` flag (always on) with the Clone 8 accent
+  resolution, the cyan and owner-level handoff modes, `apply_rgb`/`cycle_rgb`
+  and the RGB file reader, and the wrapper gates that only blocked them.
+- Journal readers accept only the formats this path writes (`proxy-v7`..`v12`,
+  `editor-v2`..`v7`, `selection-v2`). Older formats came only from the removed
+  path; previous-process journals are archived, never replayed.
+- Fixed: a preview install that changed nothing (`SetFragmentInstances`
+  no-op) left the palette donor hovered on rollback. Rollback in the
+  `installing` phase now resets the donor when the live fragment is the exact
+  donor object this session activated.
+- Tests: the install/restore safety cases from the legacy section run on the
+  donor path (`skin_test`); `tint_test` is generic-only (every supported
+  profile, Default integration, editor Apply on the real stack); the
+  Default-selection, editor and compatibility tests use realistic
+  active-page fixtures.
+
 ### Player/dev split and cleanup — v0.2.120
 
 - Separate player and dev builds. `ColorsPlus-Testers` contains only the
@@ -75,9 +98,7 @@ the player-only package.
   running status notes moved to `docs/status-history.md`. The tester guide
   no longer promises Dev Panel diagnostics.
 - Deliberately not changed yet: the `generic_colors` flag and legacy Clone 8
-  path. ~1,100 lines of core transaction tests (rollback, recovery, stale
-  callbacks, event ordering) still run through it; they move to the generic
-  path together with the planned wrapper-layer flattening.
+  path (removed in v0.3.0, after porting its transaction tests).
 
 ### Swatches ignore the mouse while the picker launches — v0.2.119
 

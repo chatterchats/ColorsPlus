@@ -238,7 +238,7 @@ io.open=function(p,mode)
 end
 os.rename=function(from,to) assert(files[from] and not files[to]); files[to],files[from]=files[from],nil; return true end
 os.remove=function(p) assert(files[p]); files[p]=nil; return true end
-local runtime={generic_colors=true,log=function(s) logs[#logs+1]=s end}
+local runtime={log=function(s) logs[#logs+1]=s end}
 function runtime:after(k,delay,fn) jobs[k]={fn=fn,delay=delay} end
 function runtime:cancel(k) jobs[k]=nil end
 local function run(k) local job=assert(jobs[k],k); jobs[k]=nil; job.fn() end
@@ -356,7 +356,7 @@ for instance,values in pairs(meshes) do
     all_meshes[instance]={}; for mesh,value in pairs(values) do all_meshes[instance][mesh]=value end
 end
 local function reset(case)
-    files={["rgb.txt"]="255,128,32"}; jobs={}; logs={}; absent_slot=nil; clone_alias=nil
+    files={}; jobs={}; logs={}; absent_slot=nil; clone_alias=nil
     layout=case[2]; donor_layout=case[5]
     route_zabrak=case[6]
     cross_target=case[7]=="0B1"
@@ -717,7 +717,6 @@ do
         assert(vm.EquippedCustomizationPartViewModel==stock and files.selection==nil,"HSV opening must never equip another preset")
         s=start(); arrays[owner][1].after_set=function() arrays[owner][1].after_set=nil; error("HSV Apply interrupted") end
         assert(not editor.apply_live(s)); original_matches(before); assert(not editor.applied and not editor.blocked)
-        n=writes; assert(not tint.apply_rgb() and writes==n,"RGB file inputs must not be written as HSV shifts")
         s=start(); local bad={R=181,G=0,B=0,A=1}; n=source_writes
         assert(not editor.update_live(s,bad) and source_writes==n and not tint.pending); original_matches(before)
     end

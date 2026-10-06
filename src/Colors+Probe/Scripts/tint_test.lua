@@ -1,14 +1,9 @@
--- Opt-in experiment: modify only a cloned fragment in the game's preview.
--- No SetColor on equipped fragments; no default, equip, or save calls.
+-- Preview session: activate a verified palette donor in the game's preview,
+-- then modify only a cloned fragment there. No SetColor on equipped
+-- fragments; no default, equip, or save calls. ("blue" names the donor
+-- record: the first donor was the stock Blue_14 swatch.)
 local M = {}
-local ACCENT = "br.Customization.Slot.Character.Outfit.Torso.Color.Secondary"
-local MESH = "br.Customization.Slot.Character.Outfit.Torso.Mesh"
-local CLONE8 = "CustomizationPartDefinition:CPD_H_Outfit_Clo001_TORS_TintF"
 local COLOR_CLASS = "Class /Script/BitReactorCore.CustomizationFragmentInstanceMaterialColor"
-local BLUE = "CustomizationPartDefinition:CPD_H_Outfit_Color_Blue_14"
--- Measured stock Blue_14, not an arbitrary replacement asset. Verify it live
--- before cyan; retain this baseline separately from the equipped source color.
-local BLUE_COLOR = {R=0, G=1/15, B=0.2, A=1}
 
 function M.new(runtime, access, recovery_path)
     local self = { busy = false, pending = nil }
@@ -50,7 +45,7 @@ function M.new(runtime, access, recovery_path)
         -- Do not infer callability from UE4SS's protected metatable. This is
         -- reached only inside protected game-thread inspect/apply/restore work.
         local ok, value = pcall(function()
-            local expected=profile and profile.slot or ACCENT
+            local expected=profile.slot
             local name = FName(expected)
             assert(a.text(name) == expected, "FName round-trip did not match selected slot")
             return {TagName = name}
@@ -80,9 +75,7 @@ function M.new(runtime, access, recovery_path)
         -- clone. Its stock RGB is checked separately before clone installation.
         return session.blue and not session.blue.materials and session.blue.original or session.original
     end
-    local function test_color(session)
-        return session.test_color or {R=0, G=1, B=1, A=session.original.A}
-    end
+    local function test_color(session) return session.test_color end
     local function asset_value(value)
         local kind, name = value:match("^([^:]+):(.+)$")
         return {PrimaryAssetType={Name=kind}, PrimaryAssetName=name}
@@ -93,46 +86,12 @@ function M.new(runtime, access, recovery_path)
     local function find_blue(c)
         local slot_name = a.name(c.slot)
         assert(allowed_slot_vm(slot_name), "Unsupported selected slot view model location")
-        if c.profile then
-            assert(rules.color(c.original,c.profile.slot,c.profile.parameter),"Unsupported source value/alpha")
-            local vm,asset=targets.donor(c.slot,c.page,c.profile)
-            return vm,{part=asset,original=c.original,slot_vm=slot_name,pending_baseline=true,
-                materials=target_module.donor_materials(c.profile,id(c.part.AssetId),asset)}
-        end
-        assert(id(c.part.AssetId) ~= BLUE, "Equip a red swatch, not the blue test swatch")
-        assert(c.original.A == 1, "Blue handoff requires an opaque equipped accent")
-        local outer = slot_name:match("^[^ ]+ (.+)%.BitReactorCustomizationSlotViewModel_%d+$")
-        local matches, count = {}, 0
-        for _, vm in pairs(FindAllOf("BitReactorCustomizationPartViewModel") or {}) do
-            count = count + 1; assert(count <= 2048, "Too many cached part view models")
-            if a.live(vm) and id(a.prop(vm,"AssetId")) == BLUE then
-                local path = a.name(vm):match("^BitReactorCustomizationPartViewModel (.+)%.BitReactorCustomizationPartViewModel_%d+$")
-                if path == outer then
-                    assert(a.name(object(vm:GetClass())) == "Class /Script/BitReactorGame.BitReactorCustomizationPartViewModel",
-                        "Unexpected blue view model class")
-                    matches[#matches+1] = vm
-                end
-            end
-        end
-        assert(#matches == 1, "Expected one cached Blue_14 view model in the selected slot's game instance")
-        return matches[1], {part=BLUE, original={R=BLUE_COLOR.R,G=BLUE_COLOR.G,B=BLUE_COLOR.B,A=1}, slot_vm=slot_name}
+        assert(rules.color(c.original,c.profile.slot,c.profile.parameter),"Unsupported source value/alpha")
+        local vm,asset=targets.donor(c.slot,c.page,c.profile)
+        return vm,{part=asset,original=c.original,slot_vm=slot_name,pending_baseline=true,
+            materials=target_module.donor_materials(c.profile,id(c.part.AssetId),asset)}
     end
-    local function target(fragment,profile)
-        if profile then return targets.target(fragment,profile) end
-        local t = a.prop(fragment, "MaterialTarget")
-        assert(a.text(a.prop(t, "MaterialParameterName")) == "Color 02", "Not the Color 02 accent target")
-        local tags = a.values(a.prop(a.prop(t, "SlotNameTagsToApply"), "GameplayTags"))
-        assert(#tags == 1 and tag(tags[1]) == MESH, "Target is not restricted to the torso mesh slot")
-        local materials, torso = {}, false
-        for _, value in ipairs(a.values(a.prop(t, "MaterialSlotNames"))) do
-            local name = a.text(value)
-            assert(name ~= "<unavailable>", "Unreadable material slot")
-            materials[#materials + 1] = name
-            torso = torso or name == "MI_TORS"
-        end
-        assert(torso, "Target does not include MI_TORS")
-        return table.concat(materials, ",")
-    end
+    local function target(fragment,profile) return targets.target(fragment,profile) end
     local function single_color(array,profile,stock_preview) return fragments.read(array,profile,stock_preview) end
     local function allowed_name(name)
         return type(name) == "string" and not name:find("[\r\n]")
@@ -182,26 +141,19 @@ function M.new(runtime, access, recovery_path)
             end
             assert(#selected == 1, "Current customization context is missing or ambiguous")
         end
-        local slot = selected[1]
-        if runtime.generic_colors then slot=targets.selected(slot,page_name,selected_root) end
-        if not runtime.generic_colors then
-            assert(tag(slot.SlotTag) == ACCENT, "Select Tops > Clone 8 > Primary Accent (not Main Color or Style)")
-        end
+        local slot = targets.selected(selected[1],page_name,selected_root)
         local part = object(slot.EquippedCustomizationPartViewModel)
         local fragment,_,skin_race,skin_scalar,description = timed("validate.source_fragments",function()
-            return single_color(slot:GetFragments(),runtime.generic_colors and {slot=tag(slot.SlotTag)} or nil)
+            return single_color(slot:GetFragments(),{slot=tag(slot.SlotTag)})
         end)
         local owner = object(fragment:GetOwningCustomizationInstance())
         assert(allowed_name(a.name(owner)), "First write test is restricted to the main-menu customization character")
         local source_slot = object(fragment:GetOwningCustomizationSlot())
         assert(tag(source_slot:GetSlotNameTag()) == tag(slot.SlotTag), "Fragment belongs to another slot")
         assert(a.name(object(owner:GetSlotInstance(slot.SlotTag))) == a.name(source_slot), "Slot owner mismatch")
-        local profile=runtime.generic_colors and timed("validate.source_profile",targets.read,fragment,tag(slot.SlotTag),owner,skin_race,skin_scalar,description) or nil
+        local profile=timed("validate.source_profile",targets.read,fragment,tag(slot.SlotTag),owner,skin_race,skin_scalar,description)
         local materials = timed("validate.source_target",target,fragment,profile)
-        if profile then timed("validate.source_meshes",targets.mesh,owner,profile) else
-            local mesh_tag = a.values(a.prop(a.prop(fragment.MaterialTarget, "SlotNameTagsToApply"), "GameplayTags"))[1]
-            assert(id(object(owner:GetSlotInstance(mesh_tag)):GetCustomizationPartPrimaryAssetId()) == CLONE8, "Equip Clone 8 before this test")
-        end
+        timed("validate.source_meshes",targets.mesh,owner,profile)
         assert(id(source_slot:GetCustomizationPartPrimaryAssetId()) == id(part.AssetId), "Equipped swatch/fragment mismatch")
         return {page = page_name, slot = slot, part = part, fragment = fragment, owner = owner, source_slot = source_slot,
             original = color(fragment), materials = materials, profile=profile,aux=aux_name}
@@ -215,7 +167,7 @@ function M.new(runtime, access, recovery_path)
         if binding and binding.epoch~=route_epoch then
             binding=nil; label="tint.resolve_fallback"
         end
-        if not binding and runtime.generic_colors and lookup_route then
+        if not binding and lookup_route then
             local route=lookup_route
             local ok,value=pcall(timed,"tint.resolve_lookup",resolve_impl,route)
             assert(revision==context_revision,"Context changed during lookup")
@@ -223,37 +175,32 @@ function M.new(runtime, access, recovery_path)
             lookup_route=nil
         end
         local c=timed(label,resolve_impl,binding)
-        if runtime.generic_colors then
-            local route={page=c.page,aux=c.aux,creator=binding and binding.creator or lifetime.bind(c.page),revision=revision,epoch=route_epoch}
-            assert(revision==context_revision,"Context changed during discovery")
-            lookup_route=route
-        end
+        local route={page=c.page,aux=c.aux,creator=binding and binding.creator or lifetime.bind(c.page),revision=revision,epoch=route_epoch}
+        assert(revision==context_revision,"Context changed during discovery")
+        lookup_route=route
         return c
     end
     local function resolve_proxy(c, blue, idle_baseline)
         local preview = object(c.owner:GetPreviewCustomizationInstance(), "linked preview instance")
         assert(allowed_preview(a.name(preview)) and a.name(preview) ~= a.name(c.owner), "No verified linked customization preview proxy")
-        local preview_slot = object(preview:GetSlotInstance(c.slot.SlotTag), "proxy Primary Accent slot")
+        local preview_slot = object(preview:GetSlotInstance(c.slot.SlotTag), "proxy color slot")
         assert(a.name(preview_slot) ~= a.name(c.source_slot), "Preview slot aliases the equipped slot")
-        assert(tag(preview_slot:GetSlotNameTag()) == (c.profile and c.profile.slot or ACCENT), "Proxy slot changed")
+        assert(tag(preview_slot:GetSlotNameTag()) == c.profile.slot, "Proxy slot changed")
         -- Exercise the exact reconstruction used by restore before any write.
         local recovery_slot = object(preview:GetSlotInstance(recovery_tag(c.profile)), "reconstructed recovery slot")
         assert(a.name(recovery_slot) == a.name(preview_slot), "Recovery slot lookup differs from selected proxy slot")
         log("Recovery lookup verified | FName round-trip and proxy slot match")
         local proxy_part, equipped_part = id(preview_slot:GetCustomizationPartPrimaryAssetId()), id(c.part.AssetId)
-        if c.profile and c.profile.skin_race then
+        if c.profile.skin_race then
             log("SKIN PROXY CHECK | phase=" .. (idle_baseline and "idle" or blue and "stock-preview" or "selected")
                 .. " | source=" .. equipped_part .. " | requested=" .. (blue and blue.part or equipped_part)
                 .. " | actual=" .. proxy_part)
         end
         assert(idle_baseline or proxy_part == (blue and blue.part or equipped_part), "Proxy is previewing a different swatch | proxy=" .. proxy_part .. " | equipped=" .. equipped_part)
-        if c.profile then targets.mesh(preview,c.profile) else
-            local mesh_tag = a.values(a.prop(a.prop(c.fragment.MaterialTarget, "SlotNameTagsToApply"), "GameplayTags"))[1]
-            assert(id(object(preview:GetSlotInstance(mesh_tag)):GetCustomizationPartPrimaryAssetId()) == CLONE8, "Proxy is previewing different armor")
-        end
+        targets.mesh(preview,c.profile)
         -- Idle proxy data may be a different stock skin shade/race tag; it is
         -- never adopted. The verified same-family donor replaces it first.
-        local existing = single_color(preview_slot:GetFragmentInstances(),idle_baseline and c.profile
+        local existing = single_color(preview_slot:GetFragmentInstances(),idle_baseline
             and c.profile.skin_race and {slot=c.profile.slot} or c.profile,blue~=nil or idle_baseline==true)
         assert(a.name(existing) ~= a.name(c.fragment), "Proxy fragment aliases equipped fragment")
         assert(a.name(object(existing:GetOwningCustomizationInstance())) == a.name(preview), "Proxy fragment owner mismatch")
@@ -265,7 +212,6 @@ function M.new(runtime, access, recovery_path)
     end
     local source_file = debug.getinfo(1, "S").source:gsub("^@", "")
     local handoff_module = assert(loadfile(assert(source_file:match("^(.*[/\\])")) .. "display_handoff.lua"))()
-    local rgb_input = assert(loadfile(assert(source_file:match("^(.*[/\\])")) .. "rgb_input.lua"))()
     local function inspect_display(instance, expected_color, materials, part,profile,stock_preview,uniform)
         local slot = object(instance:GetSlotInstance(recovery_tag(profile)))
         local fragment = single_color(slot:GetFragmentInstances(),profile,stock_preview)
@@ -274,20 +220,17 @@ function M.new(runtime, access, recovery_path)
             "Display fragment ownership mismatch")
         assert(target(fragment,profile) == materials and same_color(color(fragment), expected_color),
             "Display accent color/target mismatch")
-        if profile and profile.bundle and not stock_preview then
+        if profile.bundle and not stock_preview then
             assert(fragments.matches(fragment,profile,expected_color,not uniform),"Display companion colors differ")
         end
         assert(id(slot:GetCustomizationPartPrimaryAssetId()) == id(part), "Display accent swatch mismatch")
-        if profile then targets.mesh(instance,profile) else
-            local mesh_tag = a.values(a.prop(a.prop(fragment.MaterialTarget, "SlotNameTagsToApply"), "GameplayTags"))[1]
-            assert(id(object(instance:GetSlotInstance(mesh_tag)):GetCustomizationPartPrimaryAssetId()) == CLONE8,"Display mesh changed")
-        end
+        targets.mesh(instance,profile)
     end
     local handoff = handoff_module.new(runtime, a, inspect_display, targets.mesh)
     -- Read-only checkpoints: reacquire the linked slot, then log every field
     -- independently so an identity mismatch cannot hide its color or target.
     -- All UObject references remain local to this game-thread action.
-    local function verify_checkpoint(stage, c, expected, cyan, accept_installed_copy)
+    local function verify_checkpoint(stage, c, expected, chosen, accept_installed_copy)
         local read_failed = false
         local function read(field, getter, display)
             local ok, value = pcall(getter)
@@ -335,7 +278,7 @@ function M.new(runtime, access, recovery_path)
         local materials = read("materials", function() return target(checked_fragment(),c.profile) end)
         local current_color = read("linear_rgba", function() return color(checked_fragment()) end, rgba)
         read("companion_colors",function()
-            assert(fragments.matches(checked_fragment(),c.profile,cyan),"Installed companion colors differ")
+            assert(fragments.matches(checked_fragment(),c.profile,chosen),"Installed companion colors differ")
             return "verified"
         end)
         -- Audit the equipped fragment even when preview verification fails.
@@ -358,7 +301,7 @@ function M.new(runtime, access, recovery_path)
             {"preview", a.name(preview) == expected.preview}, {"slot", a.name(slot) == expected.slot},
             {"part", part == expected.part}, {"fragment", fragment_name == expected.fragment or not not installed_copy},
             {"owner", owner == expected.preview}, {"target", materials == expected.materials},
-            {"color", current_color ~= nil and same_color(current_color, cyan)},
+            {"color", current_color ~= nil and same_color(current_color, chosen)},
             {"source", a.name(source) == expected.source and source_color ~= nil and same_color(source_color, expected.original)},
             {"fragment_slot", fragment_slot == expected.slot},
         }
@@ -377,49 +320,37 @@ function M.new(runtime, access, recovery_path)
         local ok, err = pcall(function()
             local data = ""
             if session then
-                local fields = {session.previous_color and "proxy-v6" or session.test_color and "proxy-v5" or session.blue and "proxy-v4" or session.handoff and "proxy-v3" or "proxy-v2", session.owner, session.preview, session.fragment, session.part, session.materials,
-                    string.format("%.17g,%.17g,%.17g,%.17g", session.original.R, session.original.G, session.original.B, session.original.A),
-                    session.phase or "owned"}
-                if session.handoff then
-                    fields[9], fields[10] = session.handoff.container, session.handoff.display
-                end
-                if session.blue then
-                    fields[11], fields[12], fields[13] = session.blue.part,
-                        string.format("%.17g,%.17g,%.17g,%.17g", session.blue.original.R, session.blue.original.G, session.blue.original.B, session.blue.original.A),
-                        session.blue.slot_vm
-                end
+                assert(target_module.valid(session.profile),"Invalid recovery target profile")
+                assert(session.handoff and session.blue,"Preview sessions always own a donor handoff")
+                local function encode(c) return string.format("%.17g,%.17g,%.17g,%.17g", c.R, c.G, c.B, c.A) end
+                local fields = {"proxy-v7", session.owner, session.preview, session.fragment, session.part, session.materials,
+                    encode(session.original), session.phase or "owned", session.handoff.container, session.handoff.display,
+                    session.blue.part, encode(session.blue.original), session.blue.slot_vm, "", "",
+                    session.profile.slot, session.profile.parameter, session.profile.mesh, session.profile.asset,
+                    session.blue.pending_baseline and "pending" or "verified"}
                 if session.test_color then
-                    assert(session.blue and rules.color(session.test_color,session.profile and session.profile.slot,session.profile and session.profile.parameter)
+                    assert(rules.color(session.test_color,session.profile.slot,session.profile.parameter)
                         and session.test_color.A==session.original.A, "Invalid custom RGB session")
-                    fields[14] = string.format("%.17g,%.17g,%.17g,%.17g",
-                        session.test_color.R, session.test_color.G, session.test_color.B, session.test_color.A)
+                    fields[14] = encode(session.test_color)
                 end
                 if session.previous_color then
                     assert(session.test_color and session.phase == "owned"
-                        and rules.color(session.previous_color,session.profile and session.profile.slot,session.profile and session.profile.parameter)
+                        and rules.color(session.previous_color,session.profile.slot,session.profile.parameter)
                         and session.previous_color.A==session.original.A, "Invalid RGB transition")
-                    fields[15] = string.format("%.17g,%.17g,%.17g,%.17g",
-                        session.previous_color.R, session.previous_color.G, session.previous_color.B, session.previous_color.A)
+                    fields[15] = encode(session.previous_color)
                 end
-                if session.profile then
-                    assert(target_module.valid(session.profile),"Invalid recovery target profile")
-                    fields[1]="proxy-v7"
-                    for i=9,15 do fields[i]=fields[i] or "" end
-                    fields[16],fields[17],fields[18],fields[19]=session.profile.slot,session.profile.parameter,session.profile.mesh,session.profile.asset
-                    fields[20]=session.blue and session.blue.pending_baseline and "pending" or "verified"
-                    if session.profile.targets then
-                        fields[1]="proxy-v8"; fields[21]=target_module.encode_targets(session.profile)
-                    end
-                    if session.profile.skin_race then fields[1]="proxy-v9"; fields[22]=session.profile.skin_race end
-                    if session.profile.skin_scalar then fields[1]="proxy-v10"; fields[23]=session.profile.skin_scalar end
-                    if session.profile.bundle then
-                        fields[1]="proxy-v11"; fields[21]=session.profile.targets and target_module.encode_targets(session.profile) or ""
-                        fields[22]=session.profile.bundle
-                        if session.blue.materials then
-                            assert(session.blue.materials==target_module.donor_materials(session.profile,session.part,session.blue.part),
-                                "Unverified cross-target donor record")
-                            fields[1]="proxy-v12"; fields[23]=session.blue.materials
-                        end
+                if session.profile.targets then
+                    fields[1]="proxy-v8"; fields[21]=target_module.encode_targets(session.profile)
+                end
+                if session.profile.skin_race then fields[1]="proxy-v9"; fields[22]=session.profile.skin_race end
+                if session.profile.skin_scalar then fields[1]="proxy-v10"; fields[23]=session.profile.skin_scalar end
+                if session.profile.bundle then
+                    fields[1]="proxy-v11"; fields[21]=session.profile.targets and target_module.encode_targets(session.profile) or ""
+                    fields[22]=session.profile.bundle
+                    if session.blue.materials then
+                        assert(session.blue.materials==target_module.donor_materials(session.profile,session.part,session.blue.part),
+                            "Unverified cross-target donor record")
+                        fields[1]="proxy-v12"; fields[23]=session.blue.materials
                     end
                 end
                 data = table.concat(fields, "\n") .. "\n"
@@ -454,14 +385,14 @@ function M.new(runtime, access, recovery_path)
                 local slot = object(preview:GetSlotInstance(recovery_tag(session.profile)))
                 local values = a.values(slot:GetFragmentInstances())
                 local current = values[1]
-                local skin_stock=session.profile and (session.profile.skin_race or session.profile.bundle) and session.blue
+                local skin_stock=(session.profile.skin_race or session.profile.bundle)
                     and (session.phase=="handoff" or session.phase=="prepared")
-                if session.profile and (session.profile.skin_race or session.profile.bundle)
+                if (session.profile.skin_race or session.profile.bundle)
                     and not (session.blue and session.blue.pending_baseline)
                     and id(slot:GetCustomizationPartPrimaryAssetId())==preview_part(session) then
                     current=single_color(values,session.profile,skin_stock and true or nil)
                 end
-                if session.blue and session.blue.pending_baseline then
+                if session.blue.pending_baseline then
                     -- Only stock preview activation has happened. No clone or
                     -- color write is permitted before its baseline is durable.
                     assert(session.phase=="handoff","Invalid unverified donor phase")
@@ -475,7 +406,7 @@ function M.new(runtime, access, recovery_path)
                         and target(current,session.profile)==(session.blue.materials or session.materials)
                         and same_color(color(current),session.blue.original),"Skin donor changed before reset; recovery retained")
                     may_reset=true
-                elseif (#values == 1 or session.profile and (session.profile.skin_race or session.profile.bundle)) and a.live(current) and a.name(current) == session.fragment
+                elseif (#values == 1 or session.profile.skin_race or session.profile.bundle) and a.live(current) and a.name(current) == session.fragment
                     and id(slot:GetCustomizationPartPrimaryAssetId()) == preview_part(session) then
                     assert(a.name(object(current:GetClass())) == COLOR_CLASS, "Owned clone class changed")
                     assert(a.name(object(current:GetOwningCustomizationInstance())) == session.preview
@@ -517,7 +448,7 @@ function M.new(runtime, access, recovery_path)
                             "Untracked non-original fragment; no object modified; recovery retained")
                         log("Live slot already has original color; no fragment modified | " .. reason)
                         -- Activation may rebuild the stock fragment before cloning.
-                        -- Only the pre-cyan handoff phase may own that original copy,
+                        -- Only the pre-write handoff phase may own that original copy,
                         -- or an install that changed nothing: the exact donor object
                         -- this session activated, still at its baseline color.
                         may_reset = session.phase == "handoff" or session.phase == "prepared"
@@ -527,15 +458,12 @@ function M.new(runtime, access, recovery_path)
                         log("Owned swatch already replaced; no current fragment modified | " .. reason)
                     end
                 end
-                if session.handoff then
-                    handoff.restore(session, owner, preview, may_reset, function(instance)
+                handoff.restore(session, owner, preview, may_reset, function(instance)
                         local source_slot = object(owner:GetSlotInstance(recovery_tag(session.profile)))
                         local source = single_color(source_slot:GetFragmentInstances(),session.profile)
-                        if session.blue then
-                            assert(id(source_slot:GetCustomizationPartPrimaryAssetId()) == session.part
-                                and same_color(color(source), session.original) and target(source,session.profile) == session.materials,
-                                "Equipped source changed during blue cleanup; recovery retained")
-                        end
+                        assert(id(source_slot:GetCustomizationPartPrimaryAssetId()) == session.part
+                            and same_color(color(source), session.original) and target(source,session.profile) == session.materials,
+                            "Equipped source changed during blue cleanup; recovery retained")
                         inspect_display(instance, color(source), target(source,session.profile), source_slot:GetCustomizationPartPrimaryAssetId(),session.profile)
                     end, function()
                         -- Rebind the recorded slot VM, including after Lua reload.
@@ -549,7 +477,7 @@ function M.new(runtime, access, recovery_path)
                             end
                         end
                         vm = object(vm, "recorded blue slot VM")
-                        assert(tag(vm.SlotTag) == (session.profile and session.profile.slot or ACCENT), "Preview reset slot tag changed")
+                        assert(tag(vm.SlotTag) == session.profile.slot, "Preview reset slot tag changed")
                         local source = single_color(vm:GetFragments(),session.profile)
                         assert(a.name(object(source:GetOwningCustomizationInstance())) == session.owner
                             and id(object(vm.EquippedCustomizationPartViewModel).AssetId) == session.part
@@ -557,7 +485,6 @@ function M.new(runtime, access, recovery_path)
                             "Blue reset source/swatch changed; recovery retained")
                         vm:ResetPreviewedPart()
                     end)
-                end
             else
                 log("Owned preview already replaced/cleared; no other preview modified | " .. reason)
             end
@@ -571,10 +498,8 @@ function M.new(runtime, access, recovery_path)
         draft_route,draft_owner=nil,nil
         self.busy = true
         local ok, err = pcall(function()
-            -- Invalidate the sequence even if engine cancellation or cleanup
-            -- fails. A retained recovery record must never resume cycling.
-            if self.pending then self.pending.cycle = nil; self.pending.live = nil end
-            runtime:cancel("tint:rgb-cycle")
+            -- End the draft even if engine cancellation or cleanup fails.
+            if self.pending then self.pending.live = nil end
             runtime:cancel("tint:handoff-check")
             runtime:cancel("tint:timeout")
             restore_impl(reason or "panel")
@@ -627,7 +552,7 @@ function M.new(runtime, access, recovery_path)
         local baseline = session.context
         assert(session.phase == "owned" and baseline, "No active-test context baseline")
         local c = resolve(binding)
-        assert(not session.profile or target_module.same(c.profile,session.profile),"Selected target profile changed")
+        assert(target_module.same(c.profile,session.profile),"Selected target profile changed")
         assert(c.page == baseline.page, "Active customization page changed")
         assert(a.name(c.slot) == baseline.slot_vm, "Selected slot view model changed")
         assert(a.name(c.owner) == session.owner, "Customization character changed")
@@ -640,7 +565,7 @@ function M.new(runtime, access, recovery_path)
         local preview = object(c.owner:GetPreviewCustomizationInstance(), "context preview")
         assert(a.name(preview) == session.preview, "Linked preview changed")
         local slot = object(preview:GetSlotInstance(c.slot.SlotTag), "context preview slot")
-        assert(a.name(slot) == baseline.preview_slot and tag(slot:GetSlotNameTag()) == (session.profile and session.profile.slot or ACCENT),
+        assert(a.name(slot) == baseline.preview_slot and tag(slot:GetSlotNameTag()) == session.profile.slot,
             "Preview accent slot changed")
         assert(id(slot:GetCustomizationPartPrimaryAssetId()) == preview_part(session), "Preview accent swatch changed")
         local fragment = timed("validate.preview_fragments",function()
@@ -655,11 +580,8 @@ function M.new(runtime, access, recovery_path)
                 and same_color(color(fragment), test_color(session)),
                 "Tracked preview color/target changed")
         end)
-        if session.profile then timed("validate.preview_meshes",targets.mesh,preview,session.profile) else
-            local mesh_tag = a.values(a.prop(a.prop(c.fragment.MaterialTarget, "SlotNameTagsToApply"), "GameplayTags"))[1]
-            assert(id(object(preview:GetSlotInstance(mesh_tag)):GetCustomizationPartPrimaryAssetId()) == CLONE8,"Preview armor changed")
-        end
-        if session.handoff then timed("validate.display_links",handoff.verify,session,c.owner,preview) end
+        timed("validate.preview_meshes",targets.mesh,preview,session.profile)
+        timed("validate.display_links",handoff.verify,session,c.owner,preview)
         return c,preview,slot,fragment
     end
     local function verify_live_context(session)
@@ -684,7 +606,7 @@ function M.new(runtime, access, recovery_path)
             local verified, failure = pcall(function()
                 local live = verify_live_context(session)
                 handoff.verify(session, live.owner, object(live.owner:GetPreviewCustomizationInstance()),
-                    test_color(session), session.materials, session.blue and asset_value(session.blue.part) or live.part.AssetId)
+                    test_color(session), session.materials, asset_value(session.blue.part))
             end)
             if not verified then
                 log("HANDOFF VERIFICATION FAILED | " .. tostring(failure))
@@ -696,7 +618,7 @@ function M.new(runtime, access, recovery_path)
     end
     local function update_owned_color(session, chosen)
         assert(self.pending == session and session.phase == "owned", "Preview session changed")
-        assert(session.blue and session.test_color and rules.input_color(chosen,session.profile and session.profile.slot,session.profile and session.profile.parameter)
+        assert(session.test_color and rules.input_color(chosen,session.profile.slot,session.profile.parameter)
             and (chosen.A==1 or chosen.A==session.original.A), "Invalid live color")
         assert(not session.force_restore_reason, "Context event already requested restore")
         local revision=(session.color_revision or 0)+1
@@ -741,14 +663,13 @@ function M.new(runtime, access, recovery_path)
         end
         return binding -- returned reader scope stays synchronous; internal hint is draft-owned
     end
-    function self.apply(use_handoff, requested_color, input_mode)
+    local function apply(requested_color, input_mode)
         if runtime.skin_target and (runtime.skin_target.pending or runtime.skin_target.blocked) then
             log("REFUSED | Stop/recover colors_target first"); return false
         end
         if runtime.eye_preview and (runtime.eye_preview.pending or runtime.eye_preview.blocked) then
             log("APPLY REFUSED | Stop/restore the eye probe first"); return
         end
-        if runtime.generic_colors then use_handoff="blue" end -- dynamic targets require the verified display handoff
         if self.blocked then log("APPLY REFUSED | " .. self.blocked); return end
         if self.pending then log("APPLY REFUSED | Restore the previous test first"); return end
         self.busy = true
@@ -768,23 +689,18 @@ function M.new(runtime, access, recovery_path)
                     for _,key in ipairs({"R","G","B"}) do requested_color[key]=math.min(1,math.max(0,requested_color[key])) end
                 end
             end
-            local custom
-            if requested_color ~= nil then
-                assert(use_handoff == "blue" and rules.input_color(requested_color,c.profile and c.profile.slot,c.profile and c.profile.parameter)
-                    and requested_color.A == 1,"Invalid custom RGB/HSV input")
-                custom = {R=requested_color.R,G=requested_color.G,B=requested_color.B,A=1}
+            assert(requested_color ~= nil and rules.input_color(requested_color,c.profile.slot,c.profile.parameter)
+                and requested_color.A == 1,"Invalid custom RGB/HSV input")
+            -- RGB controls preserve the native source alpha.
+            local custom = {R=requested_color.R,G=requested_color.G,B=requested_color.B,A=c.original.A}
+            local creator=timed("opening.bind_creator",lifetime.bind,c.page)
+            if revision==context_revision then
+                opening_route={page=c.page,aux=c.aux,creator=creator,revision=revision,epoch=route_epoch}
             end
-            if custom then custom.A=c.original.A end -- RGB controls preserve the native source alpha.
-            if c.profile then
-                local creator=timed("opening.bind_creator",lifetime.bind,c.page)
-                if revision==context_revision then
-                    opening_route={page=c.page,aux=c.aux,creator=creator,revision=revision,epoch=route_epoch}
-                end
-            end
-            local handoff_record, blue, blue_vm
-            if c.profile then
-                -- Palette/creator/source are verified before resetting anything.
-                blue_vm, blue = timed("opening.donor",find_blue,c)
+            -- Palette/creator/source are verified before resetting anything.
+            local blue_vm, blue = timed("opening.donor",find_blue,c)
+            local handoff_record
+            do
                 local preview = object(c.owner:GetPreviewCustomizationInstance())
                 assert(allowed_preview(a.name(preview)), "Unsupported preview proxy")
                 handoff_record = timed("open.settle", handoff.settle_selected, c, preview, function(instance)
@@ -806,51 +722,45 @@ function M.new(runtime, access, recovery_path)
             end
             -- An inactive proxy can retain the last native hovered swatch. It
             -- is not the visible baseline and will be replaced by our donor.
-            local preview, preview_slot, existing = timed("open.proxy", resolve_proxy, c, nil, c.profile~=nil)
-            trace("capture", custom and "before custom RGB" or "before cyan")
-            assert(c.profile and rules.color(c.original,c.profile.slot,c.profile.parameter)
-                or not c.profile and rules.normalized(c.original),"Unsupported original value")
+            local preview, preview_slot, existing = timed("open.proxy", resolve_proxy, c, nil, true)
+            trace("capture", "before custom RGB")
+            assert(rules.color(c.original,c.profile.slot,c.profile.parameter),"Unsupported original value")
             -- Check file access before any color write.
             timed("open.journal", persist, nil)
-            if use_handoff then
-                handoff_record = timed("open.prepare", handoff.prepare, c, preview)
-                if use_handoff == "blue" and not blue then blue_vm, blue = find_blue(c) end
-                assert(clone_name_for(a.name(preview), a.name(existing)), "Unexpected stock preview fragment location")
-                self.pending = {owner=a.name(c.owner), preview=a.name(preview), fragment=a.name(existing),
-                    part=id(c.part.AssetId), materials=c.materials, original=c.original, phase="handoff", handoff=handoff_record, blue=blue, test_color=custom,profile=c.profile}
-                timed("open.journal", persist, self.pending) -- activation intent must survive a throw/reload
-                if c.profile and c.profile.skin_race then
-                    log("SKIN DONOR | ACTIVATE | source=" .. self.pending.part .. " | donor=" .. blue.part)
-                end
-                timed("open.activate", handoff.activate, self.pending, c, preview, blue_vm)
-                preview, preview_slot, existing = timed("open.proxy_donor", resolve_proxy, c, blue)
-                assert(a.name(preview) == self.pending.preview, "Activation replaced data proxy")
-                if blue and blue.pending_baseline then
-                    local measured=color(existing)
-                    assert(rules.color(measured,c.profile and c.profile.slot,c.profile and c.profile.parameter),"Unsupported donor baseline value/alpha")
-                    -- Verify the displayed copy as well as the preview data,
-                    -- then journal the measured baseline before any color write.
-                    timed("open.verify_display", handoff.verify, self.pending,c.owner,preview,measured,blue.materials or c.materials,blue_vm.AssetId)
-                    blue.original=measured; blue.pending_baseline=nil
-                    self.pending.fragment=a.name(existing)
-                    timed("open.journal", persist, self.pending)
-                    log("PALETTE DONOR VERIFIED | " .. blue.part .. " | " .. rgba(measured)
-                        .. " | donor_materials=" .. (blue.materials or c.materials) .. " | source_materials=" .. c.materials)
-                end
-                if blue then
-                    timed("open.verify_display", handoff.verify, self.pending, c.owner, preview, blue.original, blue.materials or c.materials, blue_vm.AssetId)
-                    -- Activation is not allowed to mutate the equipped source.
-                    local checked = timed("opening.after_activation",resolve,opening_route)
-                    assert(a.name(checked.owner) == a.name(c.owner) and a.name(checked.fragment) == a.name(c.fragment)
-                        and id(checked.part.AssetId) == id(c.part.AssetId) and same_color(checked.original,c.original),
-                        "Blue activation changed equipped source")
-                    assert(fragments.matches(checked.fragment,c.profile,c.original,true),"Donor activation changed source companion colors")
-                    log("BLUE BASELINE VERIFIED | preview_part=" .. blue.part .. " | preview_rgba=" .. rgba(blue.original)
-                        .. " | equipped_part=" .. id(c.part.AssetId) .. " | equipped_rgba=" .. rgba(c.original))
-                end
+            handoff_record = timed("open.prepare", handoff.prepare, c, preview)
+            assert(clone_name_for(a.name(preview), a.name(existing)), "Unexpected stock preview fragment location")
+            self.pending = {owner=a.name(c.owner), preview=a.name(preview), fragment=a.name(existing),
+                part=id(c.part.AssetId), materials=c.materials, original=c.original, phase="handoff", handoff=handoff_record, blue=blue, test_color=custom,profile=c.profile}
+            timed("open.journal", persist, self.pending) -- activation intent must survive a throw/reload
+            if c.profile.skin_race then
+                log("SKIN DONOR | ACTIVATE | source=" .. self.pending.part .. " | donor=" .. blue.part)
             end
+            timed("open.activate", handoff.activate, self.pending, c, preview, blue_vm)
+            preview, preview_slot, existing = timed("open.proxy_donor", resolve_proxy, c, blue)
+            assert(a.name(preview) == self.pending.preview, "Activation replaced data proxy")
+            if blue.pending_baseline then
+                local measured=color(existing)
+                assert(rules.color(measured,c.profile.slot,c.profile.parameter),"Unsupported donor baseline value/alpha")
+                -- Verify the displayed copy as well as the preview data,
+                -- then journal the measured baseline before any color write.
+                timed("open.verify_display", handoff.verify, self.pending,c.owner,preview,measured,blue.materials or c.materials,blue_vm.AssetId)
+                blue.original=measured; blue.pending_baseline=nil
+                self.pending.fragment=a.name(existing)
+                timed("open.journal", persist, self.pending)
+                log("PALETTE DONOR VERIFIED | " .. blue.part .. " | " .. rgba(measured)
+                    .. " | donor_materials=" .. (blue.materials or c.materials) .. " | source_materials=" .. c.materials)
+            end
+            timed("open.verify_display", handoff.verify, self.pending, c.owner, preview, blue.original, blue.materials or c.materials, blue_vm.AssetId)
+            -- Activation is not allowed to mutate the equipped source.
+            local checked = timed("opening.after_activation",resolve,opening_route)
+            assert(a.name(checked.owner) == a.name(c.owner) and a.name(checked.fragment) == a.name(c.fragment)
+                and id(checked.part.AssetId) == id(c.part.AssetId) and same_color(checked.original,c.original),
+                "Blue activation changed equipped source")
+            assert(fragments.matches(checked.fragment,c.profile,c.original,true),"Donor activation changed source companion colors")
+            log("BLUE BASELINE VERIFIED | preview_part=" .. blue.part .. " | preview_rgba=" .. rgba(blue.original)
+                .. " | equipped_part=" .. id(c.part.AssetId) .. " | equipped_rgba=" .. rgba(c.original))
             local clone, clones = timed("open.clone", function() return single_color(c.slot:CloneFragments(preview_slot),c.profile) end)
-            if c.profile and (c.profile.skin_race or c.profile.bundle) then
+            if c.profile.skin_race or c.profile.bundle then
                 fragments.distinct(clones,c.slot:GetFragments(),preview_slot:GetFragmentInstances())
                 log("TINT BUNDLE VERIFIED | complete clone array; companion fragments preserved")
             end
@@ -873,7 +783,7 @@ function M.new(runtime, access, recovery_path)
             local chosen = test_color(self.pending)
             timed("open.write_clone", fragments.write, clone, c.profile, chosen, clones)
             assert(same_color(color(clone), chosen), "Clone SetColor readback did not match")
-            if c.profile and c.profile.skin_race then fragments.read(clones,c.profile) end
+            if c.profile.skin_race then fragments.read(clones,c.profile) end
             log("CLONE COLOR VERIFIED | linear_rgba=" .. rgba(chosen) .. " | original_linear_rgba=" .. rgba(c.original))
             self.pending.phase = "installing"
             timed("open.journal", persist, self.pending)
@@ -893,14 +803,12 @@ function M.new(runtime, access, recovery_path)
             runtime:after("tint:timeout", 15000, function()
                 if self.pending == session and not session.live then self.restore("15-second timeout") end
             end)
-            if session.handoff then
-                timed("open.verify_settled", handoff.verify, session, c.owner, preview)
-                schedule_display_check(session)
-            end
-            log("PREVIEW APPLIED | " .. (custom and "custom_linear_rgba=" or "cyan_linear_rgba=") .. rgba(chosen) .. " | original_linear_rgba=" .. rgba(c.original)
+            timed("open.verify_settled", handoff.verify, session, c.owner, preview)
+            schedule_display_check(session)
+            log("PREVIEW APPLIED | custom_linear_rgba=" .. rgba(chosen) .. " | original_linear_rgba=" .. rgba(c.original)
                 .. " | source unchanged | preview=" .. session.preview .. " | auto-restore=15s | visual confirmation required")
-            trace("capture", custom and "after custom RGB refresh" or "after cyan refresh")
-            trace("event", custom and "custom RGB settled" or "cyan settled")
+            trace("capture", "after custom RGB refresh")
+            trace("event", "custom RGB settled")
         end)
         if not ok then
             log("APPLY REFUSED/FAILED | " .. tostring(err))
@@ -911,19 +819,9 @@ function M.new(runtime, access, recovery_path)
         self.busy = false
         return ok
     end
-    function self.apply_rgb()
-        if self.blocked or self.pending then log("RGB APPLY REFUSED | Resolve pending/blocked recovery first"); return end
-        -- Read afresh per click. File edits during a test never change its
-        -- intended color or recovery baseline.
-        local path = recovery_path:gsub("[^/\\]+$", "rgb.txt")
-        local ok, chosen, input = pcall(rgb_input.read, path)
-        if not ok then log("RGB APPLY REFUSED | " .. tostring(chosen)); return end
-        log("RGB INPUT | srgb_255=" .. input .. " | linear_rgba=" .. rgba(chosen))
-        return self.apply("blue", chosen)
-    end
     function self.begin_live()
         draft_route,draft_owner=nil,nil
-        if not self.apply("blue",nil,"selected") then return nil end
+        if not apply(nil,"selected") then return nil end
         local session = self.pending
         local ok, err = pcall(function()
             assert(session and session.phase == "owned" and session.test_color, "No owned picker preview")
@@ -992,60 +890,6 @@ function M.new(runtime, access, recovery_path)
         assert(type(consumer)=="function","Update consumer required")
         return update_live(session,chosen,consumer)
     end
-    function self.cycle_rgb()
-        if self.blocked or self.pending then log("RGB CYCLE REFUSED | Resolve pending/blocked recovery first"); return end
-        -- The first color remains file-configurable; all colors are snapshotted
-        -- before scheduling. Later file edits cannot alter a running sequence.
-        if not self.apply_rgb() then return end
-        local session = self.pending
-        if not session or session.phase ~= "owned" or not session.test_color then return end
-        local sequence = {index=1, colors={session.test_color,
-            rgb_input.parse("160,64,224"), (rgb_input.parse("64,208,112"))},
-            labels={"configured RGB", "violet 160,64,224", "green 64,208,112"}}
-        session.cycle = sequence
-        local function schedule_next()
-            local expected_index = sequence.index
-            runtime:after("tint:rgb-cycle", 5000, function()
-                if self.pending ~= session or session.cycle ~= sequence or sequence.index ~= expected_index then return end
-                if sequence.index == #sequence.colors then
-                    log("RGB CYCLE COMPLETE | 3 colors; restoring equipped appearance")
-                    self.restore("RGB cycle complete (3 x 5 seconds)")
-                    return
-                end
-                self.busy = true
-                local ok, err = pcall(function()
-                    local next_index = sequence.index + 1
-                    -- Journal both accepted colors before touching the owned
-                    -- installed fragment: reload can happen on either side of
-                    -- SetColor. Never re-equip, re-clone or reopen the handoff.
-                    update_owned_color(session, sequence.colors[next_index])
-                    sequence.index = next_index
-                    log("RGB CYCLE STEP | " .. next_index .. "/3 | " .. sequence.labels[next_index]
-                        .. " | linear_rgba=" .. rgba(session.test_color) .. " | hold=5s | source unchanged")
-                    schedule_next()
-                    trace("event", "RGB cycle step " .. next_index)
-                end)
-                self.busy = false
-                if not ok then
-                    log("RGB CYCLE FAILED | " .. tostring(err))
-                    self.restore("RGB cycle failed")
-                end
-            end)
-        end
-        local ok, err = pcall(function()
-            -- One fixed watchdog, never extended by color updates. Normal
-            -- completion restores five seconds after the third color.
-            runtime:after("tint:timeout", 20000, function()
-                if self.pending == session then self.restore("RGB cycle 20-second safety timeout") end
-            end)
-            log("RGB CYCLE STEP | 1/3 | configured RGB | linear_rgba=" .. rgba(session.test_color) .. " | hold=5s")
-            schedule_next()
-        end)
-        if not ok then
-            log("RGB CYCLE FAILED | " .. tostring(err))
-            self.restore("RGB cycle scheduling failed")
-        end
-    end
     function self.invalidate_context_lookup(reason)
         context_revision=context_revision+1
         if rules.structural_context(reason) then
@@ -1104,10 +948,6 @@ function M.new(runtime, access, recovery_path)
                     if not number or number ~= number or math.abs(number)==math.huge or blue_count > 4 then blue_count = -1; break end
                     blue_original[({"R","G","B","A"})[blue_count]] = number
                 end
-                local blue_ok = fields[11] == BLUE and blue_count == 4
-                    and (fields[12] or ""):match("^[^,]+,[^,]+,[^,]+,[^,]+$")
-                    and same_color(blue_original, BLUE_COLOR) and allowed_slot_vm(fields[13] or "")
-                    and fields[5] ~= BLUE and original.A == 1
                 local requested, requested_count = {}, 0
                 for value in (fields[14] or ""):gmatch("[^,]+") do
                     requested_count = requested_count + 1
@@ -1152,35 +992,16 @@ function M.new(runtime, access, recovery_path)
                     and (fields[20]=="verified" or fields[20]=="pending" and fields[8]=="handoff")
                     and handoff_module.valid_record(fields[9],fields[10])
                     and (fields[8]=="handoff" or fields[8]=="prepared" or fields[8]=="installing" or fields[8]=="owned")
-                local format_ok = rules.normalized(original) and ((#fields == 7 and fields[1] == "proxy-v1") or
-                    (#fields == 8 and fields[1] == "proxy-v2"
-                        and (fields[8] == "prepared" or fields[8] == "installing" or fields[8] == "owned")) or
-                    ((#fields == 10 and fields[1] == "proxy-v3" or #fields == 13 and fields[1] == "proxy-v4" and blue_ok
-                        or #fields == 14 and fields[1] == "proxy-v5" and blue_ok and requested_ok
-                        or #fields == 15 and fields[1] == "proxy-v6" and blue_ok and requested_ok and previous_ok and fields[8] == "owned")
-                        and handoff_module.valid_record(fields[9], fields[10])
-                        and (fields[8] == "handoff" or fields[8] == "prepared" or fields[8] == "installing" or fields[8] == "owned")))
-                if #data <= 32768 and data:sub(-1) == "\n" and (format_ok or generic_ok) and allowed_name(fields[2])
+                if #data <= 32768 and data:sub(-1) == "\n" and generic_ok and allowed_name(fields[2])
                     and allowed_preview(fields[3]) and clone_name_for(fields[3], fields[4]) and count == 4
                     and fields[5]:match("^CustomizationPartDefinition:[%w_]+$") and rules.materials(fields[6]) then
                     self.pending = {owner=fields[2], preview=fields[3], fragment=fields[4], part=fields[5], materials=fields[6],
-                        original=original, phase=fields[8] or "owned"}
-                    if fields[1] == "proxy-v3" or fields[1] == "proxy-v4" or fields[1] == "proxy-v5" or fields[1] == "proxy-v6" then
-                        self.pending.handoff = {container=fields[9], display=fields[10]}
-                    end
-                    if fields[1] == "proxy-v4" or fields[1] == "proxy-v5" or fields[1] == "proxy-v6" then
-                        self.pending.blue = {part=fields[11], original=blue_original, slot_vm=fields[13]}
-                    end
-                    if fields[1] == "proxy-v5" or fields[1] == "proxy-v6" then self.pending.test_color = requested end
-                    if fields[1] == "proxy-v6" then self.pending.previous_color = previous end
-                    if generic_ok then
-                        self.pending.profile=profile
-                        self.pending.handoff={container=fields[9],display=fields[10]}
-                        self.pending.blue={part=fields[11],original=blue_original,slot_vm=fields[13],pending_baseline=fields[20]=="pending" or nil}
-                        if fields[1]=="proxy-v12" then self.pending.blue.materials=fields[23] end
-                        if requested_ok then self.pending.test_color=requested end
-                        if previous_ok then self.pending.previous_color=previous end
-                    end
+                        original=original, phase=fields[8], profile=profile,
+                        handoff={container=fields[9],display=fields[10]},
+                        blue={part=fields[11],original=blue_original,slot_vm=fields[13],pending_baseline=fields[20]=="pending" or nil}}
+                    if fields[1]=="proxy-v12" then self.pending.blue.materials=fields[23] end
+                    if requested_ok then self.pending.test_color=requested end
+                    if previous_ok then self.pending.previous_color=previous end
                     runtime:after("tint:recovery", 1, function() self.restore("startup/reload recovery") end)
                 else
                     self.blocked = "Malformed tint recovery record; inspect DevPanel/tint_recovery.txt before applying"

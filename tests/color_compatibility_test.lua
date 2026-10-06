@@ -49,6 +49,15 @@ local tiles=obj("WBP_Customization_SelectionTiles_C /Game/Test.Tiles",{
     IsVisible=function() return true end,CurrentSlotTag=vm.SlotTag,PartsGridList=grid})
 local aux=obj("CustomizationAuxVM_C /Game/Test.Aux",{CurrentCustomizationSlotVM=vm})
 lists.WBP_Customization_ItemPage_C={page}; lists.CustomizationAuxVM_C={aux}; lists.WBP_Customization_SelectionTiles_C={tiles}
+-- The active page owns exactly one attached palette for the selected slot.
+tiles.GetParent=function() return page end
+local active_children={tiles}
+local active_list=obj("BitReactorStackBox /Game/Test.ActiveList",{
+    IsVisible=function() return true end,GetAllChildren=function() return active_children end})
+local active_panel=obj("WBP_CustomizationSlotPanelCombined_C /Game/Test.ActivePanel",{
+    IsVisible=function() return true end,CustomizationSlots=active_list})
+page.WBP_CustomizationSlotPanelCombined=active_panel
+page.SlotWidgetSwitcher=obj("CommonActivatableWidgetSwitcher /Game/Test.Switcher",{GetActiveWidget=function() return active_panel end})
 function FindAllOf(c) assert(on_thread); return lists[c] end
 function StaticFindObject(path)
     assert(on_thread); for n,o in pairs(objects) do if n:match("^[^ ]+ (.+)$")==path then return o end end
@@ -76,7 +85,6 @@ local r=boot(); assert(reads==0 and not next(jobs),"no startup UObject work")
 command({"extra"}); assert(not next(jobs))
 command(); assert(reads==0); run()
 assert(has("RESULT | CANDIDATE") and has("parameter=Color 01") and has("equipped_part=CustomizationPartDefinition:CPD_OtherArmor"))
-assert(has("legacy_blue_present=false"),"candidate does not mean the old preview donor works")
 -- Generalize discovery without changing gameplay on other zones or asset families.
 logs={}; vm.SlotTag.TagName="br.Customization.Slot.Character.Appearance.Hair.Color.Root"
 mesh_tag.TagName="br.Customization.Slot.Character.Appearance.Hair.Mesh"
@@ -94,7 +102,7 @@ logs={}; stack.WidgetList={page}; command(); run(); assert(has("Creator removed 
 logs={}; fragments={}; for i=1,17 do fragments[i]=fragment end
 command(); run(); assert(has("Fragment detail limit exceeded")); fragments={fragment}
 logs={}; local original_count=grid.GetNumItems; grid.GetNumItems=function() return 1025 end
-command(); run(); assert(has("Unsupported palette size") and has("RESULT | UNVERIFIED")); grid.GetNumItems=original_count
+command(); run(); assert(has("Invalid palette size") and has("RESULT | UNVERIFIED")); grid.GetNumItems=original_count
 logs={}; lists.CustomizationAuxVM_C={}; for i=1,129 do lists.CustomizationAuxVM_C[i]=aux end
 command(); run(); assert(has("Scan limit: CustomizationAuxVM_C")); lists.CustomizationAuxVM_C={aux}
 -- Same-state reload retires queued work, reuses the command, and doesn't retain objects.
@@ -121,15 +129,6 @@ children={nested_slot}; logs={}; command(); run(); assert(has("Nested slot cycle
 children={fragment}; fragments={fragment}
 -- Active-page palette ownership resolves a stale visible palette, while truly
 -- ambiguous attached palettes still refuse. Donors exclude Default/current.
-r.generic_colors=true
-tiles.GetParent=function() return page end
-local active_children={tiles}
-local active_list=obj("BitReactorStackBox /Game/Test.ActiveList",{
-    IsVisible=function() return true end,GetAllChildren=function() return active_children end})
-local active_panel=obj("WBP_CustomizationSlotPanelCombined_C /Game/Test.ActivePanel",{
-    IsVisible=function() return true end,CustomizationSlots=active_list})
-page.WBP_CustomizationSlotPanelCombined=active_panel
-page.SlotWidgetSwitcher=obj("CommonActivatableWidgetSwitcher /Game/Test.Switcher",{GetActiveWidget=function() return active_panel end})
 local second=obj("WBP_Customization_SelectionTiles_C /Game/Test.Second",{
     IsVisible=function() return true end,CurrentSlotTag=vm.SlotTag,PartsGridList=obj("BitReactorTileView /Game/Test.Stale")})
 lists.WBP_Customization_SelectionTiles_C={second,tiles}

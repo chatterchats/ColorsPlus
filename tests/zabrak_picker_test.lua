@@ -178,7 +178,6 @@ local function boot()
     function base.restore() return true end
     function base.context_changed() end
     function base.start() end
-    base.apply=base.update_live; base.apply_rgb=base.update_live; base.cycle_rgb=base.update_live
     worker=load("zabrak_picker").wrap(runtime,a,"journal",base)
     runtime.tint=worker
     runtime.skin_enable={stop=function() return true end,start=function() error("No MID workaround permitted") end}

@@ -1,17 +1,14 @@
--- One opt-in Clone 8 accent for this editor visit. Unlike hover preview, Apply
+-- One applied color zone for this editor visit. Unlike hover preview, Apply
 -- writes the verified per-character source fragment. Never edits stock assets.
 -- The original is journaled before mutation; exit/reload restores, never saves.
 local M={}
 local directory=debug.getinfo(1,"S").source:gsub("^@",""):match("^(.*[/\\])")
 local rules=assert(loadfile(directory .. "color_rules.lua"))()
-local ACCENT="br.Customization.Slot.Character.Outfit.Torso.Color.Secondary"
-local MESH="br.Customization.Slot.Character.Outfit.Torso.Mesh"
-local ARMOR="CustomizationPartDefinition:CPD_H_Outfit_Clo001_TORS_TintF"
 local CLASS="Class /Script/BitReactorCore.CustomizationFragmentInstanceMaterialColor"
 local OWNER="^CustomizationInstance /Game/Game/Maps/MainMenu/MainMenu%.MainMenu:PersistentLevel%.Char_Hero_Humanoid_C_%d+%.CustomizationInstance$"
 local VM="^BitReactorCustomizationSlotViewModel /Engine/Transient%.GameEngine_%d+:BP_BrunoGameInstance_C_%d+%.BitReactorCustomizationSlotViewModel_%d+$"
 local function copy(c) return {R=c.R,G=c.G,B=c.B,A=c.A} end
-local function valid_color(c,p) return rules.color(c,p and p.slot,p and p.parameter) end
+local function valid_color(c,p) return rules.color(c,p.slot,p.parameter) end
 local function same(x,y)
     for _,k in ipairs({"R","G","B","A"}) do if math.abs(x[k]-y[k])>0.00001 then return false end end
     return true
@@ -78,13 +75,13 @@ function M.wrap(runtime,a,path,base)
         assert(s.owner:match(OWNER) and s.vm:match(VM)
             and child(s.owner,s.slot,"CustomizationFragmentInstanceSlot")
             and child(s.owner,s.fragment,"CustomizationFragmentInstanceMaterialColor")
-            and s.part:match(s.profile and "^CustomizationPartDefinition:[%w_]+$" or "^CustomizationPartDefinition:CPD_H_Outfit_Color_[%w_]+$")
+            and s.part:match("^CustomizationPartDefinition:[%w_]+$")
             and rules.materials(s.materials) and s.page:match("^WBP_Customization_ItemPage_C /[^\r\n]+$"),
             "Untrusted editor recovery identity")
+        assert(target_module.valid(s.profile),"Invalid editor target profile")
         assert(valid_color(s.original,s.profile) and valid_color(s.chosen,s.profile) and valid_color(s.previous,s.profile)
             and s.chosen.A==s.original.A and s.previous.A==s.original.A,"Invalid editor colors")
-        assert(not s.profile or target_module.valid(s.profile),"Invalid editor target profile")
-        if s.profile and s.profile.bundle then
+        if s.profile.bundle then
             assert(type(s.bundle_ids)=="string" and #s.bundle_ids<=8192 and not s.bundle_ids:find("[\r\n]"),"Invalid editor bundle identities")
             local ids={}
             for full in s.bundle_ids:gmatch("[^|]+") do
@@ -102,19 +99,17 @@ function M.wrap(runtime,a,path,base)
         local data=""
         if s then
             validate(s)
-            local fields={s.profile and "editor-v2" or "editor-v1",s.owner,s.slot,s.fragment,s.part,s.materials,
-                encoded(s.original),encoded(s.chosen),encoded(s.previous),s.page,s.vm}
-            if s.profile then
-                fields[12],fields[13],fields[14],fields[15]=s.profile.slot,s.profile.parameter,s.profile.mesh,s.profile.asset
-                if s.profile.targets then fields[1]="editor-v3"; fields[16]=target_module.encode_targets(s.profile) end
-                if s.profile.skin_race then fields[1]="editor-v4"; fields[17]=s.profile.skin_race end
-                if s.profile.skin_scalar then fields[1]="editor-v5"; fields[18]=s.profile.skin_scalar end
-                if s.skin_target then fields[1]="editor-v6"; fields[18]="outfit"; fields[19]=s.skin_target end
-                if s.profile.bundle then
-                    fields[1]="editor-v7"; fields[16]=s.profile.targets and target_module.encode_targets(s.profile) or ""
-                    fields[17]=s.profile.bundle
-                    fields[18]=s.bundle_ids
-                end
+            local fields={"editor-v2",s.owner,s.slot,s.fragment,s.part,s.materials,
+                encoded(s.original),encoded(s.chosen),encoded(s.previous),s.page,s.vm,
+                s.profile.slot,s.profile.parameter,s.profile.mesh,s.profile.asset}
+            if s.profile.targets then fields[1]="editor-v3"; fields[16]=target_module.encode_targets(s.profile) end
+            if s.profile.skin_race then fields[1]="editor-v4"; fields[17]=s.profile.skin_race end
+            if s.profile.skin_scalar then fields[1]="editor-v5"; fields[18]=s.profile.skin_scalar end
+            if s.skin_target then fields[1]="editor-v6"; fields[18]="outfit"; fields[19]=s.skin_target end
+            if s.profile.bundle then
+                fields[1]="editor-v7"; fields[16]=s.profile.targets and target_module.encode_targets(s.profile) or ""
+                fields[17]=s.profile.bundle
+                fields[18]=s.bundle_ids
             end
             data=table.concat(fields,"\n") .. "\n"
             assert(#data<=32768,"Editor recovery size limit")
@@ -140,19 +135,11 @@ function M.wrap(runtime,a,path,base)
     local function target(f,s)
         assert(name(f:GetClass())==CLASS and name(f:GetOwningCustomizationInstance())==s.owner
             and name(f:GetOwningCustomizationSlot())==s.slot,"Editor fragment ownership changed")
-        if s.profile then
-            assert(targets.target(f,s.profile)==s.materials,"Editor materials changed"); return
-        end
-        local t=f.MaterialTarget
-        local tags=a.values(t.SlotNameTagsToApply.GameplayTags)
-        assert(a.text(t.MaterialParameterName)=="Color 02" and #tags==1 and a.text(tags[1].TagName)==MESH,
-            "Editor fragment target changed")
-        local materials={}; for _,v in ipairs(a.values(t.MaterialSlotNames)) do materials[#materials+1]=a.text(v) end
-        assert(table.concat(materials,",")==s.materials,"Editor materials changed")
+        assert(targets.target(f,s.profile)==s.materials,"Editor materials changed")
     end
     local function source(s,repair)
         local owner=find(s.owner)
-        local slot=a.unwrap(owner:GetSlotInstance({TagName=FName(s.profile and s.profile.slot or ACCENT)}))
+        local slot=a.unwrap(owner:GetSlotInstance({TagName=FName(s.profile.slot)}))
         -- A verified original owner may lose this slot when its race changes.
         -- Retire the old intent without touching the new race's replacement.
         if not a.live(slot) then return nil,"replaced" end
@@ -171,7 +158,7 @@ function M.wrap(runtime,a,path,base)
         if s.skin_target then
             f=skin_source.read(values,s,repair)
             if not f then return nil,"replaced" end
-        elseif s.profile and (s.profile.skin_race or s.profile.bundle) then
+        elseif s.profile.skin_race or s.profile.bundle then
             f=fragments.read(values,s.profile)
             if name(f)~=s.fragment then return nil,"replaced" end
         else
@@ -188,11 +175,7 @@ function M.wrap(runtime,a,path,base)
             assert(allow_transition and s.inactive_checks<=2,"Creator visit ended")
         end
         local owner=find(s.owner)
-        if s.profile then targets.mesh(owner,s.profile)
-        else
-            local mesh=object(owner:GetSlotInstance({TagName=FName(MESH)}))
-            assert(id(mesh:GetCustomizationPartPrimaryAssetId())==ARMOR,"Applied armor changed")
-        end
+        targets.mesh(owner,s.profile)
         -- The recorded VM must still point to this character, even when another
         -- slot is selected. Do not bind to a newly selected character by name.
         local vm=find(s.vm); local values=a.values(vm:GetFragments())
@@ -324,7 +307,7 @@ function M.wrap(runtime,a,path,base)
             if record then
                 assert(name(c.owner)==record.owner and name(c.fragment)==record.fragment
                     and name(c.slot)==record.vm and lifetime.belongs(record.creator,c.page)
-                    and (not record.profile or target_module.same(c.profile,record.profile)),"Applied editor target changed")
+                    and target_module.same(c.profile,record.profile),"Applied editor target changed")
                 visit(record)
             end
             local was_applied=record~=nil
@@ -333,7 +316,7 @@ function M.wrap(runtime,a,path,base)
             s.creator=s.creator or lifetime.bind(c.page)
             assert(lifetime.active(s.creator),"Creator not active")
             s.previous=copy(c.original); s.chosen=copy(session.test_color)
-            if s.profile and s.profile.bundle and not s.bundle_ids then
+            if s.profile.bundle and not s.bundle_ids then
                 s.bundle_ids=fragments.identities(c.source_slot:GetFragmentInstances())
             end
             if not record and skin_source.supports(s) then
@@ -385,7 +368,7 @@ function M.wrap(runtime,a,path,base)
                 local c=base.read_context()
                 assert(lifetime.belongs(record.creator,c.page) and name(c.owner)==record.owner and name(c.slot)==record.vm
                     and name(c.fragment)==record.fragment and same(c.original,record.chosen)
-                    and (not record.profile or target_module.same(c.profile,record.profile)),
+                    and target_module.same(c.profile,record.profile),
                     "One applied zone per visit in this test build; restore it before opening another zone")
             end)
             if not ok then log("OPEN REFUSED | " .. tostring(err)); return nil end
@@ -400,7 +383,7 @@ function M.wrap(runtime,a,path,base)
     function self.update_live(s,chosen)
         if not timed("update.skin_stop",skin_stop,"RGB update") then return false end
         local ok
-        if s.profile and s.profile.slot=="br.Customization.Slot.Character.Appearance.Humanoid.Head.Face.SkinTone"
+        if s.profile.slot=="br.Customization.Slot.Character.Appearance.Humanoid.Head.Face.SkinTone"
             and type(base.update_live_scoped)=="function" then
             ok=base.update_live_scoped(s,chosen,function(read_context)
                 return timed("update.skin_enable",skin_sync,s,"preview",read_context)
@@ -451,34 +434,31 @@ function M.wrap(runtime,a,path,base)
             if data~="" then
                 local ok,err=pcall(function()
                     local v={}; for line in data:gmatch("([^\n]*)\n") do v[#v+1]=line end
-                    assert(#data<=32768 and data:sub(-1)=="\n" and (#v==11 and v[1]=="editor-v1"
-                        or #v==15 and v[1]=="editor-v2" or #v==16 and v[1]=="editor-v3"
+                    assert(#data<=32768 and data:sub(-1)=="\n" and (#v==15 and v[1]=="editor-v2" or #v==16 and v[1]=="editor-v3"
                         or #v==17 and v[1]=="editor-v4" or #v==18 and v[1]=="editor-v5"
                         or #v==19 and v[1]=="editor-v6" or #v==18 and v[1]=="editor-v7"),"Malformed editor recovery")
                     local s={owner=v[2],slot=v[3],fragment=v[4],part=v[5],materials=v[6],original=parsed(v[7]),
                         chosen=parsed(v[8]),previous=parsed(v[9]),page=v[10],vm=v[11]}
-                    if v[1]=="editor-v2" or v[1]=="editor-v3" or v[1]=="editor-v4" or v[1]=="editor-v5" or v[1]=="editor-v6" or v[1]=="editor-v7" then
-                        s.profile={slot=v[12],parameter=v[13],mesh=v[14],asset=v[15]}
-                        if v[1]=="editor-v7" then
-                            s.profile.bundle=v[17]
-                            s.bundle_ids=v[18]
-                            assert(v[16]=="" or target_module.decode_targets(s.profile,v[16]),"Invalid bundle mesh recovery")
-                        end
-                        if v[1]=="editor-v4" or v[1]=="editor-v5" or v[1]=="editor-v6" then
-                            assert(fragment_module.valid_race(v[17]),"Invalid skin recovery race tag")
-                            s.profile.skin_race=v[17]
-                        end
-                        if v[1]=="editor-v5" then
-                            assert(v[18]=="outfit","Invalid skin scalar recovery layout")
-                            s.profile.skin_scalar=v[18]
-                        end
-                        if v[1]=="editor-v6" then
-                            assert(v[18]=="outfit","Invalid skin source original layout")
-                            s.skin_target=v[19]
-                        end
-                        if v[1]=="editor-v3" or v[1]=="editor-v4" or v[1]=="editor-v5" or v[1]=="editor-v6" then
-                            assert(target_module.decode_targets(s.profile,v[16]),"Invalid multi-mesh recovery")
-                        end
+                    s.profile={slot=v[12],parameter=v[13],mesh=v[14],asset=v[15]}
+                    if v[1]=="editor-v7" then
+                        s.profile.bundle=v[17]
+                        s.bundle_ids=v[18]
+                        assert(v[16]=="" or target_module.decode_targets(s.profile,v[16]),"Invalid bundle mesh recovery")
+                    end
+                    if v[1]=="editor-v4" or v[1]=="editor-v5" or v[1]=="editor-v6" then
+                        assert(fragment_module.valid_race(v[17]),"Invalid skin recovery race tag")
+                        s.profile.skin_race=v[17]
+                    end
+                    if v[1]=="editor-v5" then
+                        assert(v[18]=="outfit","Invalid skin scalar recovery layout")
+                        s.profile.skin_scalar=v[18]
+                    end
+                    if v[1]=="editor-v6" then
+                        assert(v[18]=="outfit","Invalid skin source original layout")
+                        s.skin_target=v[19]
+                    end
+                    if v[1]=="editor-v3" or v[1]=="editor-v4" or v[1]=="editor-v5" or v[1]=="editor-v6" then
+                        assert(target_module.decode_targets(s.profile,v[16]),"Invalid multi-mesh recovery")
                     end
                     validate(s); record=s; base.hold_selection(true)
                 end)
@@ -487,12 +467,6 @@ function M.wrap(runtime,a,path,base)
         end
         base.start()
         if record then runtime:after("editor:recovery",25,function() self.restore("reload recovery") end) end
-    end
-    for _,key in ipairs({"apply","apply_rgb","cycle_rgb"}) do
-        self[key]=function(...)
-            if record or self.blocked then log("ACTION REFUSED | Restore editor Apply first"); return false end
-            return base[key](...)
-        end
     end
     -- Inclusive per-layer opening time for the performance log; no behavior change.
     local timed_begin_live=self.begin_live

@@ -1,7 +1,7 @@
 local scripts=assert(arg[1])
 local module=assert(loadfile(scripts .. "/multi_editor.lua"))()
 local jobs,workers,proxies,logs={},{},{},{}
-local runtime={generic_colors=true,skin_enable={sentinel=true},log=function(s) logs[#logs+1]=s end}
+local runtime={skin_enable={sentinel=true},log=function(s) logs[#logs+1]=s end}
 function runtime:after(k,ms,fn) jobs[k]=fn end
 function runtime:cancel(k) jobs[k]=nil end
 local selected="VM_A"
@@ -34,8 +34,6 @@ local function factory(r,i)
     function w.invalidate_context_lookup() w.invalidations=(w.invalidations or 0)+1 end
     function w.start() w.starts=w.starts+1 end
     function w.read_context() return {slot=selected} end
-    function w.apply() return true end
-    w.apply_rgb=w.apply; w.cycle_rgb=w.apply
     return w
 end
 local m=module.new(runtime,factory); runtime.tint=m
@@ -51,7 +49,6 @@ assert(not m.begin_live(),"cannot open concurrent drafts")
 assert(m.update_live(b)); assert(m.apply_live(b))
 assert(jobs["editor:watch"] and jobs["zone2:editor:watch"])
 jobs["editor:watch"](); jobs["zone2:editor:watch"](); assert(workers[1].watched and workers[2].watched)
-assert(not m.apply_rgb(),"diagnostics may not overwrite applied zones")
 selected="VM_E"; local e=m.begin_live(); assert(e.index==3 and #workers==3)
 assert(m.cancel_live() and not workers[3].applied)
 selected="VM_A"; a=m.begin_live(); assert(a.index==1 and #workers==3,"Reopening an applied zone reuses it")

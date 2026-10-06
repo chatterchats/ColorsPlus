@@ -80,14 +80,6 @@ function M.new(runtime,factory,has_journal)
     end
     function self.start() started=true; for _,w in ipairs(workers) do w.start() end end
     function self.zone_count() return #workers end
-    for _,k in ipairs({"apply","apply_rgb","cycle_rgb"}) do
-        self[k]=function(...)
-            if self.applied or self.pending or self.blocked then
-                runtime.log("MULTI EDITOR | diagnostic write refused while edits are owned"); return false
-            end
-            return workers[active][k](...)
-        end
-    end
     return self
 end
 return M

@@ -13,13 +13,6 @@ function M.parse(text)
     assert(r and g and b and r <= 255 and g <= 255 and b <= 255, "RGB channels must be integers from 0 to 255")
     return {R=linear(r), G=linear(g), B=linear(b), A=1}, string.format("%d,%d,%d",r,g,b)
 end
-function M.read(path)
-    local f = assert(io.open(path, "r"), "Cannot open RGB input: " .. path)
-    local ok, text = pcall(function() return f:read(257) end)
-    f:close()
-    assert(ok, text)
-    return M.parse(text)
-end
 function M.to_srgb(color)
     local bytes = {}
     for _, key in ipairs({"R","G","B"}) do

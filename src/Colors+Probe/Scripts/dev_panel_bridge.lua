@@ -56,10 +56,7 @@ function M.attach(runtime, probe, tint, client)
             if key == "restore_tint" or key == "close_picker" or key == "trace_stock_calls" then cancel_writes() end
             if stops[key] then runtime:cancel("panel:" .. stops[key]) end
             if key == "stop_screen_trace" then runtime:cancel("screen-trace:command") end
-            if key == "restore_tint" then
-                runtime:cancel("tint:rgb-cycle")
-                runtime:cancel("tint:timeout")
-            end
+            if key == "restore_tint" then runtime:cancel("tint:timeout") end
             -- Keep the owned delayed-action boundary even if a helper ever
             -- dispatches without ExecuteInGameThread. Never mutate in LoopAsync.
             runtime:after("panel:" .. key, 1, function()

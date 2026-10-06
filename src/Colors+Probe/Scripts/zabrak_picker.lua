@@ -245,12 +245,6 @@ function M.wrap(runtime,a,path,base)
         end)
     end
     function self.start() base.start(); engine.start() end
-    for _,key in ipairs({"apply","apply_rgb","cycle_rgb"}) do
-        self[key]=function(...)
-            if engine.pending or engine.blocked then log("DIAGNOSTIC REFUSED | Restore source CP first"); return false end
-            return base[key](...)
-        end
-    end
     -- Inclusive per-layer opening time for the performance log; no behavior change.
     local timed_begin_live=self.begin_live
     function self.begin_live(...)
