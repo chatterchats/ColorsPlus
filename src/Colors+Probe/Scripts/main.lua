@@ -86,9 +86,7 @@ if #missing == 0 then
     local prefix=index==1 and "" or ("zone" .. index .. "_")
     local function journal(leaf) return directory .. "../DevPanel/" .. prefix .. leaf end
     local tint = module("tint_test").new(zone_runtime, probe.access, journal("tint_recovery.txt"))
-    local regular = tint
-    tint = module("default_tint").wrap(zone_runtime, probe.access, journal("tint_recovery.txt"), tint)
-    tint = module("default_selection").wrap(zone_runtime, probe.access, journal("default_selection_recovery.txt"), regular, tint)
+    tint = module("default_selection").wrap(zone_runtime, probe.access, journal("default_selection_recovery.txt"), tint, tint)
     tint = module("editor_session").wrap(zone_runtime, probe.access, journal("editor_recovery.txt"), tint)
     tint = module("zabrak_picker").wrap(zone_runtime, probe.access, journal("zabrak_picker_recovery.txt"), tint)
     return tint
