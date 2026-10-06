@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "community.colors-plus",
+  "name": "Colors+",
+  "version": "0.1.0",
+  "author": "Chats",
+  "description": "Adds continuous color selection to compatible character-customization tint zones.",
+  "game": {
+    "appId": 2075800,
+    "testedBuilds": [
+      "25134257",
+      "24874058"
+    ]
+  },
+  "type": [
+    "ue4ss"
+  ],
+  "requires": {
+    "ue4ss": true
+  }
+}

@@ -1,0 +1,11 @@
+/debug/
+/dist/
+/*.zip
+*.log
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+/src/Colors+Probe/DevPanel/*

@@ -1,0 +1,7 @@
+{
+  "title": "Colors+Probe",
+  "version": "0.2.115",
+  "author": "Chats",
+  "description": "Choose your own colors for clothing, hair, skin and more. Early test version with automatic performance logging to help us improve it. No Dev Panel needed.",
+  "launchers": ["steam"]
+}
