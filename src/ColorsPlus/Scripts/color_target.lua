@@ -116,6 +116,24 @@ function M.new(a,logger)
         assert(empty or asset(value),"Invalid palette asset")
         return value,empty
     end
+    -- The equipped swatch is normally one of the palette's own items. A
+    -- character loaded from a save (seen in the hub editor) can hold its own
+    -- swatch VM for the same asset until a swatch is equipped from the grid.
+    -- Accept that only as the single palette item with the equipped asset;
+    -- the palette is already bound to this slot by its tiles' slot tag.
+    local function asset_match(grid,count,host,equipped,current)
+        local wanted=id(equipped.AssetId); local match,matches=nil,0
+        for i=0,count-1 do
+            local item=object(grid:GetItemAt(i))
+            local value,empty=palette_part(item,host)
+            if not empty and value==wanted then match=i; matches=matches+1 end
+        end
+        assert(matches==1,"Equipped item absent from active palette | equipped=" .. current
+            .. " | asset=" .. wanted .. " | asset_matches=" .. matches)
+        if logger then logger("PALETTE | equipped swatch matched by asset; identity differs | asset=" .. wanted
+            .. " | equipped=" .. current .. " | index=" .. match) end
+        return match
+    end
     local last_selection
     function self.selected(vm,page,root)
         vm=object(vm)
@@ -251,7 +269,7 @@ function M.new(a,logger)
             found=found or full==current
             items[#items+1]={object=item,asset=value,index=i,name=full,empty=empty}
         end
-        assert(found,"Equipped item absent from active palette")
+        if not found then asset_match(grid,count,owner,object(vm.EquippedCustomizationPartViewModel),current) end
         return items,name(grid)
     end
     function self.equipped_in_palette(vm,grid)
@@ -262,8 +280,11 @@ function M.new(a,logger)
         local count=grid:GetNumItems()
         assert(type(count)=="number" and count%1==0 and count>0 and count<=1024,"Invalid palette size")
         local index=grid:GetIndexForItem(item)
-        assert(type(index)=="number" and index%1==0 and index>=0 and index<count,"Equipped item absent from active palette")
-        assert(name(grid:GetItemAt(index))==full and grid:GetIndexForItem(item)==index,"Palette order changed")
+        if type(index)=="number" and index%1==0 and index>=0 and index<count then
+            assert(name(grid:GetItemAt(index))==full and grid:GetIndexForItem(item)==index,"Palette order changed")
+        else
+            asset_match(grid,count,host,item,full)
+        end
         assert(name(vm.EquippedCustomizationPartViewModel)==full,"Equipped item changed during palette verification")
     end
     function self.donor(vm,page,profile)

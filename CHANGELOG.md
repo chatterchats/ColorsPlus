@@ -76,6 +76,14 @@ the player-only package.
   stock edit is left alone, explicit Restore still restores, and a failed
   keep falls back to restoring. `AFTER KEEP` lines at +2s/+10s log whether
   the game kept the color. Apply refuses a character from the other editor.
+  Confirmed in game: hub skin and tattoo colors persist outside the editor
+  and through save > main menu > load; Rodian (swap) skin works.
+- Hub armor colors refused to open (`Equipped item absent from active
+  palette`) until a swatch was picked from the grid: the equipped swatch VM
+  was not one of the palette's items by identity (likely a save-loaded VM).
+  The palette check now accepts the single palette item with the equipped
+  asset (logged as `matched by asset`); none or several still refuse, and
+  the refusal names the equipped VM and asset.
 - Dev tools: `colors_compat` surveys without a creator binding and logs the
   preview links and button class; `colors_screens` traces the hub screens.
 
