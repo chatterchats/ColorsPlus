@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "community.colors-plus-probe",
   "name": "Colors+Probe",
-  "version": "0.2.117",
+  "version": "0.2.118",
   "author": "Chats",
   "description": "Choose your own character colors with the Custom Color button. Apply your choice, then save your character normally to keep it. Early test version; performance logging is automatic.",
   "game": {"appId": 2075800, "testedBuilds": []},

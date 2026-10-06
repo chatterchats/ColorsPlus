@@ -230,7 +230,8 @@ local function start()
 end
 boot()
 -- Opening uses one fresh scalar route for its repeated source checks. A
--- native event during donor activation must invalidate that route immediately.
+-- non-structural event during donor activation keeps that route (every use
+-- fully revalidates it); a structural event retires it immediately.
 do
     local before=discovery_scans
     local s=tint.begin_live(); assert_ok(s)
@@ -244,7 +245,15 @@ do
     end
     before=discovery_scans
     s=tint.begin_live(); assert_ok(s)
-    assert(discovery_scans==before+2,"Opening event must force full source rediscovery after reusing the initial hint")
+    assert(discovery_scans==before,"A non-structural opening event keeps the revalidated hint")
+    assert_ok(tint.restore("opening event test"))
+    vm.PreviewCustomizationPart=function(self,p)
+        previous(self,p)
+        tint.invalidate_context_lookup("creator closed")
+    end
+    before=discovery_scans
+    s=tint.begin_live(); assert_ok(s)
+    assert(discovery_scans==before+2,"A structural opening event must force full source rediscovery")
     vm.PreviewCustomizationPart=previous
     assert_ok(tint.restore("opening event test"))
     before=discovery_scans
@@ -260,7 +269,10 @@ do
     assert(discovery_scans==before,"Bound selection should skip global page/aux scans")
     tint.context_changed("UpdateCurrentCustomizationSlotVM")
     assert(tint.read_selected_context(route).owner==owner)
-    assert(discovery_scans==before+2,"Notification must force full rediscovery")
+    assert(discovery_scans==before,"Non-structural notification keeps the revalidated route")
+    tint.invalidate_context_lookup("page closed")
+    assert(tint.read_selected_context(route).owner==owner)
+    assert(discovery_scans==before+2,"Structural notification must force full rediscovery")
     route=tint.bind_selected_context(tint.read_context())
     local current=aux.CurrentCustomizationSlotVM
     aux.CurrentCustomizationSlotVM=nil
@@ -346,7 +358,7 @@ assert_ok(tint.update_live_scoped(s,{R=.2,G=.5,B=.3,A=1},function(read)
     assert(read().owner==owner)
     return true
 end))
-assert(discovery_scans==scans_before+2,"Native event must force full consumer rediscovery")
+assert(discovery_scans==scans_before,"Non-structural event keeps the revalidated consumer route")
 for _,failure in ipairs({"throw","false","page"}) do
     assert(not tint.update_live_scoped(s,{R=.2,G=.5,B=.3,A=1},function(read)
         captured_reader=read
@@ -365,14 +377,16 @@ assert_ok(editor.cancel_live("Cancel"))
 assert(not tint.pending and not container.IsPreviewing and equal(arrays[displayed][2].color,original))
 s=start(); assert(not jobs["tint:timeout"]); assert_ok(editor.cancel_live("picker Cancel")); assert(not tint.pending and files.recovery=="")
 -- An untouched picker reuses its opening route on its first idle check, then
--- revalidates without broad discovery; native events retire it immediately.
+-- revalidates without broad discovery; structural events retire it immediately.
 s=start(); scans_before=discovery_scans; idle_writes=writes
 assert_ok(tint.check_live(s))
 assert(discovery_scans==scans_before)
 scans_before=discovery_scans
 assert_ok(tint.check_live(s)); assert(discovery_scans==scans_before and writes==idle_writes)
 tint.context_changed("UpdateCurrentCustomizationSlotVM")
-assert_ok(tint.check_live(s)); assert(discovery_scans==scans_before+2)
+assert_ok(tint.check_live(s)); assert(discovery_scans==scans_before,"Non-structural event keeps the idle route")
+tint.invalidate_context_lookup("page closed")
+assert_ok(tint.check_live(s)); assert(discovery_scans==scans_before+2,"Structural event retires the idle route")
 scans_before=discovery_scans
 assert_ok(tint.check_live(s)); assert(discovery_scans==scans_before)
 page.inactive=true
@@ -454,12 +468,12 @@ do
     page.inactive=false
     assert_ok(editor.restore("post-refresh guard cleanup")); vm:ResetPreviewedPart()
 end
--- A native context event during the setter forces full rediscovery rather
--- than treating the transaction route as valid across that notification.
+-- A non-structural event during the setter keeps the fully revalidated route
+-- (it still blocks promoting this update's binding as the draft route).
 s=start(); assert_ok(editor.update_live(s,{R=.1,G=.6,B=.2,A=1})); scans_before=discovery_scans
 arrays[preview][2].after_set=function() arrays[preview][2].after_set=nil; editor.context_changed("UpdateCurrentCustomizationSlotVM") end
 assert_ok(editor.update_live(s,{R=.2,G=.4,B=.6,A=1}))
-assert(discovery_scans==scans_before+2,"Context event must rediscover once before reusing fresh follow-up lookup")
+assert(discovery_scans==scans_before,"Non-structural setter event keeps the revalidated route")
 scans_before=discovery_scans
 assert_ok(editor.update_live(s,{R=.1,G=.6,B=.2,A=1}))
 assert(discovery_scans==scans_before,"Next update can reuse discovery performed after the busy event")

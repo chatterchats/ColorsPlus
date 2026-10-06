@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Lookup hints survive non-structural events — v0.2.118
+
+- v0.2.117 openings (developer machine, 5 opens) still spent ~180ms of ~431ms
+  in full page/auxiliary-VM `FindAllOf` discoveries (~37ms each, 4-5 per
+  opening): every native notification discarded the scalar route hints,
+  including the picker's own donor activation and the game's follow-up
+  `UpdateCurrentCustomizationSlotVM`.
+- Separate the two meanings of an event. `context_revision` (tint) and
+  `lookup_revision` (selection) still advance on every event and still make
+  any lookup in flight refuse its result and block draft-route promotion.
+  Stored hints are retired only by structural events: `page closed`,
+  `creator closed`, `UpdateRootCustomizationSlotVM`, or an unknown reason
+  (`color_rules.structural_context`). Routes carry `epoch`; a missing or old
+  epoch falls back to full discovery.
+- Hints remain lookup shortcuts only: every use revalidates the active page
+  and creator stack, auxiliary VM identity, current slot VM (and identity/tag
+  for selection), source, owner, target and colors; any failure rediscovers.
+- Tests: non-structural events keep routes; structural events rediscover;
+  reentrant structural and non-structural events both refuse in-flight
+  lookups.
+
 ### Opening without first-lookup scans — v0.2.117
 
 - Source of the installed UE4SS (`a1e7f571`, UEPseudo `885ba757`): string

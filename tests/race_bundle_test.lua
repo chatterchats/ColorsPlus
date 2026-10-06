@@ -404,7 +404,9 @@ local identity=editor.selected_slot_identity()
 local scans=discovery_scans
 assert(editor.selected_slot_identity()==identity and discovery_scans==scans)
 editor.context_changed("UpdateCurrentCustomizationSlotVM")
-assert(editor.selected_slot_identity()==identity and discovery_scans==scans+2)
+assert(editor.selected_slot_identity()==identity and discovery_scans==scans,"Non-structural events keep the revalidated hint")
+editor.invalidate_context_lookup("page closed")
+assert(editor.selected_slot_identity()==identity and discovery_scans==scans+2,"Structural events force rediscovery")
 local extra_aux=obj("CustomizationAuxVM_C",host .. "CustomizationAuxVM_C_99",{CurrentCustomizationSlotVM=vm})
 editor.invalidate_context_lookup()
 assert(not pcall(editor.selected_slot_identity),"Rediscovery accepted ambiguous auxiliary VMs")
@@ -420,6 +422,11 @@ page.IsActivated=function(self)
     return activated(self)
 end
 assert(not pcall(editor.selected_slot_identity),"Reentrant event promoted stale selected-slot lookup")
+page.IsActivated=function(self)
+    editor.invalidate_context_lookup("PreviewCustomizationPart")
+    return activated(self)
+end
+assert(not pcall(editor.selected_slot_identity),"Any reentrant event, structural or not, refuses the lookup in flight")
 page.IsActivated=activated
 assert(editor.selected_slot_identity()==identity)
 tint.read_context(); scans=discovery_scans
@@ -427,12 +434,20 @@ tint.read_context()
 assert(discovery_scans==scans,"Repeated source reads must reuse scalar lookup")
 tint.context_changed("UpdateCurrentCustomizationSlotVM")
 tint.read_context()
-assert(discovery_scans==scans+2,"Source lookup must rediscover after notification")
+assert(discovery_scans==scans,"Non-structural notification keeps the revalidated source lookup")
+tint.invalidate_context_lookup("creator closed")
+tint.read_context()
+assert(discovery_scans==scans+2,"Structural notification must force source rediscovery")
 page.IsActivated=function(self)
     tint.invalidate_context_lookup()
     return activated(self)
 end
 assert(not pcall(tint.read_context),"Reentrant event promoted stale source lookup")
+page.IsActivated=function(self)
+    tint.invalidate_context_lookup("UpdateCurrentCustomizationSlotVM")
+    return activated(self)
+end
+assert(not pcall(tint.read_context),"Any reentrant event refuses the source lookup in flight")
 page.IsActivated=activated
 for _,case in ipairs(cases) do
     reset(case); local before=originals(); local writes_before=writes
@@ -498,7 +513,11 @@ for _,case in ipairs(cases) do
     tint.context_changed("UpdateCurrentCustomizationSlotVM")
     scans_before=discovery_scans
     assert_ok(editor.update_live(s,violet))
-    assert(discovery_scans==scans_before+2,"Every layout must rediscover after a context event: " .. case[1])
+    assert(discovery_scans==scans_before,"Non-structural events keep the revalidated route: " .. case[1])
+    tint.invalidate_context_lookup("page closed")
+    scans_before=discovery_scans
+    assert_ok(editor.update_live(s,orange))
+    assert(discovery_scans==scans_before+2,"Every layout must rediscover after a structural event: " .. case[1])
     run("tint:handoff-check"); original_matches(before)
     assert_ok(editor.cancel_live("Cancel")); original_matches(before)
     s=start(); assert(not jobs["tint:timeout"]); assert_ok(editor.cancel_live("picker Cancel")); assert(not tint.pending); original_matches(before)

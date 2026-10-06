@@ -1,4 +1,4 @@
-# Welcome to Colors+ — tester build v0.2.117
+# Welcome to Colors+ — tester build v0.2.118
 
 Colors+ lets you choose your own colors when customizing a character, instead
 of being limited to the game's existing choices. Thanks for trying it out!

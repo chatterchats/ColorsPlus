@@ -101,4 +101,10 @@ function M.launcher_color_slot(slot)
         and slot~="br.Customization.Slot.Character.Appearance.Humanoid.Head.Eyes.Color"
         and not slot:match("%.Mesh$")
 end
+-- Context events that retire scalar lookup hints: the page, creator or slot
+-- category itself changed (unknown reasons count). Every other event only
+-- refuses lookups in flight; hints are fully revalidated on each use and a
+-- failed hint falls back to full discovery.
+local STRUCTURAL={["page closed"]=true,["creator closed"]=true,UpdateRootCustomizationSlotVM=true}
+function M.structural_context(reason) return reason==nil or STRUCTURAL[reason]==true end
 return M

@@ -1196,9 +1196,12 @@ do
         case.perf_scans=0
         runtime.test_set_event=function() runtime.test_set_event=nil; g.context_changed("UpdateCurrentCustomizationSlotVM") end
         assert(g.update_live(s,rgb_module.parse("19,93,233")))
-        assert(case.perf_scans==2,"Native event must force fresh discovery before post-write lookup reuse")
-        case.perf_scans=0
+        assert(case.perf_scans==0,"A non-structural event keeps the fully revalidated lookup hint")
+        g.invalidate_context_lookup("UpdateRootCustomizationSlotVM")
         assert(g.update_live(s,rgb_module.parse("20,94,234")))
+        assert(case.perf_scans==2,"A structural event must force fresh discovery")
+        case.perf_scans=0
+        assert(g.update_live(s,rgb_module.parse("21,95,235")))
         assert(case.perf_scans==0,"Next update may reuse the fresh post-event discovery")
         FindAllOf=case.perf_find
         run("tint:handoff-check"); assert(g.pending)

@@ -20,7 +20,8 @@ function M.new(runtime, access, recovery_path)
     local fragment_module=assert(loadfile(directory .. "color_fragments.lua"))()
     local fragments=fragment_module.new(a,runtime.log)
     local lifetime=assert(loadfile(directory .. "creator_lifetime.lua"))().new(a)
-    local context_revision=0
+    local context_revision=0 -- every native event: refuses lookups in flight
+    local route_epoch=0 -- structural events only: retires stored lookup hints
     -- Creator-page and draft discovery hints, never native objects or cached validation.
     -- Not serialized: reload recovery must restore rather than resume a route.
     local draft_route,draft_owner,lookup_route
@@ -208,9 +209,10 @@ function M.new(runtime, access, recovery_path)
     local function resolve(binding)
         local revision=context_revision
         local label=binding and "tint.resolve_bound" or "tint.resolve"
-        -- A native notification invalidates both transaction and draft reuse,
-        -- even while ordinary event restoration is suppressed by self.busy.
-        if binding and binding.revision~=context_revision then
+        -- A structural notification retires transaction and draft hints, even
+        -- while ordinary event restoration is suppressed by self.busy. Other
+        -- events keep the hint; resolve_impl revalidates it completely.
+        if binding and binding.epoch~=route_epoch then
             binding=nil; label="tint.resolve_fallback"
         end
         if not binding and runtime.generic_colors and lookup_route then
@@ -222,7 +224,7 @@ function M.new(runtime, access, recovery_path)
         end
         local c=timed(label,resolve_impl,binding)
         if runtime.generic_colors then
-            local route={page=c.page,aux=c.aux,creator=binding and binding.creator or lifetime.bind(c.page),revision=revision}
+            local route={page=c.page,aux=c.aux,creator=binding and binding.creator or lifetime.bind(c.page),revision=revision,epoch=route_epoch}
             assert(revision==context_revision,"Context changed during discovery")
             lookup_route=route
         end
@@ -584,7 +586,7 @@ function M.new(runtime, access, recovery_path)
     function self.bind_selected_context(c)
         assert(c.profile and c.profile.slot==fragment_module.SKIN and type(c.aux)=="string",
             "Selected skin context required")
-        return {page=c.page,aux=c.aux,creator=lifetime.bind(c.page),revision=context_revision,
+        return {page=c.page,aux=c.aux,creator=lifetime.bind(c.page),revision=context_revision,epoch=route_epoch,
             vm=a.name(object(c.slot)),owner=a.name(object(c.owner)),part=id(object(c.part).AssetId)}
     end
     function self.read_selected_context(route)
@@ -664,7 +666,7 @@ function M.new(runtime, access, recovery_path)
         if reuse then
             -- Retain scalar lookup hints only. All native objects, relationships
             -- and colors were freshly checked above, exactly as during a drag.
-            binding=binding or {page=c.page,aux=c.aux,creator=lifetime.bind(c.page),revision=revision}
+            binding=binding or {page=c.page,aux=c.aux,creator=lifetime.bind(c.page),revision=revision,epoch=route_epoch}
             assert(context_revision==revision and self.pending==session and session.live
                 and not session.force_restore_reason,"Context changed during idle validation")
             draft_route,draft_owner=binding,session
@@ -705,7 +707,7 @@ function M.new(runtime, access, recovery_path)
         local c,preview,slot,fragment=timed("update.validate_before",verify_unchanged_context,session,initial_binding)
         local binding
         if target_module.preview_policy(session.profile) then
-            binding={page=c.page,aux=c.aux,creator=timed("update.bind_creator",lifetime.bind,c.page),revision=context_revision}
+            binding={page=c.page,aux=c.aux,creator=timed("update.bind_creator",lifetime.bind,c.page),revision=context_revision,epoch=route_epoch}
         end
         -- A callback during discovery/binding must not promote a route built
         -- from the old context or allow the first write through that result.
@@ -772,7 +774,7 @@ function M.new(runtime, access, recovery_path)
             if c.profile then
                 local creator=timed("opening.bind_creator",lifetime.bind,c.page)
                 if revision==context_revision then
-                    opening_route={page=c.page,aux=c.aux,creator=creator,revision=revision}
+                    opening_route={page=c.page,aux=c.aux,creator=creator,revision=revision,epoch=route_epoch}
                 end
             end
             local handoff_record, blue, blue_vm
@@ -1039,13 +1041,16 @@ function M.new(runtime, access, recovery_path)
             self.restore("RGB cycle scheduling failed")
         end
     end
-    function self.invalidate_context_lookup()
+    function self.invalidate_context_lookup(reason)
         context_revision=context_revision+1
-        lookup_route=nil
-        draft_route,draft_owner=nil,nil
+        if rules.structural_context(reason) then
+            route_epoch=route_epoch+1
+            lookup_route=nil
+            draft_route,draft_owner=nil,nil
+        end
     end
     function self.context_changed(reason)
-        self.invalidate_context_lookup()
+        self.invalidate_context_lookup(reason)
         -- Invalidation also retires draft routes, even during synchronous writes.
         if self.busy or not self.pending then return end
         local session = self.pending

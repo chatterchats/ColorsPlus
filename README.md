@@ -17,7 +17,14 @@ currently selected zone.
 
 ## Status
 
-**Current build: Colors+Probe v0.2.117 (picker opening without first-lookup object scans).**
+**Current build: Colors+Probe v0.2.118 (lookup hints survive non-structural events).**
+
+Scalar page/VM lookup hints are now retired only when the page, creator or
+slot category changes; other notifications still refuse lookups in flight.
+Every hint use is fully revalidated, so openings and updates skip repeated
+whole-object `FindAllOf` discovery.
+
+Previously (v0.2.117):
 
 UE4SS answers repeat name lookups from its own cache, but a first lookup of a
 new object scans every UObject. v0.2.117 records the widgets the picker builds

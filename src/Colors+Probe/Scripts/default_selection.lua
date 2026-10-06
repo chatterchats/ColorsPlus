@@ -285,13 +285,15 @@ function M.wrap(runtime,a,path,regular,base)
         end
         return session
     end
-    function self.invalidate_context_lookup()
-        lookup_revision=lookup_revision+1
-        lookup_route=nil
-        if base.invalidate_context_lookup then base.invalidate_context_lookup() end
+    function self.invalidate_context_lookup(reason)
+        lookup_revision=lookup_revision+1 -- refuses lookups in flight
+        -- Stored hints survive non-structural events: selected() revalidates
+        -- page, auxiliary VM, slot VM identity and tag before every use.
+        if rules.structural_context(reason) then lookup_route=nil end
+        if base.invalidate_context_lookup then base.invalidate_context_lookup(reason) end
     end
     function self.context_changed(reason)
-        self.invalidate_context_lookup()
+        self.invalidate_context_lookup(reason)
         if busy then return end -- ignore only our synchronous equip/reset events
         base.context_changed(reason)
     end

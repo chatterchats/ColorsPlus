@@ -71,7 +71,7 @@ function M.new(runtime,factory,has_journal)
         -- Inactive zone workers can retain scalar discovery hints. Invalidate
         -- those too, without scheduling native work or restoring their edits.
         for _,w in ipairs(workers) do
-            if w.invalidate_context_lookup then w.invalidate_context_lookup() end
+            if w.invalidate_context_lookup then w.invalidate_context_lookup(reason) end
         end
         workers[active].context_changed(reason,identity)
         for i,w in ipairs(workers) do
