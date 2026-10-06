@@ -51,6 +51,27 @@ the player-only package.
 - The widget library lookup uses a plain validity check: `a.live` rejects
   class default objects by design (caught by the launcher test).
 
+### Flattening, steps 3-5: one zone instead of four wrapper layers — v0.3.0
+
+- New `color_zone.lua` owns each zone and sequences its steps explicitly:
+  opening (applied-record check, temporary Default selection, preview, skin
+  display), Apply (record, hold Default, end preview, write source, verify,
+  watch) and Restore (Zabrak route, preview, applied source, Default).
+- `default_selection`, `editor_session` and `zabrak_picker` are components
+  (native reads/writes and their own journals) instead of wrappers; no
+  metatable fall-through or patched restore remains. A preview ending on its
+  own (timeout, context change, failed update) still returns a temporary
+  selection to Default, now through an explicit `after_restore` hook.
+- The Zabrak source route is the zone's backend choice: it claims Zabrak
+  skins with material swaps at opening, and its drafts are dispatched to it.
+- No change to journals, formats or recovery order. One journal per zone was
+  planned and not done: the Apply journal's atomic replacement would either
+  be lost or added to every drag tick (see `docs/flatten-plan.md`).
+- Tests run the production zone. Cases that combined layers in ways players
+  never run (Default without the Apply layer; a Zabrak swap skin on the
+  regular backend) were changed to the production behaviour or removed where
+  the real path has its own coverage.
+
 ### Flattening, steps 1-2: one code path — v0.3.0
 
 What players run is now the only path in the code and the tests (plan:

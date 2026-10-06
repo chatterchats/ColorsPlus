@@ -4,7 +4,27 @@ Goal: replace the five-layer wrapper chain per zone with one editing pipeline
 whose tests exercise only what players run, without losing the transaction
 safety the old tests protect.
 
-## Current chain (per zone, outermost first)
+## Result (steps 1-5)
+
+`color_zone.lua` owns one zone. Its regular backend sequences the preview
+engine (`tint_test`), the temporary Default selection (`default_selection`)
+and applied source edits (`editor_session`); the zone chooses between that
+backend and the Zabrak source route (`zabrak_picker` + `zabrak_picker_source`)
+at each opening and dispatches drafts by identity. Components own their native
+reads/writes and journals; `color_zone` owns the order:
+
+- Open: applied-record check, temporary Default selection, preview, then the
+  applied color and skin display on the new draft.
+- Apply: journal the record, hold Default, end the preview, write the source,
+  verify the display, watch for the rest of the visit.
+- Restore: the Zabrak route first, then preview, applied source, Default.
+- Any preview end (Cancel, timeout, context change, failed update) returns a
+  temporary selection to Default through the preview's `after_restore` hook.
+
+No `wrap()` layers remain: no metatable fall-through, no patched
+`regular.restore`, no `hold_selection` reaching through a layer.
+
+## Former chain (per zone, outermost first)
 
 | Layer | Production role | Journal |
 |---|---|---|
@@ -41,14 +61,21 @@ safety the old tests protect.
    modes, `generic_colors`, Clone 8 resolution and old journal readers.
    `tests/tint_test.lua` is now generic-only (605 lines, was 1,368): every
    supported profile, Default integration and editor Apply on the real stack.
-3. Merge `default_selection` into the pipeline (temporary stock selection as a
-   step of opening/closing), keeping its write-ahead ordering.
-4. Merge `editor_session` (Apply/watch/visit restore) into the pipeline.
-5. Merge the Zabrak source route as a pipeline backend choice.
-6. One journal file per zone with one current format, written in the same
-   order the separate journals guarantee today (preview, selection, editor).
+3. **Done.** Merge `default_selection` into the pipeline (temporary stock
+   selection as a step of opening/closing), keeping its write-ahead ordering.
+4. **Done.** Merge `editor_session` (Apply/watch/visit restore) into the pipeline.
+5. **Done.** Merge the Zabrak source route as a pipeline backend choice.
+6. **Not done (recommended against).** One journal file per zone. The journals
+   need different write schemes: the preview journal is a plain overwrite,
+   written twice per drag tick (0.5ms average, 7ms max over 1,608 logged
+   updates); the Apply journal is replaced atomically (temp file, rename,
+   retained `.previous`) because it holds the only copy of the applied
+   original. One file would either put that original behind a plain write a
+   crash can tear mid-drag, or put every drag tick behind the atomic scheme
+   (several file operations per write under Proton). Each component already
+   owns its journal; recovery reads them in a fixed order.
 
-Milestones 3-6 change recovery ordering and need in-game verification of
+Milestones 3-5 change event and recovery sequencing and need in-game verification of
 Cancel, Apply, Restore, reload and save across armor, hair, skin (including
 Zabrak tones 4/5/10), makeup, tattoos, horns, scars and Default/empty slots.
 
