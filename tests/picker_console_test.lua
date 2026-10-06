@@ -36,7 +36,7 @@ command({"OPEN"}); command({"open"}); run(); assert(opens==2,"coalesce repeated 
 command({}); command({"close"}); run(); assert(opens==2 and closes==1,"close supersedes open")
 command({"invalid"}); command({"open","extra"}); run(); assert(opens==2 and closes==1)
 assert(replies[#replies]:find("Usage:",1,true))
-command({}); first:cancel("panel:open_picker"); run(); assert(opens==2,"navigation cancellation")
+command({}); first:cancel("console:picker"); run(); assert(opens==2,"navigation cancellation")
 local picker=first.picker; first.picker=nil; first.tint_disabled_reason="session held"
 command({}); run(); assert(replies[#replies]=="Disabled: session held")
 first.picker=picker

@@ -209,11 +209,11 @@ slot.invalid = nil
 commands.colors_probe()
 first.picker.active={session={}}
 local lateAction=false
-first:after("panel:open_picker",1,function() lateAction=true end)
+first:after("console:picker",1,function() lateAction=true end)
 commands.colors_picker("colors_picker",{})
-assert(first.actions["panel:open_picker"],"console open uses the navigation-owned action slot")
+assert(first.actions["console:picker"],"console open is a queued runtime action")
 hooks[page_path .. "BP_OnDeactivated"].first(wrap(page))
-assert(not first.actions["panel:open_picker"],"page exit cancels queued console opening")
+assert(not first.actions["console:picker"],"page exit cancels queued console opening")
 assert(not first.picker.active,"page exit must end picker ownership synchronously")
 before_reads = reads; drain()
 assert(reads == before_reads, "closing the page must cancel pending snapshots")
@@ -225,7 +225,7 @@ first.probe.on_context_event=function(reason,who)
 end
 commands.colors_picker("colors_picker",{})
 hooks[aux_path .. "ClearCustomizationAuxData"].first(wrap(aux))
-assert(boundary=="creator closed" and not identity and not first.actions["panel:open_picker"])
+assert(boundary=="creator closed" and not identity and not first.actions["console:picker"])
 local master_path="/Game/Game/UI/Strategy/Customization/Widgets/CustomCharacter/WBP_CustomCharacter_Master.WBP_CustomCharacter_Master_C:CloseMenu"
 local creator=object("WBP_CustomCharacter_Master_C /Game/Test.Creator")
 hooks[master_path].first(wrap(creator))
@@ -249,7 +249,7 @@ local pending_handles = {}
 for handle in pairs(queue) do pending_handles[#pending_handles + 1] = handle end
 local second = boot()
 assert(not first.alive and second.alive and second.generation == 2)
-assert(console_count == 7,"probe, picker, performance, screen, compatibility, skin enable and panel status reuse registrations")
+assert(console_count == 6,"probe, picker, performance, screen, compatibility and skin enable reuse registrations")
 assert(commands.colors_perf,"Performance console dispatcher must survive same-state reload")
 assert(native_unhooks == 13)
 for _, handle in ipairs(pending_handles) do assert(cancelled[handle]) end

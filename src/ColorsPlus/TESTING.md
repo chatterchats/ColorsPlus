@@ -37,8 +37,8 @@ picker. No console commands or extra setup are needed.
 
 ## Getting started
 
-You need a working UE4SS installation for Zero Company. You do not need SWZC
-Dev Panel or any console commands to use the color picker.
+You need a working UE4SS installation for Zero Company. You do not need any
+other mods or console commands to use the color picker.
 
 1. Close the game.
 2. Extract the ZIP's `Colors_Probe` folder into your game's
@@ -46,9 +46,10 @@ Dev Panel or any console commands to use the color picker.
 3. Start the game and open character customization.
 
 If you are updating, copy the new files over your existing `Colors_Probe`
-folder rather than deleting it first. Leave any extra files already there
-alone; they help the mod recover unfinished edits. Only keep one copy of this
-mod enabled. An older copy may be called `Colors+Probe`.
+folder rather than deleting it first. Keep its `Recovery` folder: it lets the
+mod recover unfinished edits. A `DevPanel` folder left by an older version is
+no longer used and can be deleted. Only keep one copy of this mod enabled. An
+older copy may be called `Colors+Probe`.
 
 For this test version, restart the game when updating the mod. Please avoid
 **Reload All Mods**, which has caused crashes during testing.

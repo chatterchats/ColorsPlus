@@ -78,12 +78,12 @@ if name_type ~= "function" and name_type ~= "userdata" and name_type ~= "table" 
 end
 if #missing == 0 then
     runtime.log("STARTUP | SESSION GATE BEGIN")
-    local allowed,session_reason=module("recovery_session").prepare(runtime,directory .. "../DevPanel/")
+    local allowed,session_reason=module("recovery_session").prepare(runtime,directory .. "../Recovery/")
     runtime.log("STARTUP | SESSION GATE RETURN | allowed=" .. tostring(allowed))
     if allowed then
     tint = module("multi_editor").new(runtime,function(zone_runtime,index)
     local prefix=index==1 and "" or ("zone" .. index .. "_")
-    local function journal(leaf) return directory .. "../DevPanel/" .. prefix .. leaf end
+    local function journal(leaf) return directory .. "../Recovery/" .. prefix .. leaf end
     return module("color_zone").new(zone_runtime, probe.access, journal)
     end,function(index)
         -- Same per-zone journals the session gate preserves/archives. Readers
@@ -91,7 +91,7 @@ if #missing == 0 then
         -- file (interrupted replacement) blocks its zone, so it always counts.
         for _,leaf in ipairs({"tint_recovery.txt","default_selection_recovery.txt","editor_recovery.txt",
             "editor_recovery.txt.previous","zabrak_picker_recovery.txt","zabrak_picker_recovery.txt.previous"}) do
-            local f=io.open(directory .. "../DevPanel/zone" .. index .. "_" .. leaf,"r")
+            local f=io.open(directory .. "../Recovery/zone" .. index .. "_" .. leaf,"r")
             if f then
                 local data=f:read(1); f:close()
                 if data or leaf:sub(-9)==".previous" then return true end

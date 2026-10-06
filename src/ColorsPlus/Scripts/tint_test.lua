@@ -991,7 +991,7 @@ function M.new(runtime, access, recovery_path)
                     if previous_ok then self.pending.previous_color=previous end
                     runtime:after("tint:recovery", 1, function() self.restore("startup/reload recovery") end)
                 else
-                    self.blocked = "Malformed tint recovery record; inspect DevPanel/tint_recovery.txt before applying"
+                    self.blocked = "Malformed tint recovery record; inspect Recovery/tint_recovery.txt before applying"
                     log(self.blocked)
                 end
             end

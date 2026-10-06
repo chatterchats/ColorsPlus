@@ -8,9 +8,8 @@ __pycache__/
 Thumbs.db
 *.swp
 *.tmp
-/src/ColorsPlus/DevPanel/*
-# The Dev Panel action schema ships in every package (and keeps the DevPanel
-# folder, where recovery journals live, present after extraction).
-!/src/ColorsPlus/DevPanel/actions.lua
+/src/ColorsPlus/Recovery/*
+# Ships in every package so the journal folder exists after extraction.
+!/src/ColorsPlus/Recovery/README.txt
 # Local journals from running the mod out of the old combined source folder.
 /src/Colors+Probe/DevPanel/

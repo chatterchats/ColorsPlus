@@ -1,8 +1,8 @@
 """Build clean player and dev ZIPs from source, never the live mod directory.
 
 src/ColorsPlus is the mod: the Testers package is exactly its files.
-src/Colors+Probe/Scripts holds developer tools (probes, traces, Dev Panel
-integration). The Dev package overlays them into the same Scripts folder:
+src/Colors+Probe/Scripts holds developer tools (traces, the compatibility
+survey, console commands). The Dev package overlays them into the same Scripts folder:
 UE4SS gives every mod its own Lua state, so the tools must run inside the mod.
 """
 from pathlib import Path
@@ -21,13 +21,12 @@ version = json.loads((SOURCE / "modinfo.json").read_text())["version"]
 assert re.fullmatch(r"\d+\.\d+\.\d+", version), "Invalid package version"
 assert json.loads((SOURCE / "zcom-mod.json").read_text())["version"] == version
 assert f'local VERSION = "{version}"' in (SCRIPTS / "main.lua").read_text()
-assert f'version = "{version}"' in (SOURCE / "DevPanel/actions.lua").read_text()
 assert f"v{version}" in (SOURCE / "TESTING.md").read_text()
 
-# DevPanel/actions.lua ships in both packages: the DevPanel folder must exist
-# because recovery journals and session metadata are written there.
+# Recovery/README.txt keeps the Recovery folder present after extraction:
+# journals and session metadata are written there, and Lua cannot create it.
 COMMON = [SOURCE / leaf for leaf in (
-    "enabled.txt", "modinfo.json", "zcom-mod.json", "TESTING.md", "DevPanel/actions.lua",
+    "enabled.txt", "modinfo.json", "zcom-mod.json", "TESTING.md", "Recovery/README.txt",
     "Assets/hue.png", "Assets/saturation.png", "Assets/value.png",
 )]
 DEV_ENTRY = "dev_tools"
@@ -70,7 +69,7 @@ def build(label, scripts):
     entries = {f"{PACKAGE_ROOT}/" + (p.relative_to(SOURCE).as_posix() if p.is_relative_to(SOURCE)
                else "Scripts/" + p.name): p for p in files}
     assert len(entries) == len(files)
-    assert not any("recovery" in name and not name.endswith(".lua") for name in entries)
+    assert not any(re.search(r"_recovery\.txt|\.previous|\.archive-|session", name) for name in entries)
     output = ROOT / "dist" / f"ColorsPlus-{label}-{version}.zip"
     output.parent.mkdir(exist_ok=True)
     if output.exists():

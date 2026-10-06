@@ -162,7 +162,7 @@ function M.new(runtime,options)
         if w then emit({"PERF | window=" .. w.id .. " | " .. tostring(message):gsub("[\r\n\t]"," "):sub(1,1024)}) end
     end
     function self.picker_opening()
-        self.begin_picker("console/Dev Panel")
+        self.begin_picker("console")
         self.window.phase="opening"
     end
     function self.picker_ready(session)

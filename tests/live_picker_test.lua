@@ -247,7 +247,7 @@ values={R=-8,G=-35,B=7}; action="apply"; run(); gates_gone()
 assert(applied.R==-8 and applied.G==-35 and applied.B==7)
 assert(picker.open()); updates=calls.update
 view.read=function() return values,nil,false end
-assert(not picker.apply() and picker.active and calls.update==updates,"Invalid Dev Panel Apply must retain the draft")
+assert(not picker.apply() and picker.active and calls.update==updates,"Invalid console Apply must retain the draft")
 view.read=old_view_read; action="cancel"; run(); gates_gone()
 -- A native selection changing input kind during construction cannot write
 -- through the mode that was chosen for the previous source.

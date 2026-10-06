@@ -1,4 +1,4 @@
--- Standalone entry point; no Dev Panel UI or action-file dispatch required.
+-- Console entry point for the picker (UE4SS console: colors_picker).
 local M = {}
 function M.attach(runtime)
     if type(RegisterConsoleCommandHandler) ~= "function" then
@@ -21,10 +21,9 @@ function M.attach(runtime)
             reply("Disabled: " .. (runtime.tint_disabled_reason or "picker unavailable"))
             return
         end
-        -- Share the existing open-action key so page exit, Restore and stock
-        -- tracing cancel queued opens regardless of which entry point was used.
-        -- Repeated commands coalesce; close also supersedes a queued open.
-        runtime:after("panel:open_picker", 1, function()
+        -- One queued action: repeated commands coalesce and close supersedes
+        -- a queued open. Leaving the page or creator cancels it (below).
+        runtime:after("console:picker", 1, function()
             if action == "close" then runtime.picker.close("console close")
             elseif action == "apply" then runtime.picker.apply()
             elseif action == "restore" then
@@ -38,6 +37,10 @@ function M.attach(runtime)
         end)
         reply("Queued picker " .. action .. "; close the game console to interact.")
     end)
+    -- Never run a queued action on the next screen.
+    runtime.dev_context = {before=function(reason)
+        if reason == "page closed" or reason == "creator closed" then runtime:cancel("console:picker") end
+    end}
     runtime.log("PICKER CONSOLE | Ready: colors_picker [open|trace|close|apply|restore]")
 end
 return M

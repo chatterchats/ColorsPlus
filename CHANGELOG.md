@@ -51,6 +51,18 @@ the player-only package.
 - The widget library lookup uses a plain validity check: `a.live` rejects
   class default objects by design (caught by the launcher test).
 
+### Dev Panel integration removed; journals move to `Recovery/`
+
+- Removed the SWZC Dev Panel client, bridge and action catalog
+  (`DevPanel/actions.lua`). Developer tools remain console commands:
+  `colors_picker`, `colors_compat`, `colors_screens`. The picker console now
+  owns its queued action and cancels it on page/creator exit.
+- Recovery journals and session metadata live in `Recovery/`, which ships
+  with a README so the folder exists after extraction. A `DevPanel/` folder
+  from an older version is no longer read; its journals were from a previous
+  game process, which are archived rather than replayed anyway. The tester
+  guide says it can be deleted.
+
 ### Source split: the mod in `src/ColorsPlus`, dev tools in `src/Colors+Probe`
 
 - `src/ColorsPlus` holds the mod (37 scripts, assets, manifests, tester guide,

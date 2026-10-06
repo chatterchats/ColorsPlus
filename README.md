@@ -16,7 +16,7 @@ game's eye choices are not supported.
 
 - **Apply Color** keeps the choice for the current editor visit; save the
   character normally to keep it. **Cancel** returns to the previous color.
-- Unfinished edits are journaled under `DevPanel/` and restored after a Lua
+- Unfinished edits are journaled under `Recovery/` and restored after a Lua
   reload; journals from a previous game process are archived, never replayed.
 - The picker writes `colors_plus_performance.log` automatically (5-second
   summaries, environment line, lookup timings). Detailed events go to
@@ -41,19 +41,20 @@ rename to `ColorsPlus` is planned for v0.4):
 
 - **`ColorsPlus-Testers-<version>.zip`**: the player build, exactly
   `src/ColorsPlus`: picker, editing backend, recovery, performance log,
-  assets, manifests, the tester guide and `DevPanel/actions.lua` (which also
-  keeps the journal folder present). The packager checks that every mod
+  assets, manifests, the tester guide and `Recovery/README.txt` (which keeps
+  the journal folder present after extraction). The packager checks that every mod
   script is reachable from `main.lua` and that none needs a developer script.
 - **`ColorsPlus-Dev-<version>.zip`**: the mod plus `src/Colors+Probe/Scripts`
-  overlaid into the same `Scripts/` folder: traces, the compatibility survey,
-  console commands and the SWZC Dev Panel integration. `main.lua` attaches
+  overlaid into the same `Scripts/` folder: traces, the compatibility survey
+  and console commands (`colors_picker`, `colors_compat`, `colors_screens`).
+  `main.lua` attaches
   them when `dev_tools.lua` is present. They can't be a separate UE4SS mod:
   each mod runs in its own Lua state, and the tools read the picker's runtime.
 
 Both exclude logs, recovery journals and panel state. A released version is
 immutable: the packager refuses to overwrite an existing ZIP with different
 contents, so bump the version in `src/ColorsPlus` (`Scripts/main.lua`,
-`modinfo.json`, `zcom-mod.json`, `DevPanel/actions.lua`, `TESTING.md`) first.
+`modinfo.json`, `zcom-mod.json`, `TESTING.md`) first.
 
 To install, extract `Colors_Probe/` into
 `SWZeroCompany/Binaries/Win64/ue4ss/Mods/` and restart the game. Copy over an
@@ -77,7 +78,7 @@ cooked implementation of the customization preview and save lifecycle.
 ├── CHANGELOG.md
 ├── docs/                    # architecture, status history, UE4SS notes
 ├── src/
-│   ├── ColorsPlus/          # the mod (Scripts/, Assets/, DevPanel/, manifests)
+│   ├── ColorsPlus/          # the mod (Scripts/, Assets/, Recovery/, manifests)
 │   └── Colors+Probe/        # developer tools (Scripts/ only; Dev package)
 ├── tests/                   # LuaJIT test scripts
 └── tools/

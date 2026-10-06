@@ -15,7 +15,7 @@ for f in src/ColorsPlus/Scripts/*.lua src/Colors+Probe/Scripts/*.lua; do
     if [ -e "$tree/Scripts/$name" ]; then echo "Script in both trees: $name"; exit 1; fi
     ln -s "$root/$f" "$tree/Scripts/$name"
 done
-ln -s "$root/src/ColorsPlus/DevPanel" "$tree/DevPanel"
+ln -s "$root/src/ColorsPlus/Recovery" "$tree/Recovery"
 ln -s "$root/src/ColorsPlus/Assets" "$tree/Assets"
 pass=0
 fail=0

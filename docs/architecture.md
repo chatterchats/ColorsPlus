@@ -16,7 +16,7 @@ in `tests/` (`tools/run-tests.sh`).
   `update_live`, `check_live`, `apply_live`, `cancel_live`, `restore`,
   `context_changed`, plus `pending`/`applied`/`blocked`/`busy`.
 - `dev_tools.lua` (Dev package only, from `src/Colors+Probe`) attaches traces,
-  the compatibility survey, the picker console and the SWZC Dev Panel. The
+  the compatibility survey and the picker console. The
   Testers package is exactly `src/ColorsPlus`.
 
 ## A zone (`color_zone.lua`)
@@ -48,8 +48,8 @@ whole regular backend (`parts.regular`).
 | `zabrak_picker` / `zabrak_picker_source` | Zabrak swap skins: source-owned drafts and Apply | `zabrak_picker_recovery.txt` (`zabrak-picker-source-v1`) |
 
 Zone *n* > 1 prefixes its journals with `zone<n>_`. All journals live in
-`DevPanel/`. Journals left by a previous game process are archived by
-`recovery_session`, never replayed; only a same-process Lua reload replays
+`Recovery/` (`DevPanel/` until v0.3.0). Journals left by a previous game
+process are archived by `recovery_session`, never replayed; only a same-process Lua reload replays
 them, and an unreadable journal blocks its zone instead of guessing.
 
 ### Why the journals stay separate
