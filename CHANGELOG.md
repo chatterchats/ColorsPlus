@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ancestry and hidden siblings are recorded unpinned at discovery/install.
 - The launcher holds the cache from the start of `install` (released by
   `retire`, which every failed install runs).
+- Startup builds an extra zone only for a non-empty zone journal or any
+  `.previous` file; readers treat empty journals as nothing to recover, so
+  leftover empty files no longer force zones 2-N at every launch.
 - Not yet changed: preview setup's own hook events still discard the scalar
   route hints, so each opening repeats 3-5 `FindAllOf` discoveries (~35-40ms
   each on the developer machine).

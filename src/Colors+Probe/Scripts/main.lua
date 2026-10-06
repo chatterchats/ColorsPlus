@@ -94,11 +94,16 @@ if #missing == 0 then
     tint = module("zabrak_picker").wrap(zone_runtime, probe.access, journal("zabrak_picker_recovery.txt"), tint)
     return tint
     end,function(index)
-        -- Same per-zone journals the session gate preserves/archives.
+        -- Same per-zone journals the session gate preserves/archives. Readers
+        -- treat an empty journal as nothing to recover, but any ".previous"
+        -- file (interrupted replacement) blocks its zone, so it always counts.
         for _,leaf in ipairs({"tint_recovery.txt","default_selection_recovery.txt","editor_recovery.txt",
             "editor_recovery.txt.previous","zabrak_picker_recovery.txt","zabrak_picker_recovery.txt.previous"}) do
             local f=io.open(directory .. "../DevPanel/zone" .. index .. "_" .. leaf,"r")
-            if f then f:close(); return true end
+            if f then
+                local data=f:read(1); f:close()
+                if data or leaf:sub(-9)==".previous" then return true end
+            end
         end
         return false
     end)
