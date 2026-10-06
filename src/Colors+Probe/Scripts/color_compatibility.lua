@@ -136,12 +136,47 @@ function M.new(runtime,a)
         if not eligible then log("TARGET INELIGIBLE | " .. scalar(err)) end
         return eligible
     end
+    -- Source actor, preview instance and the container/display that show it;
+    -- the hub editor's are not the main menu's. Read-only, like the rest.
+    local function links(f)
+        local owner=object(object(f):GetOwningCustomizationInstance())
+        local function optional(read)
+            local ok,v=pcall(function() local o=a.unwrap(read()); return a.live(o) and name(o) or "<none>" end)
+            return ok and v or ("<error: " .. scalar(v) .. ">")
+        end
+        log("LINK | source_actor=" .. optional(function() return owner:GetOwner() end))
+        local preview=a.unwrap(owner:GetPreviewCustomizationInstance())
+        log("LINK | preview=" .. (a.live(preview) and name(preview) or "<none>"))
+        if not a.live(preview) then return end
+        local data=object(preview:GetOwner())
+        log("LINK | preview_actor=" .. name(data))
+        local matched=0
+        for _,c in pairs(candidates("BP_CustomizationPreviewProxyContainer_C",64)) do
+            if a.live(c) then
+                local storage=a.unwrap(a.prop(c,"ProxyDataStorage"))
+                local mine=a.live(storage) and name(storage)==name(data)
+                matched=matched+(mine and 1 or 0)
+                log("LINK CONTAINER | " .. name(c) .. " | storage_matches=" .. tostring(mine)
+                    .. " | previewing=" .. scalar(a.prop(c,"IsPreviewing"))
+                    .. " | display=" .. optional(function() return a.prop(c,"ProxyCharacter") end)
+                    .. " | display_instance=" .. optional(function() return a.prop(c,"ProxyCharacter").CustomizationInstance end))
+            end
+        end
+        log("LINK | matched_containers=" .. matched)
+    end
+    local BUTTON_CLASS="/Game/Game/UI/Strategy/Customization/Widgets/CharacterDatabank/WBP_CharacterDataBank_TopNavButton.WBP_CharacterDataBank_TopNavButton_C"
+    local function button_class()
+        local ok,found=pcall(function() local c=a.unwrap(StaticFindObject(BUTTON_CLASS)); return a.live(c) end)
+        log("BUTTON CLASS | loaded=" .. scalar(ok and found or ("<error: " .. tostring(found) .. ">"))
+            .. " | LoadAsset=" .. type(rawget(_G,"LoadAsset")))
+    end
     function self.capture()
         if runtime.picker and runtime.picker.active or runtime.tint and
             (runtime.tint.pending or runtime.tint.applied or runtime.tint.blocked) then
             log("REFUSED | Close/restore the picker session before surveying another slot"); return false
         end
         log("BEGIN | read-only selected color-slot survey")
+        button_class()
         local ok,err=pcall(function()
             local page
             for _,p in pairs(candidates("WBP_Customization_ItemPage_C",128)) do
@@ -189,6 +224,10 @@ function M.new(runtime,a)
                 single=read and eligible and #values==1
                 if skin_race and i==2 then skin_candidate=read and eligible end
                 if description and name(f)==primary_name then race_candidate=read and eligible end
+            end
+            if #values>0 then
+                local links_ok,links_error=pcall(links,values[1])
+                if not links_ok then log("LINK GAP | " .. scalar(links_error)) end
             end
             local nested_ok,nested_error=pcall(nested,values)
             if not nested_ok then log("NESTED GAP | " .. scalar(nested_error)) end
