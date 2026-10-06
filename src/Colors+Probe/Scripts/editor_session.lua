@@ -37,6 +37,13 @@ function M.wrap(runtime,a,path,base)
         return base[k]
     end})
     local function log(s) runtime.log("EDITOR COLOR | " .. s) end
+    -- The 250ms watch reacquires the same verified objects for the whole visit.
+    -- Hold the shared hook-invalidated lookup cache while an Apply is owned.
+    local holder="editor:" .. tostring(path)
+    local function hold_lookups(on)
+        if not runtime.objects then return end
+        if on then runtime.objects.hold(holder) else runtime.objects.release(holder) end
+    end
     local function timed(label,fn,...)
         if runtime.perf then return runtime.perf.measure(label,fn,...) end
         return fn(...)
@@ -260,16 +267,23 @@ function M.wrap(runtime,a,path,base)
                     assert(base.verify_editor_display(),"Restored editor display verification failed")
                 end
             end
-            persist(nil); record=nil; blocked=nil
+            persist(nil); record=nil; blocked=nil; hold_lookups(false)
             log("RESTORED | " .. tostring(reason) .. (outcome=="replaced" and " | later stock edit preserved" or ""))
         end)
         busy=false
-        if not ok then blocked=tostring(err); log("RESTORE FAILED | " .. blocked .. " | recovery retained; do not save") end
+        if not ok then
+            blocked=tostring(err); hold_lookups(false)
+            log("RESTORE FAILED | " .. blocked .. " | recovery retained; do not save")
+        end
         return ok
     end
     local function watch(s)
+        hold_lookups(true)
         runtime:after("editor:watch",250,function()
-            if record~=s or blocked then return end
+            if record~=s or blocked then
+                if not record or blocked then hold_lookups(false) end
+                return
+            end
             local external=false
             local ok,err=pcall(function()
                 local f=source(s)

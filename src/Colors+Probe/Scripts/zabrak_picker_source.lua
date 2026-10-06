@@ -341,6 +341,7 @@ function M.new(runtime,a,path)
         if not result[1] then error(result[2],0) end
         return unpack_values(result,2,result.n)
     end
+    local update_logged=false
     function self.update(chosen)
         if self.busy or self.blocked or not self.pending then return false end
         calls=0; self.busy=true
@@ -360,13 +361,15 @@ function M.new(runtime,a,path)
             timed("zupdate.refresh",call,"owner RefreshCustomization",function() object(c.owner):RefreshCustomization() end)
             c=assert(timed("zupdate.source_after_refresh",source,next_state),"CP refresh replaced source")
             assert(c.expanded and c.order==REORDERED and same(color(c.values[2]),chosen),"CP refresh readback failed")
-            log("RGB VERIFIED | " .. rgba(chosen))
+            -- One line per picker session; failures and Apply still log values.
+            if not update_logged then log("RGB VERIFIED | first update | " .. rgba(chosen)); update_logged=true end
         end)
         self.busy=false
         if not ok then self.blocked=tostring(err); log("UPDATE FAILED | " .. self.blocked .. " | recovery retained") end
         return ok
     end
     function self.begin(c,chosen)
+        update_logged=false
         calls=0
         if self.pending or self.blocked or self.busy then return false end
         self.busy=true

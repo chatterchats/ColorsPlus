@@ -695,8 +695,8 @@ function M.new(runtime, access, recovery_path)
         assert(not session.force_restore_reason, "Context event already requested restore")
         local revision=(session.color_revision or 0)+1
         local function checkpoint(stage)
-            -- Bounded crash diagnostics, not an endless successful-poll trace.
-            if revision<=8 then log("RGB UPDATE | revision=" .. revision .. " | " .. stage) end
+            -- Stage trace for the first update only; later stages are in PERF.
+            if revision==1 then log("RGB UPDATE | revision=" .. revision .. " | " .. stage) end
         end
         checkpoint("VALIDATE BEGIN")
         local reuse=session.live and target_module.preview_policy(session.profile)~=nil
@@ -949,8 +949,11 @@ function M.new(runtime, access, recovery_path)
         local binding
         local ok, err = pcall(function()
             binding=timed("update.core",update_owned_color,session,chosen)
-            log("LIVE PICKER UPDATE | revision=" .. session.color_revision .. " | linear_rgba=" .. rgba(session.test_color)
-                .. " | source unchanged")
+            -- Every log line is flushed and console-mirrored; log the first
+            -- update only. Failures and Apply still record the exact value.
+            if session.color_revision==1 then
+                log("LIVE PICKER UPDATE | revision=1 | linear_rgba=" .. rgba(session.test_color) .. " | source unchanged")
+            end
         end)
         self.busy = false
         if not ok then

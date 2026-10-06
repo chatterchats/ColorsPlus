@@ -122,6 +122,7 @@ local a={unwrap=function(v) return v end,live=function(v) return type(v)=="table
     text=tostring,values=function(v) assert(type(v)=="table"); return v end}
 local targets=assert(loadfile(scripts .. "/color_target.lua"))().new(a)
 local runtime={log=function(s) logs[#logs+1]=s end}
+runtime.objects=assert(loadfile(scripts .. "/object_cache.lua"))().new(function() end)
 function runtime:after(k,ms,cb) jobs[k]={ms=ms,cb=cb} end
 function runtime:cancel(k) jobs[k]=nil end
 local function run(k) local job=assert(jobs[k],k); jobs[k]=nil; job.cb() end
@@ -236,7 +237,8 @@ for _,from_default in ipairs({false,true}) do
 end
 -- Another cached creator's CloseMenu cannot end this applied session.
 clean(); apply(); session.context_changed("creator closed","WBP_CustomCharacter_Master_C /Game/Other")
-assert(session.applied); assert(session.restore("cleanup"))
+assert(session.applied); assert(runtime.objects.active(),"An owned Apply holds the lookup cache for its watch")
+assert(session.restore("cleanup")); assert(not runtime.objects.active(),"Restore releases the editor lookup hold")
 -- An open second draft is discarded on item-page exit, but Apply survives.
 clean(true); apply(); local draft=assert(session.begin_live()); session.update_live(draft,violet)
 page.inactive=true; session.context_changed("page closed")
