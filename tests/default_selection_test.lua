@@ -112,7 +112,7 @@ local function boot()
     function b.invalidate_context_lookup() end
     function b.begin_live()
         assert(current()~=default,"Must equip a stock swatch before using regular preview")
-        b.pending={live=true,test_color={R=1,G=.2,B=.1,A=1}}
+        b.pending={live=true,test_color={R=1,G=.2,B=.1,A=1},profile={slot=slot.SlotTag.TagName}}
         files.tint="RGB pending"
         if fail_preview then b.restore("open failed"); return nil end
         return b.pending
@@ -167,7 +167,8 @@ assert(wrapped.inspect()==false,"Inspection waits for the temporary selection to
 assert(wrapped.restore("Cancel")); restored()
 assert(has("RESTORED | equipped Default"))
 begin(); assert(base.restore("external backend restore")); restored() -- internal base.restore must reach adapter
-begin(); page.inactive=true; wrapped.context_changed("page closed"); run("tint:context"); restored()
+-- Leaving the item page ends the draft at once (no scheduled context restore).
+begin(); page.inactive=true; wrapped.context_changed("page closed"); assert(not jobs["tint:context"]); restored()
 clean(); begin(); aux.CurrentCustomizationSlotVM=object("BitReactorCustomizationSlotViewModel /Game/Test.OtherSlot")
 wrapped.context_changed("slot changed"); run("tint:context"); restored() -- restore recorded, not newly selected slot
 

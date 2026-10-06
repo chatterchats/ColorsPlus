@@ -526,7 +526,10 @@ do
     local s=begin(); assert(adapted.update_live(s,rgb_module.parse("160,64,224")))
     assert(adapted.restore("picker Cancel")); finished()
     begin(); assert(not jobs["tint:timeout"]); assert(regular.restore("external backend restore")); finished()
-    begin(); adapted.context_changed("page closed"); run("tint:context-restore"); finished()
+    -- A slot change ends the draft through the preview's scheduled context restore;
+    -- leaving the item page ends it immediately. Both return the slot to Default.
+    begin(); adapted.context_changed("UpdateRootCustomizationSlotVM"); run("tint:context-restore"); finished()
+    begin(); adapted.context_changed("page closed"); assert(not jobs["tint:context-restore"]); finished()
     begin(); boot(); adapted.start(); run("tint:recovery"); finished(); run("selection:recovery")
     -- Actual regular blue-activation failure still undoes the temporary equip.
     mode="before"; assert(not adapted.begin_live()); mode=nil; finished()
@@ -562,9 +565,8 @@ do
             assert(files[from]~=nil and files[to]==nil); files[to],files[from]=files[from],nil; return true
         end
         os.remove=function(p) files[p]=nil; return true end
-        local editor_module=assert(loadfile(scripts .. "/editor_session.lua"))()
         boot()
-        local session=editor_module.wrap(runtime,probe.access,"editor",adapted)
+        local session=adapted
         messages={}; local draft=assert(session.begin_live(),table.concat(messages,"\n"))
         assert(session.update_live(draft,rgb_module.parse("160,64,224")))
         assert(session.apply_live(draft),table.concat(messages,"\n"))

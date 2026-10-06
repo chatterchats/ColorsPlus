@@ -1,6 +1,7 @@
--- One applied color zone for this editor visit. Unlike hover preview, Apply
+-- Applied colors for this creator visit. Unlike the hover preview, Apply
 -- writes the verified per-character source fragment. Never edits stock assets.
 -- The original is journaled before mutation; exit/reload restores, never saves.
+-- color_zone sequences these steps with the preview and Default selection.
 local M={}
 local directory=debug.getinfo(1,"S").source:gsub("^@",""):match("^(.*[/\\])")
 local rules=assert(loadfile(directory .. "color_rules.lua"))()
@@ -19,31 +20,25 @@ local function parsed(s)
     local c={R=tonumber(r),G=tonumber(g),B=tonumber(b),A=tonumber(a)}
     assert(rules.finite(c),"Invalid editor recovery value"); return c
 end
-function M.wrap(runtime,a,path,base)
-    local record,blocked,busy
+function M.new(runtime,a,path)
+    local record
+    -- blocked: a journal or restore failure retains recovery. busy: Apply or
+    -- Restore is writing (the zone ignores events and refuses re-entry).
+    local self={busy=false}
     local source_path=debug.getinfo(1,"S").source:gsub("^@",""):match("^(.*[/\\])")
     local lifetime=assert(loadfile(source_path .. "creator_lifetime.lua"))().new(a,runtime.log)
     local target_module=assert(loadfile(source_path .. "color_target.lua"))()
     local targets=target_module.new(a)
     local fragment_module=assert(loadfile(source_path .. "color_fragments.lua"))()
     local fragments=fragment_module.new(a)
-    local self=setmetatable({}, {__index=function(_,k)
-        if k=="blocked" then return blocked or base.blocked end
-        if k=="busy" then return busy or base.busy end
-        if k=="applied" then return record end
-        return base[k]
-    end})
     local function log(s) runtime.log("EDITOR COLOR | " .. s) end
+    self.log=log
     -- The 250ms watch reacquires the same verified objects for the whole visit.
     -- Hold the shared hook-invalidated lookup cache while an Apply is owned.
     local holder="editor:" .. tostring(path)
     local function hold_lookups(on)
         if not runtime.objects then return end
         if on then runtime.objects.hold(holder) else runtime.objects.release(holder) end
-    end
-    local function timed(label,fn,...)
-        if runtime.perf then return runtime.perf.measure(label,fn,...) end
-        return fn(...)
     end
     local skin_source=assert(loadfile(source_path .. "skin_source_target.lua"))().new(a,log)
     local function object(v) v=a.unwrap(v); assert(a.live(v),"Editor object unavailable"); return v end
@@ -208,226 +203,105 @@ function M.wrap(runtime,a,path,base)
         assert(fragments.matches(restored,s.profile,s.original,true),"Editor companion restore readback failed")
         return "restored"
     end
-    local function skin_stop(reason)
-        return not runtime.skin_enable or runtime.skin_enable.stop(reason)
+    function self.record() return record end
+    function self.hold_lookups(on) hold_lookups(on) end
+    -- Reopening continues from the applied color on the same character,
+    -- slot and source. read: the preview's context reader.
+    function self.reopen_check(read)
+        visit(record)
+        local c=read()
+        assert(lifetime.belongs(record.creator,c.page) and name(c.owner)==record.owner and name(c.slot)==record.vm
+            and name(c.fragment)==record.fragment and same(c.original,record.chosen)
+            and target_module.same(c.profile,record.profile),
+            "One applied zone per visit in this test build; restore it before opening another zone")
     end
-    local function skin_sync(s,mode,read_context)
-        return not runtime.skin_enable or runtime.skin_enable.start(mode,s,read_context)
-    end
-    function self.cancel_live(reason)
-        if not skin_stop(reason or "picker Cancel") then return false end
-        local restored=base.restore(reason or "picker Cancel")
-        if restored and record then
-            local ok,err=pcall(function()
-                visit(record)
-                local f=assert(source(record),"Applied skin source replaced")
-                assert(same(color(f),record.chosen),"Applied skin source changed")
-                assert(skin_sync(record,"applied"),"Applied skin enable failed")
-            end)
-            if not ok then log("CANCEL DISPLAY FAILED | " .. tostring(err)); return false end
-        end
-        return restored
-    end
-    function self.restore(reason,external)
-        if busy then return false end
-        if not skin_stop(reason or "editor Restore") then return false end
-        if not record then
-            if blocked then log("RESTORE BLOCKED | " .. blocked); return false end
-            return base.restore(reason)
-        end
-        busy=true
-        local ok,err=pcall(function()
-            runtime:cancel("editor:watch"); runtime:cancel("editor:recovery")
-            assert(base.restore(reason),"Finish hover recovery before editor restore")
-            local outcome=external and "replaced" or restore_source(record)
-            if outcome=="replaced" then base.forget_selection() end
-            -- Source RGB first, then any temporary Default -> stock selection.
-            base.hold_selection(false)
-            assert(base.restore(reason),"Finish Default selection recovery")
-            if outcome=="restored" then
-                local readable,c=pcall(base.read_context)
-                if readable and c and name(c.owner)==record.owner and name(c.slot)==record.vm then
-                    assert(base.verify_editor_display(),"Restored editor display verification failed")
-                end
-            end
-            persist(nil); record=nil; blocked=nil; hold_lookups(false)
-            log("RESTORED | " .. tostring(reason) .. (outcome=="replaced" and " | later stock edit preserved" or ""))
-        end)
-        busy=false
-        if not ok then
-            blocked=tostring(err); hold_lookups(false)
-            log("RESTORE FAILED | " .. blocked .. " | recovery retained; do not save")
-        end
-        return ok
-    end
-    local function watch(s)
-        hold_lookups(true)
-        runtime:after("editor:watch",250,function()
-            if record~=s or blocked then
-                if not record or blocked then hold_lookups(false) end
-                return
-            end
-            local external=false
-            local ok,err=pcall(function()
-                local f=source(s)
-                external=not f or not same(color(f),s.chosen) or not fragments.matches(f,s.profile,s.chosen)
-                assert(not external,"Applied source changed externally")
-                visit(s,true)
-            end)
-            if not ok then self.restore("editor context ended/changed: " .. tostring(err),external); return end
-            -- Rendering availability is not ownership of the source RGB. Keep
-            -- the verified Apply through navigation gaps; never undo it solely
-            -- because the preview/display object is temporarily absent.
-            if not base.pending and (s.render_failures or 0)<8 then
-                local rendered,result=pcall(skin_sync,s,"applied")
-                if rendered and result then
-                    if (s.render_failures or 0)>0 then log("DISPLAY RESUMED | applied RGB retained") end
-                    s.render_failures=0
-                else
-                    s.render_failures=(s.render_failures or 0)+1
-                    if s.render_failures==1 then log("DISPLAY WAIT | applied RGB retained; source/visit still verified") end
-                    if s.render_failures==8 then
-                        log("DISPLAY PAUSED | retry budget exhausted; resumes on context event; applied RGB retained; Restore before saving")
-                    end
-                end
-            end
-            watch(s)
-        end)
-    end
-    function self.apply_live(session)
-        if runtime.skin_enable and runtime.skin_enable.pending and not runtime.skin_enable.pending.mode then
-            runtime.log("SKIN ENABLE | Apply blocked until temporary test is restored"); return false
-        end
-        if self.blocked or busy then return false end
-        busy=true
-        local ok,err=pcall(function()
-            local healthy,why=base.check_live(session); assert(healthy,why)
-            assert(valid_color(session.test_color,session.profile),"Invalid Apply value")
-            local c=base.read_context()
-            if record then
-                assert(name(c.owner)==record.owner and name(c.fragment)==record.fragment
-                    and name(c.slot)==record.vm and lifetime.belongs(record.creator,c.page)
-                    and target_module.same(c.profile,record.profile),"Applied editor target changed")
-                visit(record)
-            end
-            local was_applied=record~=nil
-            local s=record or {owner=name(c.owner),slot=name(c.source_slot),fragment=name(c.fragment),
-                vm=name(c.slot),part=id(c.part.AssetId),page=c.page,materials=c.materials,original=copy(c.original),profile=c.profile}
-            s.creator=s.creator or lifetime.bind(c.page)
-            assert(lifetime.active(s.creator),"Creator not active")
-            s.previous=copy(c.original); s.chosen=copy(session.test_color)
-            if s.profile.bundle and not s.bundle_ids then
-                s.bundle_ids=fragments.identities(c.source_slot:GetFragmentInstances())
-            end
-            if not record and skin_source.supports(s) then
-                local _,values=fragments.read(c.source_slot:GetFragmentInstances(),s.profile)
-                s.skin_target=name(values[3])
-                local profile={}; for k,v in pairs(s.profile) do profile[k]=v end
-                profile.skin_scalar=nil; s.profile=profile
-            end
-            validate(s)
-            record=s
-            s.handoff=session.handoff -- plain identities for this visit, never persisted as saved support
-            persist(s) -- write-ahead intent before preview teardown/source writes
-            -- Restore the hover while its source baseline is still unchanged.
-            -- Keep Default's temporary editor selection until this visit ends.
-            base.hold_selection(true)
-            assert(skin_stop("Apply preview handoff"),"Skin preview restore failed")
-            assert(base.restore("Apply: end hover preview"),"Could not end hover preview")
-            local f,owner=source(s,true); assert(f,"Source replaced before Apply")
-            assert(same(color(f),s.previous),"Source color changed before Apply")
-            assert(fragments.matches(f,s.profile,s.previous,not was_applied),"Source companion colors changed before Apply")
-            if s.skin_target then
-                local _,scalar=skin_source.read(object(f:GetOwningCustomizationSlot()):GetFragmentInstances(),s,true)
-                skin_source.write(assert(scalar,"Skin Apply source replaced"),false)
-            end
-            fragments.write(object(f),s.profile,s.chosen)
-            f,owner=source(s); assert(f,"Source replaced during Apply setter")
-            assert(same(color(f),s.chosen),"Apply SetColor readback failed")
-            object(owner):RefreshCustomization()
-            local installed=assert(source(s),"Apply refresh replaced source fragment")
-            assert(same(color(installed),s.chosen),"Apply refresh color readback failed")
-            assert(fragments.matches(installed,s.profile,s.chosen),"Apply companion color readback failed")
-            assert(base.verify_editor_display(),"Applied display verification failed")
-            assert(skin_sync(s,"applied"),"Applied face tint enable failed")
-            watch(s)
-            log("APPLIED | linear_rgba=" .. encoded(s.chosen) .. " | creator=" .. s.creator.master .. " | creator visit only; no save; restores on exit")
-        end)
-        busy=false
-        if not ok then
-            log("APPLY FAILED | " .. tostring(err))
-            self.restore("failed editor Apply rollback")
-        end
-        return ok
-    end
-    function self.begin_live()
-        if self.blocked then return nil end
+    -- Apply, step 1: the write-ahead record, journaled before any teardown.
+    function self.prepare(session,read)
+        assert(valid_color(session.test_color,session.profile),"Invalid Apply value")
+        local c=read()
         if record then
-            local ok,err=pcall(function()
-                visit(record)
-                local c=base.read_context()
-                assert(lifetime.belongs(record.creator,c.page) and name(c.owner)==record.owner and name(c.slot)==record.vm
-                    and name(c.fragment)==record.fragment and same(c.original,record.chosen)
-                    and target_module.same(c.profile,record.profile),
-                    "One applied zone per visit in this test build; restore it before opening another zone")
-            end)
-            if not ok then log("OPEN REFUSED | " .. tostring(err)); return nil end
+            assert(name(c.owner)==record.owner and name(c.fragment)==record.fragment
+                and name(c.slot)==record.vm and lifetime.belongs(record.creator,c.page)
+                and target_module.same(c.profile,record.profile),"Applied editor target changed")
+            visit(record)
         end
-        if not skin_stop("opening skin draft") then return nil end
-        local s=base.begin_live()
-        if s and record and not base.update_live(s,record.chosen) then return nil end
-        if s and not skin_sync(s,"preview") then self.cancel_live("skin preview enable failed"); return nil end
-        if s then s.preview_policy=target_module.preview_policy(s.profile) end
-        return s
-    end
-    function self.update_live(s,chosen)
-        if not timed("update.skin_stop",skin_stop,"RGB update") then return false end
-        local ok
-        if s.profile.slot=="br.Customization.Slot.Character.Appearance.Humanoid.Head.Face.SkinTone"
-            and type(base.update_live_scoped)=="function" then
-            ok=base.update_live_scoped(s,chosen,function(read_context)
-                return timed("update.skin_enable",skin_sync,s,"preview",read_context)
-            end)
-        else
-            if not base.update_live(s,chosen) then return false end
-            ok=timed("update.skin_enable",skin_sync,s,"preview")
+        local was_applied=record~=nil
+        local s=record or {owner=name(c.owner),slot=name(c.source_slot),fragment=name(c.fragment),
+            vm=name(c.slot),part=id(c.part.AssetId),page=c.page,materials=c.materials,original=copy(c.original),profile=c.profile}
+        s.creator=s.creator or lifetime.bind(c.page)
+        assert(lifetime.active(s.creator),"Creator not active")
+        s.previous=copy(c.original); s.chosen=copy(session.test_color)
+        if s.profile.bundle and not s.bundle_ids then
+            s.bundle_ids=fragments.identities(c.source_slot:GetFragmentInstances())
         end
-        -- base.update_live verifies context before writing and verifies the
-        -- result; skin_sync must also succeed before issuing this receipt.
-        return ok,ok==true
-    end
-    function self.check_live(s)
-        local ok,why=base.check_live(s)
-        if not ok then return ok,why end
-        return skin_sync(s,"preview"),"Skin preview enable failed"
-    end
-    function self.context_changed(reason,identity)
-        if busy then return end
-        if record then record.render_failures=0 end -- event-driven retry after a bounded display wait
-        if reason=="creator closed" then
-            if identity and record and record.creator and identity~=record.creator.master then return end
-            self.restore(reason); return
+        if not record and skin_source.supports(s) then
+            local _,values=fragments.read(c.source_slot:GetFragmentInstances(),s.profile)
+            s.skin_target=name(values[3])
+            local profile={}; for k,v in pairs(s.profile) do profile[k]=v end
+            profile.skin_scalar=nil; s.profile=profile
         end
-        if reason=="page closed" then
-            -- Discard an open draft, but do not undo an already-applied source
-            -- color just because the user returned to the radial slot selector.
-            base.restore("item page closed")
-            if record then log("RETAINED | item page closed; waiting for creator navigation") end
-            return
-        end
-        base.context_changed(reason)
-        -- The watcher checks the original source independently of selected slot.
-        -- No reapplication loop: later stock edits win.
+        validate(s)
+        record=s
+        s.handoff=session.handoff -- plain identities for this visit, never persisted as saved support
+        persist(s)
+        return s,was_applied
     end
+    -- Apply, step 2 (the preview has ended): write the chosen color into the
+    -- verified source fragment, refresh, and read everything back.
+    function self.write(s,was_applied)
+        local f,owner=source(s,true); assert(f,"Source replaced before Apply")
+        assert(same(color(f),s.previous),"Source color changed before Apply")
+        assert(fragments.matches(f,s.profile,s.previous,not was_applied),"Source companion colors changed before Apply")
+        if s.skin_target then
+            local _,scalar=skin_source.read(object(f:GetOwningCustomizationSlot()):GetFragmentInstances(),s,true)
+            skin_source.write(assert(scalar,"Skin Apply source replaced"),false)
+        end
+        fragments.write(object(f),s.profile,s.chosen)
+        f,owner=source(s); assert(f,"Source replaced during Apply setter")
+        assert(same(color(f),s.chosen),"Apply SetColor readback failed")
+        object(owner):RefreshCustomization()
+        local installed=assert(source(s),"Apply refresh replaced source fragment")
+        assert(same(color(installed),s.chosen),"Apply refresh color readback failed")
+        assert(fragments.matches(installed,s.profile,s.chosen),"Apply companion color readback failed")
+    end
+    function self.log_applied(s)
+        log("APPLIED | linear_rgba=" .. encoded(s.chosen) .. " | creator=" .. s.creator.master .. " | creator visit only; no save; restores on exit")
+    end
+    -- Watch: the applied source still holds our color and the visit continues.
+    -- Returns ok, error, and whether the source was changed by someone else.
+    function self.check_applied(s)
+        local external=false
+        local ok,err=pcall(function()
+            local f=source(s)
+            external=not f or not same(color(f),s.chosen) or not fragments.matches(f,s.profile,s.chosen)
+            assert(not external,"Applied source changed externally")
+            visit(s,true)
+        end)
+        return ok,err,external
+    end
+    function self.verify_applied(s)
+        visit(s)
+        local f=assert(source(s),"Applied skin source replaced")
+        assert(same(color(f),s.chosen),"Applied skin source changed")
+    end
+    function self.restore_source(s) return restore_source(s) end
+    function self.owns_context(c,s) return name(c.owner)==s.owner and name(c.slot)==s.vm end
+    function self.clear() persist(nil); record=nil; self.blocked=nil; hold_lookups(false) end
+    function self.fail(err)
+        self.blocked=tostring(err); hold_lookups(false)
+        log("RESTORE FAILED | " .. self.blocked .. " | recovery retained; do not save")
+    end
+    -- Reads the journal. Returns nil when recovery is blocked (the zone then
+    -- reads nothing else), true when an applied record needs restoring.
     function self.start()
         local previous=io.open(path .. ".previous","r")
         if previous then
-            previous:close(); blocked="Interrupted editor journal replacement; restart game before writes"
-            log("RECOVERY BLOCKED | " .. blocked); return
+            previous:close(); self.blocked="Interrupted editor journal replacement; restart game before writes"
+            log("RECOVERY BLOCKED | " .. self.blocked); return nil
         end
         local f,read_err,read_code=io.open(path,"r")
         if not f and read_code and read_code~=2 then
-            blocked="Cannot read editor recovery: " .. tostring(read_err); log("RECOVERY BLOCKED | " .. blocked); return
+            self.blocked="Cannot read editor recovery: " .. tostring(read_err); log("RECOVERY BLOCKED | " .. self.blocked); return nil
         end
         if f then
             local data=f:read(32769) or ""; f:close(); data=data:gsub("\r\n","\n")
@@ -460,19 +334,12 @@ function M.wrap(runtime,a,path,base)
                     if v[1]=="editor-v3" or v[1]=="editor-v4" or v[1]=="editor-v5" or v[1]=="editor-v6" then
                         assert(target_module.decode_targets(s.profile,v[16]),"Invalid multi-mesh recovery")
                     end
-                    validate(s); record=s; base.hold_selection(true)
+                    validate(s); record=s
                 end)
-                if not ok then blocked=tostring(err); log("RECOVERY BLOCKED | " .. blocked); return end
+                if not ok then self.blocked=tostring(err); log("RECOVERY BLOCKED | " .. self.blocked); return nil end
             end
         end
-        base.start()
-        if record then runtime:after("editor:recovery",25,function() self.restore("reload recovery") end) end
-    end
-    -- Inclusive per-layer opening time for the performance log; no behavior change.
-    local timed_begin_live=self.begin_live
-    function self.begin_live(...)
-        if runtime.perf then return runtime.perf.measure("begin.editor",timed_begin_live,...) end
-        return timed_begin_live(...)
+        return record~=nil
     end
     return self
 end

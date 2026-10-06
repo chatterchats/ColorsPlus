@@ -250,8 +250,7 @@ local JOURNALS={["tint_recovery.txt"]="recovery",["default_selection_recovery.tx
 local function journal(leaf) return assert(JOURNALS[leaf],leaf) end
 local function boot()
     tint=load("tint_test").new(runtime,access,"recovery")
-    local zone=load("color_zone").new(runtime,access,journal,{preview=tint})
-    editor=load("editor_session").wrap(runtime,access,"editor",zone)
+    editor=load("color_zone").new(runtime,access,journal,{preview=tint})
     if route_zabrak then editor=load("zabrak_picker").wrap(runtime,access,"zabrak",editor) end
 end
 local function assert_ok(ok) assert(ok,table.concat(logs,"\n")) end
