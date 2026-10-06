@@ -98,7 +98,7 @@ function M.new(runtime,a,tint)
             current=parent(current); assert(name(current)==full,"Color pane ancestry changed")
         end
         local root=fresh(self.root_name)
-        assert(name(parent(root))==b.stack,"Rainbow launcher detached")
+        assert(name(parent(root))==(self.launcher_parent or b.stack),"Rainbow launcher detached")
         visibility.validate(b)
         return true
     end
@@ -125,19 +125,20 @@ function M.new(runtime,a,tint)
         local ok,grid=pcall(fresh,f.grid)
         if ok and grid:GetVisibility()==3 then grid:SetVisibility(f.original) end
     end
-    -- Palette box layout (measured in-game on v0.3.0). The palette column has
-    -- no height limit: the game caps the swatch area's SizeBox
-    -- (MaxDesiredHeight) so heading + swatches exactly fill the background
-    -- box, and the launcher hung below it. While the launcher shows, lower
-    -- that cap by the launcher's height. The stock cap survives Lua reloads
-    -- and is restored when the picker opens and when the launcher retires,
-    -- only if it still holds our value (another mod may manage it too).
+    -- Palette box layout (measured in-game on v0.3.0). The game caps the
+    -- swatch area's height so the palette exactly fills its background box,
+    -- and creator overhauls may keep re-applying their own cap. The launcher
+    -- never adds height: it sits in the column's overlay, aligned to the
+    -- bottom, over a band reserved by extra bottom padding on the swatch
+    -- grid's own slot; the capped area keeps its height and the grid scrolls.
+    -- The stock padding survives Lua reloads and is restored when the picker
+    -- opens and when the launcher retires, only if it still holds our value.
     -- Slots are read through WidgetLayoutLibrary (the Blueprint way); the raw
     -- Slot property is only a fallback.
-    local LAUNCHER_HEIGHT=44+6+2 -- SizeBox height plus slot padding
-    local layouts=rawget(_G,"ColorsPlusProbeLauncherLayout") or {}
-    rawset(_G,"ColorsPlusProbeLauncherLayout",layouts)
-    local capped
+    local BAND=44+6+2 -- launcher height plus its top/bottom gaps
+    local layouts=rawget(_G,"ColorsPlusProbeLauncherBand") or {}
+    rawset(_G,"ColorsPlusProbeLauncherBand",layouts)
+    local reserved
     local SLOT_AS={VerticalBox="SlotAsVerticalBoxSlot",Overlay="SlotAsOverlaySlot",SizeBox="SlotAsSizeBoxSlot",
         HorizontalBox="SlotAsHorizontalBoxSlot",Border="SlotAsBorderSlot",ScrollBox="SlotAsScrollBoxSlot",
         CanvasPanel="SlotAsCanvasSlot",GridPanel="SlotAsGridSlot",UniformGridPanel="SlotAsUniformGridSlot",
@@ -157,67 +158,66 @@ function M.new(runtime,a,tint)
         if ok and a.live(v) then return v end
         error("Unreadable " .. kind(widget) .. " slot in " .. kind(holder))
     end
-    local function stack_child(b)
-        -- The grid itself, or the chain ancestor whose parent is the stack.
-        local child=b.grid
-        for _,full in ipairs(b.chain) do
-            if full==b.stack then return child end
-            child=full
-        end
-        error("Selector stack is not an ancestor of the swatch grid")
+    local function margin(slot)
+        return {Left=pad(slot,"Left"),Top=pad(slot,"Top"),Right=pad(slot,"Right"),Bottom=pad(slot,"Bottom")}
     end
-    local function cap_host(b)
-        if capped then return end
-        local host=fresh(stack_child(b))
-        assert(kind(host)=="SizeBox" and host.bOverride_MaxDesiredHeight==true,"Swatch area has no height cap")
-        local current=assert(num(function() return host.MaxDesiredHeight end),"Unreadable swatch height cap")
-        local stock=layouts[name(host)] and layouts[name(host)].stock or current
-        local ours=math.max(stock-LAUNCHER_HEIGHT,LAUNCHER_HEIGHT)
-        layouts[name(host)]={stock=stock,ours=ours}
-        host:SetMaxDesiredHeight(ours)
-        capped=name(host)
-        return stock,ours
-    end
-    -- Another mod (e.g. a character-creator overhaul adding rows above the
-    -- swatches) may re-apply its own cap after ours. Adopt its value as the
-    -- stock cap and lower it again; back off after a few corrections rather
-    -- than fight a widget that keeps resetting it.
-    local MAX_RECAPS=3
-    local function refresh_cap(b)
-        if not capped then
-            local ok,stock,ours=pcall(cap_host,b) -- a cap may only appear later
-            if ok then log(string.format("LAUNCHER LAYOUT | height=cap %s->%s (appeared later)",tostring(stock),tostring(ours))) end
-            return
+    local function same_margin(p,q)
+        for _,k in ipairs({"Left","Top","Right","Bottom"}) do
+            if math.abs((p[k] or 0)-(q[k] or 0))>0.01 then return false end
         end
-        local record=layouts[capped]
-        local ok,host=pcall(fresh,capped)
-        if not record or not ok then return end
-        local current=num(function() return host.MaxDesiredHeight end)
-        if current==nil or current==record.ours or host.bOverride_MaxDesiredHeight~=true then return end
-        record.recaps=(record.recaps or 0)+1
-        if record.recaps>MAX_RECAPS then
-            if record.recaps==MAX_RECAPS+1 then log("LAUNCHER LAYOUT | height=left to another widget (keeps resetting the cap)") end
-            return
-        end
-        record.stock=current; record.ours=math.max(current-LAUNCHER_HEIGHT,LAUNCHER_HEIGHT)
-        host:SetMaxDesiredHeight(record.ours)
-        log(string.format("LAUNCHER LAYOUT | height=re-cap %s->%s (changed by another widget)",tostring(current),tostring(record.ours)))
+        return true
     end
-    local function restore_host()
-        local host_name=capped; capped=nil
-        local record=host_name and layouts[host_name]
+    local function grid_slot(key)
+        local grid=fresh(key)
+        return slot_of(grid,parent(grid))
+    end
+    local function reserve_band(b)
+        if reserved then return end
+        local s=grid_slot(b.grid)
+        local stock=layouts[b.grid] and layouts[b.grid].stock or margin(s)
+        local ours={Left=stock.Left,Top=stock.Top,Right=stock.Right,Bottom=stock.Bottom+BAND}
+        layouts[b.grid]={stock=stock,ours=ours}
+        s:SetPadding(ours)
+        reserved=b.grid
+        return stock.Bottom,ours.Bottom
+    end
+    -- Another widget may re-apply the grid's padding after ours: adopt its
+    -- value as stock and reserve the band again; back off after a few
+    -- corrections rather than fight a widget that keeps resetting it.
+    local MAX_RESERVES=3
+    local function refresh_band()
+        local record=reserved and layouts[reserved]
         if not record then return end
-        layouts[host_name]=nil
-        -- A destroyed page has nothing left to restore; a cap someone else
+        local ok,s=pcall(grid_slot,reserved)
+        if not ok then return end
+        local current=margin(s)
+        if same_margin(current,record.ours) then return end
+        record.resets=(record.resets or 0)+1
+        if record.resets>MAX_RESERVES then
+            if record.resets==MAX_RESERVES+1 then log("LAUNCHER LAYOUT | band=left to another widget (keeps resetting the grid padding)") end
+            return
+        end
+        record.stock=current
+        record.ours={Left=current.Left,Top=current.Top,Right=current.Right,Bottom=current.Bottom+BAND}
+        s:SetPadding(record.ours)
+        log(string.format("LAUNCHER LAYOUT | band=re-reserved bottom %s->%s (changed by another widget)",
+            tostring(current.Bottom),tostring(record.ours.Bottom)))
+    end
+    local function release_band()
+        local key=reserved; reserved=nil
+        local record=key and layouts[key]
+        if not record then return end
+        layouts[key]=nil
+        -- A destroyed page has nothing left to restore; padding someone else
         -- changed after us is theirs to keep.
-        local ok,host=pcall(fresh,host_name)
-        if ok and num(function() return host.MaxDesiredHeight end)==record.ours then host:SetMaxDesiredHeight(record.stock) end
+        local ok,s=pcall(grid_slot,key)
+        if ok and same_margin(margin(s),record.ours) then s:SetPadding(record.stock) end
     end
     -- Width: the grid's laid-out width derived from the live chain (Slate
     -- geometry is not readable from Lua), then the tile row inside it.
     local function swatch_row(b)
         local records,w={},fresh(b.grid)
-        local stack_offset,before_stack=0,true
+        local stack_offset,before_stack,stack_pad=0,true,0
         for _=1,20 do
             local r={desired=num(function() return w:GetDesiredSize().X end)}
             if kind(w)=="SizeBox" and w.bOverride_WidthOverride==true then r.width_override=num(function() return w.WidthOverride end) end
@@ -227,7 +227,8 @@ function M.new(runtime,a,tint)
                 r.parent_kind=kind(up); r.h=num(function() return s.HorizontalAlignment end)
                 r.pad_l,r.pad_r=pad(s,"Left"),pad(s,"Right")
                 r.parent_size_rule=num(function() return s.Size.SizeRule end)
-                if before_stack then stack_offset=stack_offset+r.pad_l end
+                if before_stack then stack_offset=stack_offset+r.pad_l
+                elseif name(w)==b.stack then stack_pad=r.pad_l end
                 if name(up)==b.stack then before_stack=false end
             else
                 -- A widget-tree root fills its owning UserWidget.
@@ -245,12 +246,12 @@ function M.new(runtime,a,tint)
         local row=palette_layout.swatch_row(width,num(function() return grid:GetEntryWidth() end),
             num(function() return grid.HorizontalEntrySpacing end),grid.bEntrySizeIncludesEntrySpacing==true,
             num(function() return grid.TileAlignment end),num(function() return grid:GetNumItems() end))
-        row.left=row.left+stack_offset; row.column=width
+        row.left=row.left+stack_offset; row.column=width; row.stack_pad=stack_pad
         return row
     end
     local function retire()
         thaw()
-        restore_host()
+        release_band()
         if runtime.perf then runtime.perf.cancel_launch("launcher retired before opening") end
         if runtime.objects then runtime.objects.release("color-ui") end
         epoch=epoch+1
@@ -258,7 +259,7 @@ function M.new(runtime,a,tint)
         runtime:cancel("color-ui:launch")
         runtime:cancel("color-ui:open")
         if self.root_name then button_clicks.get(runtime).retire(self.root_name) end
-        self.binding=nil; self.button_name=nil
+        self.binding=nil; self.button_name=nil; self.launcher_parent=nil
         if self.root_name then
             local root=StaticFindObject(self.root_name:match("^[^ ]+ (.+)$"))
             if a.live(root) then
@@ -316,7 +317,7 @@ function M.new(runtime,a,tint)
             if self.picker_owner or runtime.picker.active then poll(b,generation); return end
             local ok,err=pcall(self.validate_picker,b)
             if ok then
-                local refreshed,why=pcall(refresh_cap,b)
+                local refreshed,why=pcall(refresh_band)
                 if not refreshed then log("LAUNCHER LAYOUT | height check failed | " .. tostring(why):match("[^:]*$")) end
                 poll(b,generation); return
             end
@@ -361,20 +362,30 @@ function M.new(runtime,a,tint)
         button:SetIsFocusable(false); button:SetIsSelectable(false); button:SetIsToggleable(false)
         self.button_name=name(button); remember(button)
         local button_slot=row:AddChild(button); button_slot:SetSize({SizeRule=1,Value=1}); button_slot:SetVerticalAlignment(2)
-        local slot=fresh(b.stack):AddChild(root)
-        slot:SetPadding({Left=0,Top=6,Right=0,Bottom=2})
-        slot:SetSize({SizeRule=0,Value=1})
         -- Keep the launcher inside the palette box and as wide as the swatches.
-        -- Unreadable values keep the plain full-width layout, logged.
-        local capped_ok,stock_cap,our_cap=pcall(cap_host,b)
+        -- Reserve the band first; only then sit in the overlay over it. Without
+        -- a band the launcher stays below the swatches (it never covers them).
+        local stack=fresh(b.stack)
+        local banded,stock_pad,our_pad=false,"column is not in an overlay"
+        if name(parent(stack))==b.overlay then banded,stock_pad,our_pad=pcall(reserve_band,b) end
+        local holder=banded and fresh(b.overlay) or stack
+        local slot=holder:AddChild(root)
+        self.launcher_parent=name(holder)
+        if banded then
+            slot:SetHorizontalAlignment(0); slot:SetVerticalAlignment(3)
+            slot:SetPadding({Left=0,Top=0,Right=0,Bottom=2})
+        else
+            slot:SetPadding({Left=0,Top=6,Right=0,Bottom=2})
+            slot:SetSize({SizeRule=0,Value=1})
+        end
         local fitted,row=pcall(swatch_row,b)
         if fitted then
             footer_size:SetWidthOverride(row.width)
             footer_slot:SetHorizontalAlignment(1)
-            footer_slot:SetPadding({Left=row.left,Top=0,Right=0,Bottom=0})
+            footer_slot:SetPadding({Left=row.left+(banded and row.stack_pad or 0),Top=0,Right=0,Bottom=0})
         end
         log(string.format("LAUNCHER LAYOUT | height=%s | width=%s",
-            capped_ok and string.format("cap %s->%s",tostring(stock_cap),tostring(our_cap)) or ("unchanged (" .. tostring(stock_cap):match("[^:]*$") .. ")"),
+            banded and string.format("band bottom %s->%s",tostring(stock_pad),tostring(our_pad)) or ("below swatches (" .. tostring(stock_pad):match("[^:]*$") .. ")"),
             fitted and string.format("%.1f left=%.1f column=%.1f per_line=%d align=%s",row.width,row.left,row.column,row.per_line,row.align)
                 or ("full (" .. tostring(row):match("[^:]*$") .. ")")))
         -- Reacquire after native attachment/Construct before setting text.
@@ -424,7 +435,7 @@ function M.new(runtime,a,tint)
         -- Restore the true original first, in this same synchronous call, so
         -- the visibility record and later restore keep the stock value.
         thaw()
-        restore_host() -- the picker keeps the stock swatch-area cap
+        release_band() -- the picker keeps the stock swatch layout
         self.validate_picker(b)
         -- Hide disjoint native branches beside the grid's ancestry. This also
         -- covers mod-added labels/sliders without guessing their names, while
@@ -449,16 +460,16 @@ function M.new(runtime,a,tint)
                 if not protected[full] then add(full,owner) end
             end
         end
-        add(self.root_name,b.stack)
+        add(self.root_name,self.launcher_parent or b.stack)
         visibility.hide(b,root_name,targets)
         self.picker_owner=root_name
     end
     function self.release_picker(b)
         visibility.restore() -- Keep the verified launcher when the pane closes.
         self.picker_owner=nil
-        if self.binding then
-            local ok,why=pcall(cap_host,self.binding)
-            if not ok then log("LAUNCHER LAYOUT | height=unchanged | " .. tostring(why):match("[^:]*$")) end
+        if self.binding and self.launcher_parent==self.binding.overlay then
+            local ok,why=pcall(reserve_band,self.binding)
+            if not ok then log("LAUNCHER LAYOUT | band unavailable | " .. tostring(why):match("[^:]*$")) end
         end
     end
     function self.context_changed(reason)

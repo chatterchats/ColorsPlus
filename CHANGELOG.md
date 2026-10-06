@@ -31,23 +31,23 @@ the player-only package.
   while the picker owns the pane). The rainbow gradient sits beside the
   button; the native button's caption is set after attachment.
 - Launcher layout (from in-game review; tree measured with a diagnostics
-  build). The palette column has no height limit: the game caps the swatch
-  SizeBox (`MaxDesiredHeight` 550, or 455 with another mod's slider row) so
-  the palette exactly fills its 563x793 background, and the launcher hung
-  below it. While the launcher shows, the cap is lowered by the launcher's
-  52px; it is restored when the picker opens and when the launcher retires,
-  only if it still holds our value. The launcher spans just the swatch row:
+  build). The game caps the swatch SizeBox (`MaxDesiredHeight` 550, or 455
+  with Maddie's character-creator overhaul rows) so the palette exactly fills
+  its 563x793 background, and the launcher used to add height below it. The
+  overhaul re-applies its cap continuously, so the cap is never written.
+  Instead the launcher sits in the column's overlay, aligned to the bottom,
+  over a 52px band reserved by bottom padding on the swatch grid's own slot:
+  total height is unchanged and the grid scrolls within the capped area. The
+  band is restored when the picker opens and when the launcher retires (only
+  if it still holds our value), re-reserved if another widget resets the
+  padding (backing off after three corrections), and skipped when the
+  column's overlay is not where expected (the launcher then stays below the
+  swatches and never covers them). The launcher spans just the swatch row:
   the column width (465 = 563 panel - 68 - 30 padding) is derived from the
   live chain's desired sizes and slot padding (`palette_layout.lua`), then
   64px tiles with 10px spacing give a 434px row starting 5px in. Slots are
-  read through `WidgetLayoutLibrary`. Unreadable values keep the full-width
-  layout; one `LAUNCHER LAYOUT` line records the values used.
-- Coexist with mods that manage the same cap (Maddie's character-creator
-  overhaul re-applies 455 after its extra rows are built). The launcher's
-  backstop check (first at 100ms, then every 500ms while it shows) adopts a
-  cap changed by another widget as the new stock value and lowers it again,
-  backing off after three corrections instead of fighting a widget that keeps
-  resetting it. A cap that only appears later is picked up the same way.
+  read through `WidgetLayoutLibrary`. One `LAUNCHER LAYOUT` line records the
+  values used.
 - The widget library lookup uses a plain validity check: `a.live` rejects
   class default objects by design (caught by the launcher test).
 

@@ -52,7 +52,8 @@ local function object(kind,path)
     function o:SetValue(v) self.value=v; self.value_writes=(self.value_writes or 0)+1 end
     function o:GetValue() return self.value end
     function o:IsPressed() return self.pressed==true end
-    for _,fn in ipairs({"SetHeightOverride","SetWidthOverride","SetPadding","SetSize","SetVerticalAlignment",
+    function o:SetPadding(v) self.SetPadding_arg=v; self.Padding=v end
+    for _,fn in ipairs({"SetHeightOverride","SetWidthOverride","SetSize","SetVerticalAlignment",
         "SetHorizontalAlignment","SetBackgroundColor","SetColorAndOpacity","SetAnchors","SetAlignment","SetOffsets",
         "SetMinValue","SetMaxValue","SetStepSize","SetSliderBarColor","SetSliderHandleColor",
         "SetIndentHandle","SetIsReadOnly","SetHintText","SetForegroundColor",
@@ -197,8 +198,8 @@ local function launch_click()
 end
 ui.start(); run("color-ui:startup"); run("color-ui:install")
 local binding=assert(ui.binding)
-assert(#stack.children==2 and #overlay.children==1 and grid.visibility==0)
-assert(ui.reconcile()==binding and #stack.children==2,"No duplicate launcher")
+assert(#stack.children==1 and #overlay.children==2 and grid.visibility==0,"The launcher sits in the column's overlay")
+assert(ui.reconcile()==binding and #overlay.children==2,"No duplicate launcher")
 local scans_before=global_scans
 assert(ui.reconcile()==binding and global_scans==scans_before,"Verified launcher must not rediscover global pages")
 local root_name=ui.root_name
@@ -217,27 +218,30 @@ end
 assert(rainbow and rainbow.texture and imports==1)
 assert(rainbow.parent.SetWidthOverride_arg==42 and rainbow.parent.SetHeightOverride_arg==24)
 local launcher=find(root_name)
-assert(launcher.Slot.SetSize_arg.SizeRule==0,"Launcher keeps a fixed slot at the bottom of the palette box")
-assert(grid_box.MaxDesiredHeight==498,"The swatch cap shrinks by the launcher height so the palette fits its box")
+assert(launcher.parent==overlay and launcher.Slot.SetVerticalAlignment_arg==3 and launcher.Slot.SetHorizontalAlignment_arg==0,
+    "Launcher sits at the bottom of the column overlay, adding no height")
+assert(grid.Slot.Padding.Bottom==52 and grid_box.MaxDesiredHeight==550,
+    "A band inside the capped swatch area holds the launcher; the cap itself is untouched")
 local launcher_size=launcher.WidgetTree.RootWidget.children[1]
 assert(launcher_size.SetWidthOverride_arg==450 and launcher_size.Slot.SetHorizontalAlignment_arg==1
     and launcher_size.Slot.SetPadding_arg.Left==10,"Launcher spans exactly the six-swatch row")
 local layout_logged=false
 for _,line in ipairs(logs) do
-    if line:find("LAUNCHER LAYOUT | height=cap 550->498 | width=450.0 left=10.0 column=480.0 per_line=6 align=left",1,true) then layout_logged=true end
+    if line:find("LAUNCHER LAYOUT | height=band bottom 0->52 | width=450.0 left=10.0 column=480.0 per_line=6 align=left",1,true) then layout_logged=true end
 end
 assert(layout_logged,"Launcher layout records the values it used")
 local footer=launcher.WidgetTree.RootWidget
 assert(footer.kind=="Overlay" and footer.visibility==4)
 assert(footer.children[1].SetHeightOverride_arg==44 and footer.children[1].Slot.SetVerticalAlignment_arg==2)
 assert(jobs["color-ui:poll"].delay==100,"The first layout check runs soon after the page builds")
--- Another widget (e.g. a creator overhaul) re-applies its own cap after ours:
--- adopt its value as stock and lower it again; then follow it back.
-grid_box.MaxDesiredHeight=455; run("color-ui:poll")
-assert(grid_box.MaxDesiredHeight==403,"A cap reset by another widget is adopted and lowered again")
+-- Another widget re-applies the grid padding after ours: adopt it as stock
+-- and reserve the band again; a cap changed by others is never touched.
+grid.Slot:SetPadding({Left=0,Top=0,Right=0,Bottom=8}); grid_box.MaxDesiredHeight=455; run("color-ui:poll")
+assert(grid.Slot.Padding.Bottom==60 and grid_box.MaxDesiredHeight==455,"Padding reset by another widget is adopted and the band reserved again")
 assert(jobs["color-ui:poll"].delay==500,"Launcher validation is a slow backstop, not an input poll")
-run("color-ui:poll"); assert(grid_box.MaxDesiredHeight==403,"Our own cap is not re-lowered")
-grid_box.MaxDesiredHeight=550; run("color-ui:poll"); assert(grid_box.MaxDesiredHeight==498)
+run("color-ui:poll"); assert(grid.Slot.Padding.Bottom==60,"Our own band is not reserved twice")
+grid.Slot:SetPadding({Left=0,Top=0,Right=0,Bottom=0}); grid_box.MaxDesiredHeight=550; run("color-ui:poll")
+assert(grid.Slot.Padding.Bottom==52)
 launch_click(); assert(grid.visibility==0 and not jobs["color-ui:open"],"No widget work inside the native click stack")
 run("color-ui:launch"); assert(opens==0 and jobs["color-ui:open"].delay==100)
 assert(grid.visibility==3,"Swatches stop taking the mouse from the launch click")
@@ -260,7 +264,7 @@ assert(ui.prepare_picker()==binding,"Opening must not depend on geometry marshal
 -- Real view fills only the verified lower selector host, without geometry calls.
 local view=assert(loadfile(scripts .. "/picker_view.lua"))().new(runtime)
 view.open(); assert(find(view.root_name).parent==overlay and view.pane_binding==binding)
-assert(grid_box.MaxDesiredHeight==550,"The picker keeps the stock swatch cap")
+assert(grid.Slot.Padding.Bottom==0,"The picker keeps the stock swatch layout")
 assert(not find(view.hsv.hue_name).value_writes and not find(view.hsv.hex_name).text
     and not view.hsv.painted_h,"Build must not initialize an unused white draft")
 local native_heading=find(view.heading_name)
@@ -270,7 +274,7 @@ assert(heading_creates==1 and native_heading.kind=="WBP_Customization_SlotSubIte
 assert(native_heading.visibility==3 and native_heading.bIsFocusable==false
     and native_heading.WidgetTree.RootWidget.children[1].kind=="Image",
     "Keep the native marker and make the decorative heading ignore input")
-assert(#overlay.children==2 and grid.visibility==2 and grid.parent==grid_box,
+assert(#overlay.children==3 and grid.visibility==2 and grid.parent==grid_box,
     "Native swatches must be Hidden without removing their layout space")
 assert(zone_label.visibility==2 and recolour_label.visibility==2 and slider_box.visibility==2
     and launcher.visibility==2,"Both labels, the slider branch and our launcher must disappear")
@@ -408,8 +412,8 @@ old_hue.IsValid=function() return false end
 assert(find(view.buttons[1].name).text=="Cancel")
 click(view,1)
 local value,action=view.read(); assert(value==nil and action=="cancel")
-view.close(); assert(#overlay.children==1 and ui.root_name==root_name and grid.visibility==0)
-assert(grid_box.MaxDesiredHeight==498,"Closing the picker re-fits the launcher inside the box")
+view.close(); assert(#overlay.children==2 and ui.root_name==root_name and grid.visibility==0)
+assert(grid.Slot.Padding.Bottom==52,"Closing the picker re-reserves the launcher band")
 assert(zone_label.visibility==0 and recolour_label.visibility==3 and slider_box.visibility==4
     and launcher.visibility==4 and recolour_slider.value==1,"Close restores every original visibility exactly")
 assert(not view.hsv,"HSV child identities retire with the owned view")
@@ -420,7 +424,7 @@ local recovered_ui=assert(loadfile(scripts .. "/color_ui.lua"))().new(runtime,a,
 runtime.color_ui=recovered_ui
 local recovered_view=assert(loadfile(scripts .. "/picker_view.lua"))().new(runtime)
 recovered_view.cleanup()
-assert(grid.visibility==0 and not abandoned.parent and #overlay.children==1,
+assert(grid.visibility==0 and not abandoned.parent and #overlay.children==2,
     "Lua recovery must reveal the exact palette after retiring its picker")
 assert(zone_label.visibility==0 and recolour_label.visibility==3 and slider_box.visibility==4
     and launcher.visibility==4,"Lua recovery restores labels, slider and launcher as well as the grid")
@@ -428,12 +432,12 @@ runtime.color_ui=ui; view.close()
 -- Native heading failures must be closable before and after palette hiding.
 fail_heading_create=true
 assert(not pcall(view.open) and view.root_name and grid.visibility==0)
-fail_heading_create=nil; view.close(); assert(launcher.visibility==4 and #overlay.children==1)
+fail_heading_create=nil; view.close(); assert(launcher.visibility==4 and #overlay.children==2)
 fail_heading_text=true
 assert(not pcall(view.open) and view.root_name and grid.visibility==2)
 fail_heading_text=nil; view.close()
 assert(grid.visibility==0 and zone_label.visibility==0 and slider_box.visibility==4
-    and launcher.visibility==4 and #overlay.children==1,"Late heading failure restores the complete palette")
+    and launcher.visibility==4 and #overlay.children==2,"Late heading failure restores the complete palette")
 -- Actual coordinator plus native HSV view: Apply flushes current hex even
 -- between 5Hz backend updates; Cancel remains first even with broken inputs.
 local old_picker=runtime.picker
@@ -468,7 +472,7 @@ find(live_view.hsv.hex_name).text="#FF8020"
 click(live_view,2)
 run("picker:tick")
 assert(applied.R==1 and math.abs(applied.G-input.parse("255,128,32").G)<1e-9)
-assert(not runtime.picker.active and not live_view.root_name and #overlay.children==1 and grid.visibility==0,
+assert(not runtime.picker.active and not live_view.root_name and #overlay.children==2 and grid.visibility==0,
     "Apply must reveal the original palette")
 assert(zone_label.visibility==0 and recolour_label.visibility==3 and slider_box.visibility==4
     and launcher.visibility==4,"Apply restores the complete native selector")
@@ -484,7 +488,10 @@ runtime.call_trace=nil; runtime.trace_picker_initialization=nil
 -- Retired native wrappers are never retained. The path is reacquired each use.
 local retired_grid=grid
 grid=object("BitReactorTileView",retired_grid.path)
-grid.parent=grid_box; tiles.PartsGridList=grid
+grid.parent=grid_box; grid.Slot=object("SizeBoxSlot",grid_box.path .. ".Slot1"); tiles.PartsGridList=grid
+function grid:GetEntryWidth() return 75 end
+function grid:GetNumItems() return 7 end
+grid.HorizontalEntrySpacing=0; grid.bEntrySizeIncludesEntrySpacing=false; grid.TileAlignment=3
 grid_box.children[1]=grid -- a fresh native GetAllChildren call returns fresh wrappers too
 retired_grid.IsValid=function() error("old grid wrapper touched") end
 assert(ui.validate_picker(binding)); retired_grid.IsValid=function() return false end
@@ -498,13 +505,13 @@ vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
 ui.context_changed("UpdateCurrentCustomizationSlotVM")
 run("color-ui:poll"); assert(not ui.binding and not ui.root_name)
 queued(); assert(opens==before)
-run("color-ui:install"); assert(ui.binding and ui.binding.tag==tag and #stack.children==2)
+run("color-ui:install"); assert(ui.binding and ui.binding.tag==tag and #overlay.children==2)
 local stale_poll=jobs["color-ui:poll"].fn
 local retired_button=find(ui.button_name)
 assert(runtime.button_clicks.routes[ui.button_name],"Launcher click route is bound while attached")
 ui.context_changed("page closed"); assert(not ui.binding and not jobs["color-ui:poll"])
-stale_poll(); run("color-ui:retire"); assert(#stack.children==1 and not ui.root_name)
-assert(grid_box.MaxDesiredHeight==550,"Retiring the launcher restores the stock swatch cap")
+stale_poll(); run("color-ui:retire"); assert(#overlay.children==1 and not ui.root_name)
+assert(grid.Slot.Padding.Bottom==0,"Retiring the launcher restores the stock grid padding")
 assert(not runtime.button_clicks.routes[retired_button:GetFullName()],"Retiring the launcher unbinds its click route")
 hooks["/Script/CommonUI.CommonButtonBase:HandleButtonClicked"]({get=function() return retired_button end})
 assert(not jobs["color-ui:launch"] and not jobs["color-ui:open"],"A click on a retired launcher does nothing")
@@ -515,7 +522,7 @@ assert(not jobs["color-ui:install"] and not ui.binding)
 page.active=true
 -- No borrowing a page-level parent or touching unsupported/missing ancestry.
 grid.parent=object("Overlay",page.path .. ".WidgetTree_4.PageWideOverlay")
-assert(not pcall(ui.reconcile) and #stack.children==1)
+assert(not pcall(ui.reconcile) and #overlay.children==1)
 grid.parent=grid_box
 -- Failed attachment still refuses preview; removal failures retain identity.
 fail_construct="/Script/UMG.HorizontalBox"; assert(not pcall(ui.reconcile) and not ui.root_name)
@@ -538,7 +545,7 @@ do
         for _,slot in ipairs(rejected) do
             tag=slot; vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
             assert(not pcall(ui.prepare_picker),"Preset/style grids must never offer Custom Color: " .. slot)
-            assert(not ui.root_name and not ui.binding and #stack.children==1 and grid.visibility==0)
+            assert(not ui.root_name and not ui.binding and #overlay.children==1 and grid.visibility==0)
         end
     end
     vm.GetFragments=function() return {} end
@@ -568,7 +575,7 @@ do
         assert(not ui.root_name and not ui.binding and not jobs["color-ui:poll"])
         ui.context_changed("DisplayCustomizationList")
         for _=1,4 do run("color-ui:install") end
-        assert(not ui.root_name and not jobs["color-ui:install"] and #stack.children==1)
+        assert(not ui.root_name and not jobs["color-ui:install"] and #overlay.children==1)
     end
     runtime.perf=nil
 end
@@ -589,10 +596,10 @@ for _,slot in ipairs({"br.Customization.Slot.Character.Appearance.Humanoid.Facia
     tag=slot; vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
     local binding=ui.reconcile()
     assert(not binding.manual and ui.root_name and ui.button_name and jobs["color-ui:poll"])
-    assert(#stack.children==2 and ui.validate_picker(binding),"Vitiligo/scar launchers must keep verified native ancestry")
-    view.open(); assert(view.pane_binding==binding and #overlay.children==2 and ui.root_name)
+    assert(#overlay.children==2 and ui.validate_picker(binding),"Vitiligo/scar launchers must keep verified native ancestry")
+    view.open(); assert(view.pane_binding==binding and #overlay.children==3 and ui.root_name)
     view.set_rgb({R=255,G=128,B=32}); local rgb=view.read(); assert(rgb.R==255)
-    view.close(); assert(ui.binding==binding and #stack.children==2 and #overlay.children==1)
+    view.close(); assert(ui.binding==binding and #overlay.children==2)
     grid.parent=nil
     assert(not pcall(ui.validate_picker,binding),"Vitiligo/scar pane must reject changed native ancestry")
     grid.parent=grid_box; ui.close("next cosmetic"); assert(not ui.binding)
@@ -634,26 +641,36 @@ retired_shift_slider.IsValid=function() return false end
 click(view,1)
 find(channels[1].slider).GetValue=function() error("Cancel must bypass invalid HSV inputs") end
 native,local_action=view.read(); assert(native==nil and local_action=="cancel")
-view.close(); assert(not view.hsv_shift and not view.input_mode and ui.binding and #overlay.children==1)
+view.close(); assert(not view.hsv_shift and not view.input_mode and ui.binding and #overlay.children==2)
 ui.close("HSV test ended")
 tag="br.Customization.Slot.Character.Appearance.Humanoid.FacialDetails.Group.Scar.Strength"
 vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
 assert(not pcall(ui.prepare_picker),"Manual override must refuse unrelated scalar slots")
--- The swatch cap: lowered while a launcher shows, restored on retirement,
--- but a cap another mod changed after us is theirs to keep.
+-- The launcher band: reserved while a launcher shows, restored on
+-- retirement, but grid padding another mod changed after us is theirs. The
+-- swatch cap (which creator overhauls keep re-applying) is never written.
 tag="br.Customization.Slot.Character.Hair.Hair.Color.Primary"; vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
-grid_box.MaxDesiredHeight=550; ui.close("cap baseline")
-assert(pcall(ui.reconcile) and ui.binding and grid_box.MaxDesiredHeight==498)
-ui.close("cap restore"); assert(grid_box.MaxDesiredHeight==550)
-assert(pcall(ui.reconcile) and grid_box.MaxDesiredHeight==498)
--- A widget that keeps resetting the cap wins after three corrections.
-for i=1,4 do grid_box.MaxDesiredHeight=500+i; run("color-ui:poll") end
-assert(grid_box.MaxDesiredHeight==504,"Back off instead of fighting a widget that keeps resetting the cap")
-grid_box.MaxDesiredHeight=401; ui.close("cap changed by another mod")
-assert(grid_box.MaxDesiredHeight==401,"Never overwrite a swatch cap another mod changed")
-grid_box.bOverride_MaxDesiredHeight=false; grid_box.MaxDesiredHeight=0
-assert(pcall(ui.reconcile) and ui.binding and grid_box.MaxDesiredHeight==0,"No cap: leave the swatch area alone")
-ui.close("no cap")
+ui.close("band baseline"); grid.Slot:SetPadding({Left=0,Top=0,Right=0,Bottom=0})
+local cap_writes=0; local cap_set=grid_box.SetMaxDesiredHeight
+grid_box.SetMaxDesiredHeight=function(self,v) cap_writes=cap_writes+1; cap_set(self,v) end
+assert(pcall(ui.reconcile) and ui.binding and grid.Slot.Padding.Bottom==52)
+ui.close("band restore"); assert(grid.Slot.Padding.Bottom==0)
+assert(pcall(ui.reconcile) and grid.Slot.Padding.Bottom==52)
+-- A widget that keeps resetting the padding wins after three corrections.
+for i=1,4 do grid.Slot:SetPadding({Left=0,Top=0,Right=0,Bottom=i}); run("color-ui:poll") end
+assert(grid.Slot.Padding.Bottom==4,"Back off instead of fighting a widget that keeps resetting the padding")
+grid.Slot:SetPadding({Left=0,Top=0,Right=0,Bottom=9}); ui.close("padding changed by another mod")
+assert(grid.Slot.Padding.Bottom==9,"Never overwrite grid padding another mod changed")
+assert(cap_writes==0,"The swatch cap is never written")
+grid_box.SetMaxDesiredHeight=cap_set; grid.Slot:SetPadding({Left=0,Top=0,Right=0,Bottom=0})
+-- If the nearest overlay is not the column's parent, the launcher stays
+-- below the swatches and no band is reserved (it never covers swatches).
+local inner=object("Overlay",tree .. ".InnerOverlay")
+overlay.children={}; stack.parent=palette_root; palette_root.children[#palette_root.children+1]=stack
+stack.children={}; grid_box.parent=nil; stack:AddChild(inner); inner:AddChild(grid_box)
+assert(pcall(ui.reconcile) and ui.binding and ui.binding.overlay==inner:GetFullName() and grid.Slot.Padding.Bottom==0)
+assert(find(ui.root_name).parent==stack,"No band without the column's overlay: the launcher stays below the swatches")
+ui.close("no column overlay")
 -- Reload cleanup targets only exact launcher roots; no stock/mimic removal.
 local stale=object("UserWidget",page.path .. ".ColorsPlusLauncher_Root_90"); stack:AddChild(stale)
 local other=object("OtherWidget",page.path .. ".ColorsPlusLauncher_Root_91"); stack:AddChild(other)
