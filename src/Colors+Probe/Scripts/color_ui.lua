@@ -223,6 +223,64 @@ function M.new(runtime,a,tint)
         end
         return table.concat(parts," < ") .. " < stack"
     end
+    -- Diagnostics for the palette box: from the swatch grid up to the page,
+    -- each widget's kind, desired size, visibility, slot and size overrides,
+    -- plus the children of containers (where a background box would sit).
+    -- Read-only; logged once per launcher install.
+    local function size_text(w)
+        local ok,d=pcall(function() return w:GetDesiredSize() end)
+        if not ok or d==nil then return "?" end
+        return string.format("%sx%s",tostring(num(function() return d.X end)),tostring(num(function() return d.Y end)))
+    end
+    local function widget_text(w)
+        local k=kind(w); local short=name(w):match("([^.:]+)$") or "?"
+        local t=string.format("%s %s desired=%s vis=%s",k,short,size_text(w),tostring(num(function() return w:GetVisibility() end)))
+        if k=="SizeBox" then
+            t=t .. string.format(" w=%s/%s h=%s/%s maxh=%s/%s minh=%s/%s",tostring(w.bOverride_WidthOverride),
+                tostring(num(function() return w.WidthOverride end)),tostring(w.bOverride_HeightOverride),
+                tostring(num(function() return w.HeightOverride end)),tostring(w.bOverride_MaxDesiredHeight),
+                tostring(num(function() return w.MaxDesiredHeight end)),tostring(w.bOverride_MinDesiredHeight),
+                tostring(num(function() return w.MinDesiredHeight end)))
+        end
+        local ok,sl=pcall(slot_of,w)
+        if ok then
+            t=t .. string.format(" slot{h=%s v=%s pad=%s,%s,%s,%s size=%s}",tostring(num(function() return sl.HorizontalAlignment end)),
+                tostring(num(function() return sl.VerticalAlignment end)),pad(sl,"Left"),pad(sl,"Top"),pad(sl,"Right"),pad(sl,"Bottom"),
+                tostring(num(function() return sl.Size.SizeRule end)))
+        end
+        return t
+    end
+    local function log_tree(b)
+        local grid=fresh(b.grid)
+        log(string.format("LAUNCHER TREE | grid entry=%s x %s spacing=%s/%s includes=%s align=%s items=%s",
+            tostring(num(function() return grid:GetEntryWidth() end)),tostring(num(function() return grid:GetEntryHeight() end)),
+            tostring(num(function() return grid.HorizontalEntrySpacing end)),tostring(num(function() return grid.VerticalEntrySpacing end)),
+            tostring(grid.bEntrySizeIncludesEntrySpacing),tostring(num(function() return grid.TileAlignment end)),
+            tostring(num(function() return grid:GetNumItems() end))))
+        local w=grid
+        for level=0,14 do
+            log("LAUNCHER TREE | " .. level .. " | " .. widget_text(w))
+            local k=kind(w)
+            if level>0 and (k=="Overlay" or k=="CanvasPanel" or k=="Border" or k=="VerticalBox" or k=="HorizontalBox"
+                or k=="SizeBox" or k=="ScaleBox" or k=="ScrollBox") then
+                local ok,children=pcall(function() return a.values(w:GetAllChildren()) end)
+                if ok then
+                    for i,c in ipairs(children) do
+                        if i>8 then break end
+                        log("LAUNCHER TREE | " .. level .. "." .. i .. " | " .. widget_text(c))
+                    end
+                end
+            end
+            if k=="WBP_Customization_ItemPage_C" then break end
+            local ok,up=pcall(function() return obj(w:GetParent(),"parent") end)
+            if not ok then
+                -- A UserWidget's root has no panel parent: continue from its owner widget.
+                ok,up=pcall(function() return obj(w:GetOuter():GetOuter(),"outer widget") end)
+                if not ok then break end
+            end
+            w=up
+        end
+    end
     local function swatch_row(b)
         local grid=fresh(b.grid)
         local entry=num(function() return grid:GetEntryWidth() end)
@@ -390,6 +448,8 @@ function M.new(runtime,a,tint)
             footer_slot:SetPadding({Left=row.box_left,Top=0,Right=row.box_right,Bottom=0})
             row_slot:SetPadding({Left=row.row_left,Top=0,Right=math.max(0,row.box_width-row.row_left-row.width),Bottom=0})
         end
+        local traced,trace_why=pcall(log_tree,b)
+        if not traced then log("LAUNCHER TREE | unavailable | " .. tostring(trace_why):match("[^:]*$")) end
         local chained,chain=pcall(describe_chain,b)
         log(string.format("LAUNCHER LAYOUT | host=%s | width=%s | tree=%s",
             hosted and "fill" or ("stock (" .. tostring(host_why):match("[^:]*$") .. ")"),
