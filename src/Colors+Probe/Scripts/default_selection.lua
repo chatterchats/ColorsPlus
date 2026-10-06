@@ -336,6 +336,12 @@ function M.wrap(runtime,a,path,regular,base)
             return base[key](...)
         end
     end
+    -- Inclusive per-layer opening time for the performance log; no behavior change.
+    local timed_begin_live=self.begin_live
+    function self.begin_live(...)
+        if runtime.perf then return runtime.perf.measure("begin.default_selection",timed_begin_live,...) end
+        return timed_begin_live(...)
+    end
     return self
 end
 return M

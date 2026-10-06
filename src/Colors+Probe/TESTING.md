@@ -1,4 +1,4 @@
-# Welcome to Colors+ — tester build v0.2.120
+# Welcome to Colors+ — tester build v0.3.0
 
 Colors+ lets you choose your own colors when customizing a character, instead
 of being limited to the game's existing choices. Thanks for trying it out!
@@ -6,25 +6,30 @@ This is an early test version, so please back up your saves first.
 
 ## What's new in this update
 
-This update targets the lag while the picker is open. The game should no
-longer slow down just because the picker (or a color palette with the Custom
-Color button) is on screen, and dragging should update much more smoothly.
-Try leaving the picker open untouched, then drag around the color box and
-along the rainbow slider on skin, clothing and other appearance colors. Also
-switch color slots, return to the selection menu and reopen the picker.
-After applying colors to several zones, browse the creator for a while:
-it should stay smooth. Loading into the game should also be quicker.
-Opening the picker should be faster too, without a hitch right after it appears.
-The picker should no longer close by itself if your mouse passes over the
-color swatches while it opens.
+This update is all about speed and smoothness:
+
+- **No more slowdown while the picker is open.** Leaving the picker (or a
+  color palette with the Custom Color button) on screen should no longer lag
+  the game, and dragging around the color box and rainbow slider should feel
+  much smoother.
+- **Faster opening.** The picker should open noticeably quicker, especially
+  when you reopen it on a color you've already used, with no hitch right
+  after it appears.
+- **Smoother after Apply.** Browsing the creator after applying colors to
+  several parts should stay smooth, and loading into the game is quicker.
+- **No more picker closing by itself** if your mouse passes over the color
+  swatches while it opens.
+- **The Custom Color button now uses the game's own button style.** Tell us
+  if it looks out of place or doesn't respond to a click.
+
+Please try leaving the picker open untouched, dragging colors on skin,
+clothing and other appearance options, switching color slots, and reopening
+the picker. If you sent us a log for an earlier build, we'd especially like
+to compare: this build records a little extra timing detail.
 
 Cancel should still return your previous color; Apply should keep your latest
-choice. The Zabrak Skin Tone 4, 5 and 10 fixes are included and have passed
-Cancel, Restore, menu navigation and save/restart testing.
-
-Normal performance logging still runs automatically while you use the picker.
-No console commands or extra setup are needed. The skin-color fixes and native
-Apply/Cancel buttons remain included, and extra troubleshooting tracing stays off.
+choice. Performance logging still runs automatically while you use the
+picker. No console commands or extra setup are needed.
 
 ## Getting started
 

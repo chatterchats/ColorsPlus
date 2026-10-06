@@ -56,8 +56,8 @@ assert(owned.perf.window.rows["queue_clock_late.picker:tick"].max>3)
 owned:teardown(); assert(not owned.perf.window and next(owned.actions)==nil)
 local expanded=module.new(runtime)
 expanded.start()
-for i=1,129 do expanded.measure("bounded-stage-" .. i,function() end) end
-assert(expanded.window.labels==128 and expanded.window.dropped==1,"Expanded stage budget must remain bounded")
+for i=1,193 do expanded.measure("bounded-stage-" .. i,function() end) end
+assert(expanded.window.labels==192 and expanded.window.dropped==1,"Expanded stage budget (opening sub-stages) must remain bounded")
 expanded.stop("budget test")
 -- Automatic picker captures own their lifetime; manual commands cannot cut
 -- them short. Summaries go to an independent, batched sink, not runtime.log.

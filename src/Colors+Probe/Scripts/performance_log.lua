@@ -8,7 +8,7 @@ function M.new(runtime,options)
     options=options or {}
     local clock=options.clock or os.clock
     -- Bounded headroom for validation substages alongside opening/UI timings.
-    local limit=options.limit or 128
+    local limit=options.limit or 192
     local self={window=nil}
     local serial=0
     local sample

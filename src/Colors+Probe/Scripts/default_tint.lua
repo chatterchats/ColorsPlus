@@ -365,6 +365,12 @@ function M.wrap(runtime,a,path,base)
             return base[key](...)
         end
     end
+    -- Inclusive per-layer opening time for the performance log; no behavior change.
+    local timed_begin_live=wrapper.begin_live
+    function wrapper.begin_live(...)
+        if runtime.perf then return runtime.perf.measure("begin.default_tint",timed_begin_live,...) end
+        return timed_begin_live(...)
+    end
     return wrapper
 end
 return M

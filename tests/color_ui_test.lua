@@ -174,6 +174,12 @@ local function click(view,index)
     local o=find(view.buttons[index].name)
     hooks["/Script/CommonUI.CommonButtonBase:HandleButtonClicked"]({get=function() return o end})
 end
+-- The launcher is the game's CommonUI button; a click latches, the 1ms
+-- launch job pauses swatch input and queues the deferred opening.
+local function launch_click()
+    local o=find(ui.button_name)
+    hooks["/Script/CommonUI.CommonButtonBase:HandleButtonClicked"]({get=function() return o end})
+end
 ui.start(); run("color-ui:startup"); run("color-ui:install")
 local binding=assert(ui.binding)
 assert(#stack.children==2 and #overlay.children==1 and grid.visibility==0)
@@ -181,10 +187,13 @@ assert(ui.reconcile()==binding and #stack.children==2,"No duplicate launcher")
 local scans_before=global_scans
 assert(ui.reconcile()==binding and global_scans==scans_before,"Verified launcher must not rediscover global pages")
 local root_name=ui.root_name
-local button=find(ui.button_name); button.pressed=true
+local button=find(ui.button_name)
+assert(button.kind=="WBP_CharacterDataBank_TopNavButton_C" and button.text=="CUSTOM COLOR",
+    "Launcher uses the game's native button with its caption set after attachment")
+local launcher_root=find(root_name)
 local rainbow
 for _,o in pairs(objects) do
-    if o.kind=="Image" and o.path:sub(1,#button.path+1)==button.path .. "." then
+    if o.kind=="Image" and o.path:sub(1,#launcher_root.path+1)==launcher_root.path .. "." then
         assert(not rainbow,"Launcher must have one gradient image")
         assert(o.visibility==3,"Rainbow decoration must be visible and hit-test invisible")
         rainbow=o
@@ -197,14 +206,16 @@ assert(launcher.Slot.SetSize_arg.SizeRule==1,"Launcher must absorb unused select
 local footer=launcher.WidgetTree.RootWidget
 assert(footer.kind=="Overlay" and footer.visibility==4)
 assert(footer.children[1].SetHeightOverride_arg==44 and footer.children[1].Slot.SetVerticalAlignment_arg==2)
-run("color-ui:poll"); assert(opens==0 and jobs["color-ui:open"].delay==100)
-assert(grid.visibility==3,"Swatches stop taking the mouse from the launch press")
+assert(jobs["color-ui:poll"].delay==500,"Launcher validation is a slow backstop, not an input poll")
+launch_click(); assert(grid.visibility==0 and not jobs["color-ui:open"],"No widget work inside the native click stack")
+run("color-ui:launch"); assert(opens==0 and jobs["color-ui:open"].delay==100)
+assert(grid.visibility==3,"Swatches stop taking the mouse from the launch click")
 run("color-ui:open"); assert(opens==1)
 assert(grid.visibility==0,"Launch completion restores input the picker never took over")
-run("color-ui:poll"); assert(not jobs["color-ui:open"],"Held click cannot repeat")
+launch_click(); assert(not jobs["color-ui:launch"],"Clicks while the picker is open are ignored")
 runtime.picker.close()
 -- A refused launch restores the stock swatch input.
-button.pressed=false; run("color-ui:poll"); button.pressed=true; run("color-ui:poll")
+launch_click(); run("color-ui:launch")
 assert(grid.visibility==3 and jobs["color-ui:open"])
 local validate_launch=ui.validate_picker
 ui.validate_picker=function() error("launch refused for test") end
@@ -212,7 +223,7 @@ run("color-ui:open"); ui.validate_picker=validate_launch
 assert(grid.visibility==0 and opens==1,"A refused launch restores swatch input")
 -- The real picker below opens while input is paused; hiding must record the
 -- stock value (checked when the view closes), not the temporary pause.
-button.pressed=false; run("color-ui:poll"); button.pressed=true; run("color-ui:poll")
+launch_click(); run("color-ui:launch")
 assert(grid.visibility==3); runtime:cancel("color-ui:open")
 assert(ui.prepare_picker()==binding,"Opening must not depend on geometry marshalling")
 -- Real view fills only the verified lower selector host, without geometry calls.
@@ -237,7 +248,7 @@ assert(ui.reconcile()==binding,"Palette discovery must retain the active grid wh
 local validator=ui.validate_picker
 ui.validate_picker=function() error("Hidden launcher must not duplicate picker validation") end
 run("color-ui:poll")
-assert(jobs["color-ui:poll"].delay==150)
+assert(jobs["color-ui:poll"].delay==500,"Hidden launcher keeps only the slow backstop")
 ui.validate_picker=validator
 local bounds=find(view.root_name).WidgetTree.RootWidget
 assert(bounds.kind=="SizeBox" and bounds.SetHeightOverride_arg==560,"Short selectors must reserve the full pane height")
@@ -445,7 +456,7 @@ overlay.children[1]=grid -- a fresh native GetAllChildren call returns fresh wra
 retired_grid.IsValid=function() error("old grid wrapper touched") end
 assert(ui.validate_picker(binding)); retired_grid.IsValid=function() return false end
 local before=opens
-button.pressed=false; run("color-ui:poll"); button.pressed=true; run("color-ui:poll")
+launch_click(); run("color-ui:launch")
 local queued=jobs["color-ui:open"].fn
 -- Slot change retires a launcher before bounded installation runs: installation
 -- request generation must remain independent of the retired poll generation.
@@ -456,8 +467,13 @@ run("color-ui:poll"); assert(not ui.binding and not ui.root_name)
 queued(); assert(opens==before)
 run("color-ui:install"); assert(ui.binding and ui.binding.tag==tag and #stack.children==2)
 local stale_poll=jobs["color-ui:poll"].fn
+local retired_button=find(ui.button_name)
+assert(runtime.button_clicks.routes[ui.button_name],"Launcher click route is bound while attached")
 ui.context_changed("page closed"); assert(not ui.binding and not jobs["color-ui:poll"])
 stale_poll(); run("color-ui:retire"); assert(#stack.children==1 and not ui.root_name)
+assert(not runtime.button_clicks.routes[retired_button:GetFullName()],"Retiring the launcher unbinds its click route")
+hooks["/Script/CommonUI.CommonButtonBase:HandleButtonClicked"]({get=function() return retired_button end})
+assert(not jobs["color-ui:launch"] and not jobs["color-ui:open"],"A click on a retired launcher does nothing")
 -- No indefinite readiness work when the screen is unavailable.
 page.active=false; ui.context_changed("BP_OnActivated")
 for _=1,4 do run("color-ui:install") end
@@ -468,7 +484,7 @@ grid.parent=object("Overlay",page.path .. ".WidgetTree_4.PageWideOverlay")
 assert(not pcall(ui.reconcile) and #stack.children==1)
 grid.parent=overlay
 -- Failed attachment still refuses preview; removal failures retain identity.
-fail_construct="/Script/UMG.Button"; assert(not pcall(ui.reconcile) and not ui.root_name)
+fail_construct="/Script/UMG.HorizontalBox"; assert(not pcall(ui.reconcile) and not ui.root_name)
 fail_construct=nil; ui.reconcile()
 grid.parent=nil; assert(not pcall(ui.prepare_picker)); grid.parent=overlay
 fail_remove=true; assert(not pcall(ui.close,"injected failure") and ui.root_name)
@@ -505,8 +521,7 @@ do
         tag="br.Customization.Slot.Character.Outfit.Torso.Color.Primary"
         vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
         ui.reconcile()
-        local launch_button=find(ui.button_name)
-        launch_button.pressed=true; run("color-ui:poll")
+        launch_click(); run("color-ui:launch")
         assert(jobs["color-ui:open"])
         assert(runtime.perf.window and runtime.perf.window.phase=="queued" and not jobs["perf:expiry"],
             "Button press must start capture before the deferred opening")

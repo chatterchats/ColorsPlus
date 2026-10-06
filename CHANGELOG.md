@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tester release: opening timings and click-driven launcher — v0.3.0
+
+First tester build since the performance work (v0.2.114-v0.2.120): lookup
+reuse, quieter logs, on-demand zones, picker opening without object scans,
+lookup hints across non-structural events, swatch input paused at launch and
+the player-only package.
+
+- Preview setup is now itemised in the performance log. The ~160ms of each
+  opening that had no label is split into `open.settle`, `open.proxy`,
+  `open.prepare`, `open.activate`, `open.proxy_donor`, `open.verify_display`,
+  `open.clone`, `open.write_clone`, `open.install`, `open.verify_install`,
+  `open.refresh`, `open.verify_refresh`, `open.verify_settled` and
+  `open.journal`, plus inclusive per-layer `begin.zabrak`, `begin.editor`,
+  `begin.default_selection`, `begin.default_tint` and `begin.regular`.
+  Timing only; no behaviour change. The per-interval label budget is 192.
+- The Custom Color launcher is the game's CommonUI button (as used by the
+  picker's Apply/Cancel) instead of a plain UMG Button polled for `IsPressed`
+  every 33ms. Clicks arrive through the existing `HandleButtonClicked` hook;
+  the callback only schedules a 1ms launch job, which pauses swatch input and
+  queues the usual 100ms-deferred opening. Retiring the launcher unbinds its
+  click route. A 500ms validation backstop replaces the input poll (skipped
+  while the picker owns the pane). The rainbow gradient sits beside the
+  button; the native button's caption is set after attachment.
+- The widget library lookup uses a plain validity check: `a.live` rejects
+  class default objects by design (caught by the launcher test).
+
 ### Player/dev split and cleanup — v0.2.120
 
 - Separate player and dev builds. `ColorsPlus-Testers` contains only the

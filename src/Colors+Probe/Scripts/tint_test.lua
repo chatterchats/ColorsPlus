@@ -783,7 +783,7 @@ function M.new(runtime, access, recovery_path)
                 blue_vm, blue = timed("opening.donor",find_blue,c)
                 local preview = object(c.owner:GetPreviewCustomizationInstance())
                 assert(allowed_preview(a.name(preview)), "Unsupported preview proxy")
-                handoff_record = handoff.settle_selected(c, preview, function(instance)
+                handoff_record = timed("open.settle", handoff.settle_selected, c, preview, function(instance)
                     local hovered=object(c.slot:PreviewedCustomizationPartViewModel(),"selected slot hover VM")
                     local found=false
                     for _,item in ipairs(targets.palette(c.slot,c.page)) do
@@ -802,39 +802,39 @@ function M.new(runtime, access, recovery_path)
             end
             -- An inactive proxy can retain the last native hovered swatch. It
             -- is not the visible baseline and will be replaced by our donor.
-            local preview, preview_slot, existing = resolve_proxy(c,nil,c.profile~=nil)
+            local preview, preview_slot, existing = timed("open.proxy", resolve_proxy, c, nil, c.profile~=nil)
             trace("capture", custom and "before custom RGB" or "before cyan")
             assert(c.profile and rules.color(c.original,c.profile.slot,c.profile.parameter)
                 or not c.profile and rules.normalized(c.original),"Unsupported original value")
             -- Check file access before any color write.
-            persist(nil)
+            timed("open.journal", persist, nil)
             if use_handoff then
-                handoff_record = handoff.prepare(c, preview)
+                handoff_record = timed("open.prepare", handoff.prepare, c, preview)
                 if use_handoff == "blue" and not blue then blue_vm, blue = find_blue(c) end
                 assert(clone_name_for(a.name(preview), a.name(existing)), "Unexpected stock preview fragment location")
                 self.pending = {owner=a.name(c.owner), preview=a.name(preview), fragment=a.name(existing),
                     part=id(c.part.AssetId), materials=c.materials, original=c.original, phase="handoff", handoff=handoff_record, blue=blue, test_color=custom,profile=c.profile}
-                persist(self.pending) -- activation intent must survive a throw/reload
+                timed("open.journal", persist, self.pending) -- activation intent must survive a throw/reload
                 if c.profile and c.profile.skin_race then
                     log("SKIN DONOR | ACTIVATE | source=" .. self.pending.part .. " | donor=" .. blue.part)
                 end
-                handoff.activate(self.pending, c, preview, blue_vm)
-                preview, preview_slot, existing = resolve_proxy(c, blue)
+                timed("open.activate", handoff.activate, self.pending, c, preview, blue_vm)
+                preview, preview_slot, existing = timed("open.proxy_donor", resolve_proxy, c, blue)
                 assert(a.name(preview) == self.pending.preview, "Activation replaced data proxy")
                 if blue and blue.pending_baseline then
                     local measured=color(existing)
                     assert(rules.color(measured,c.profile and c.profile.slot,c.profile and c.profile.parameter),"Unsupported donor baseline value/alpha")
                     -- Verify the displayed copy as well as the preview data,
                     -- then journal the measured baseline before any color write.
-                    handoff.verify(self.pending,c.owner,preview,measured,blue.materials or c.materials,blue_vm.AssetId)
+                    timed("open.verify_display", handoff.verify, self.pending,c.owner,preview,measured,blue.materials or c.materials,blue_vm.AssetId)
                     blue.original=measured; blue.pending_baseline=nil
                     self.pending.fragment=a.name(existing)
-                    persist(self.pending)
+                    timed("open.journal", persist, self.pending)
                     log("PALETTE DONOR VERIFIED | " .. blue.part .. " | " .. rgba(measured)
                         .. " | donor_materials=" .. (blue.materials or c.materials) .. " | source_materials=" .. c.materials)
                 end
                 if blue then
-                    handoff.verify(self.pending, c.owner, preview, blue.original, blue.materials or c.materials, blue_vm.AssetId)
+                    timed("open.verify_display", handoff.verify, self.pending, c.owner, preview, blue.original, blue.materials or c.materials, blue_vm.AssetId)
                     -- Activation is not allowed to mutate the equipped source.
                     local checked = timed("opening.after_activation",resolve,opening_route)
                     assert(a.name(checked.owner) == a.name(c.owner) and a.name(checked.fragment) == a.name(c.fragment)
@@ -845,7 +845,7 @@ function M.new(runtime, access, recovery_path)
                         .. " | equipped_part=" .. id(c.part.AssetId) .. " | equipped_rgba=" .. rgba(c.original))
                 end
             end
-            local clone, clones = single_color(c.slot:CloneFragments(preview_slot),c.profile)
+            local clone, clones = timed("open.clone", function() return single_color(c.slot:CloneFragments(preview_slot),c.profile) end)
             if c.profile and (c.profile.skin_race or c.profile.bundle) then
                 fragments.distinct(clones,c.slot:GetFragments(),preview_slot:GetFragmentInstances())
                 log("TINT BUNDLE VERIFIED | complete clone array; companion fragments preserved")
@@ -858,7 +858,7 @@ function M.new(runtime, access, recovery_path)
                 part=id(c.part.AssetId), materials=c.materials, original=c.original, phase="prepared", handoff=handoff_record, blue=blue, test_color=custom,profile=c.profile,
                 context={page=c.page, slot_vm=a.name(c.slot), source=a.name(c.fragment),
                     source_slot=a.name(c.source_slot), preview_slot=a.name(preview_slot)}}
-            persist(self.pending)
+            timed("open.journal", persist, self.pending)
             local expected = {preview=self.pending.preview, slot=a.name(preview_slot), fragment=self.pending.fragment,
                 part=preview_part(self.pending), materials=c.materials, source=a.name(c.fragment), original=c.original,
                 previous=a.name(existing)}
@@ -866,30 +866,30 @@ function M.new(runtime, access, recovery_path)
                 .. " | previous_fragment=" .. a.name(existing) .. " | part=" .. expected.part
                 .. " | materials=" .. expected.materials .. " | source=" .. expected.source)
             local chosen = test_color(self.pending)
-            fragments.write(clone,c.profile,chosen,clones)
+            timed("open.write_clone", fragments.write, clone, c.profile, chosen, clones)
             assert(same_color(color(clone), chosen), "Clone SetColor readback did not match")
             if c.profile and c.profile.skin_race then fragments.read(clones,c.profile) end
             log("CLONE COLOR VERIFIED | linear_rgba=" .. rgba(chosen) .. " | original_linear_rgba=" .. rgba(c.original))
             self.pending.phase = "installing"
-            persist(self.pending)
+            timed("open.journal", persist, self.pending)
             log("CALL | SetFragmentInstances")
-            preview_slot:SetFragmentInstances(clones)
-            local installed = verify_checkpoint("after-install", c, expected, chosen, true)
+            timed("open.install", function() preview_slot:SetFragmentInstances(clones) end)
+            local installed = timed("open.verify_install", verify_checkpoint, "after-install", c, expected, chosen, true)
             -- Update memory before persistence: a disk failure still permits
             -- immediate rollback of this fully validated installed fragment.
             self.pending.fragment, self.pending.phase = installed, "owned"
-            persist(self.pending)
+            timed("open.journal", persist, self.pending)
             log("INSTALLED FRAGMENT TRACKED | submitted=" .. expected.fragment .. " | installed=" .. installed)
             expected.fragment = installed
             log("CALL | RefreshCustomization")
-            preview:RefreshCustomization()
-            verify_checkpoint("after-refresh", c, expected, chosen)
+            timed("open.refresh", function() preview:RefreshCustomization() end)
+            timed("open.verify_refresh", verify_checkpoint, "after-refresh", c, expected, chosen)
             local session = self.pending
             runtime:after("tint:timeout", 15000, function()
                 if self.pending == session and not session.live then self.restore("15-second timeout") end
             end)
             if session.handoff then
-                handoff.verify(session, c.owner, preview)
+                timed("open.verify_settled", handoff.verify, session, c.owner, preview)
                 schedule_display_check(session)
             end
             log("PREVIEW APPLIED | " .. (custom and "custom_linear_rgba=" or "cyan_linear_rgba=") .. rgba(chosen) .. " | original_linear_rgba=" .. rgba(c.original)
@@ -1183,6 +1183,12 @@ function M.new(runtime, access, recovery_path)
                 end
             end
         end
+    end
+    -- Inclusive per-layer opening time for the performance log; no behavior change.
+    local timed_begin_live=self.begin_live
+    function self.begin_live(...)
+        if runtime.perf then return runtime.perf.measure("begin.regular",timed_begin_live,...) end
+        return timed_begin_live(...)
     end
     return self
 end

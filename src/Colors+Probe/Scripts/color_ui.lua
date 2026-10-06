@@ -4,6 +4,10 @@
 local M={}
 local directory=debug.getinfo(1,"S").source:gsub("^@",""):match("^(.*[/\\])")
 local ROOT="^UserWidget .+%.ColorsPlusLauncher_Root_(%d+)$"
+-- The game's own CommonUI button, as used by the picker's Apply/Cancel: its
+-- HandleButtonClicked UFunction is hookable, so launches need no input poll.
+local BUTTON_CLASS="/Game/Game/UI/Strategy/Customization/Widgets/CharacterDatabank/WBP_CharacterDataBank_TopNavButton.WBP_CharacterDataBank_TopNavButton_C"
+local button_clicks=assert(loadfile(directory .. "button_clicks.lua"))()
 function M.new(runtime,a,tint)
     local self={binding=nil,root_name=nil}
     runtime.gradient_assets=runtime.gradient_assets or assert(loadfile(directory .. "gradient_assets.lua"))()
@@ -126,7 +130,9 @@ function M.new(runtime,a,tint)
         if runtime.objects then runtime.objects.release("color-ui") end
         epoch=epoch+1
         runtime:cancel("color-ui:poll")
+        runtime:cancel("color-ui:launch")
         runtime:cancel("color-ui:open")
+        if self.root_name then button_clicks.get(runtime).retire(self.root_name) end
         self.binding=nil; self.button_name=nil
         if self.root_name then
             local root=StaticFindObject(self.root_name:match("^[^ ]+ (.+)$"))
@@ -152,41 +158,43 @@ function M.new(runtime,a,tint)
             end
         end
     end
-    local function poll(b,generation,pressed)
-        runtime:after("color-ui:poll",self.picker_owner and 150 or 33,function()
-            if generation~=epoch or self.binding~=b then return end
-            -- The picker validates this exact binding on every UI read. Its
-            -- hidden launcher has no input to process; no duplicate tree walk.
-            if self.picker_owner or runtime.picker.active then poll(b,generation,false); return end
-            local ok,err=pcall(function()
-                self.validate_picker(b)
-                local button=fresh(self.button_name)
-                local now=button:IsPressed()==true
-                if now and not pressed and not runtime.picker.active then
-                    if runtime.perf then runtime.perf.begin_picker("Custom Color button",b.tag) end
-                    local paused,why=pcall(freeze,b)
-                    if not paused then log("PALETTE INPUT PAUSE FAILED | " .. tostring(why)) end
-                    -- Defer opening until the native press frame has retired.
-                    runtime:after("color-ui:open",100,function()
-                        if generation~=epoch or self.binding~=b then thaw(); return end
-                        local valid,why=pcall(self.validate_picker,b)
-                        if valid then log("LAUNCH | " .. b.tag); runtime.picker.open()
-                        else
-                            log("LAUNCH REFUSED | " .. tostring(why))
-                            if runtime.perf then runtime.perf.cancel_launch("launch refused: " .. tostring(why)) end
-                        end
-                        -- No-op after a successful open (hide_palette took over).
-                        thaw()
-                    end)
-                end
-                poll(b,generation,now)
-            end)
-            if not ok then
-                log("RETIRED | " .. tostring(err))
-                if runtime.picker.active then runtime.picker.close("color pane context ended") end
-                local removed,why=pcall(retire)
-                if not removed then log("CLEANUP FAILED | " .. tostring(why)) end
+    -- Clicks arrive through the CommonUI hook (button_clicks) inside native
+    -- dispatch: latch and schedule only. The launch job pauses swatch input
+    -- and defers opening until the click frame has retired.
+    local function launch(b,generation)
+        if generation~=epoch or self.binding~=b or self.picker_owner or runtime.picker.active then return end
+        if runtime.perf then runtime.perf.begin_picker("Custom Color button",b.tag) end
+        local paused,why=pcall(freeze,b)
+        if not paused then log("PALETTE INPUT PAUSE FAILED | " .. tostring(why)) end
+        runtime:after("color-ui:open",100,function()
+            if generation~=epoch or self.binding~=b then thaw(); return end
+            local valid,why=pcall(self.validate_picker,b)
+            if valid then log("LAUNCH | " .. b.tag); runtime.picker.open()
+            else
+                log("LAUNCH REFUSED | " .. tostring(why))
+                if runtime.perf then runtime.perf.cancel_launch("launch refused: " .. tostring(why)) end
             end
+            -- No-op after a successful open (hide_palette took over).
+            thaw()
+        end)
+    end
+    local function clicked(b,generation)
+        if runtime.picker.active then return end
+        runtime:after("color-ui:launch",1,function() launch(b,generation) end)
+    end
+    -- Backstop only: native context hooks drive reconciliation, and a launch
+    -- validates afresh. This catches a pane changed without a hooked event.
+    local function poll(b,generation)
+        runtime:after("color-ui:poll",500,function()
+            if generation~=epoch or self.binding~=b then return end
+            -- The picker validates this exact binding on every UI read.
+            if self.picker_owner or runtime.picker.active then poll(b,generation); return end
+            local ok,err=pcall(self.validate_picker,b)
+            if ok then poll(b,generation); return end
+            log("RETIRED | " .. tostring(err))
+            if runtime.picker.active then runtime.picker.close("color pane context ended") end
+            local removed,why=pcall(retire)
+            if not removed then log("CLEANUP FAILED | " .. tostring(why)) end
         end)
     end
     local function install(b)
@@ -204,26 +212,36 @@ function M.new(runtime,a,tint)
         local footer=construct("/Script/UMG.Overlay",tree); tree.RootWidget=footer; footer:SetVisibility(4)
         local size=construct("/Script/UMG.SizeBox",footer); size:SetHeightOverride(44)
         local footer_slot=footer:AddChild(size); footer_slot:SetHorizontalAlignment(0); footer_slot:SetVerticalAlignment(2)
-        local button=construct("/Script/UMG.Button",size); size:AddChild(button)
-        button.IsFocusable=false; button:SetBackgroundColor({R=.03,G=.045,B=.05,A=1})
-        self.button_name=name(button); remember(button)
-        local row=construct("/Script/UMG.HorizontalBox",button); button:AddChild(row)
+        local row=construct("/Script/UMG.HorizontalBox",size); size:AddChild(row)
         local rainbow=construct("/Script/UMG.Image",row)
         call("rainbow gradient",function() gradients.bind(rainbow,"hue") end)
         local box=construct("/Script/UMG.SizeBox",row)
         box:SetWidthOverride(42); box:SetHeightOverride(24); box:AddChild(rainbow)
         local rainbow_slot=row:AddChild(box); rainbow_slot:SetVerticalAlignment(2)
-        local caption=construct("/Script/UMG.TextBlock",row)
-        caption:SetText(FText("  CUSTOM COLOR")); caption:SetColorAndOpacity({SpecifiedColor={R=.9,G=.88,B=.82,A=1},ColorUseRule=0})
-        pcall(function() caption.Font.Size=14 end)
-        local text_slot=row:AddChild(caption); text_slot:SetVerticalAlignment(2)
+        rainbow_slot:SetPadding({Left=0,Top=0,Right=8,Bottom=0})
+        -- CreateWidget initializes the Blueprint button (style, text, click
+        -- wiring); a bare StaticConstructObject would not.
+        local pc=obj(call("GetPlayerController",function() return require("UEHelpers").GetPlayerController() end),"player controller")
+        -- A class default object: a.live() rejects Default__ names by design.
+        local library=StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
+        assert(library and library:IsValid()==true,"Color UI unavailable: widget library")
+        local class=obj(StaticFindObject(BUTTON_CLASS),"launcher button class")
+        local button=obj(call("launcher.Create",function() return library:Create(pc,class,pc) end),"native launcher button")
+        assert(name(button):match("^WBP_CharacterDataBank_TopNavButton_C /"),"Unexpected launcher button class")
+        button:SetIsFocusable(false); button:SetIsSelectable(false); button:SetIsToggleable(false)
+        self.button_name=name(button); remember(button)
+        local button_slot=row:AddChild(button); button_slot:SetSize({SizeRule=1,Value=1}); button_slot:SetVerticalAlignment(2)
         local slot=fresh(b.stack):AddChild(root)
         slot:SetPadding({Left=0,Top=6,Right=0,Bottom=2})
         slot:SetSize({SizeRule=1,Value=1})
+        -- Reacquire after native attachment/Construct before setting text.
+        fresh(self.button_name):UpdateText(FText("CUSTOM COLOR"))
+        local generation=epoch
+        button_clicks.get(runtime).bind(self.button_name,self.root_name,"launch",function() clicked(b,generation) end)
         self.binding=b
         self.validate_picker(b)
         log("ATTACHED | slot=" .. b.tag .. " | grid=" .. b.grid .. " | overlay=" .. b.overlay .. " | stack=" .. b.stack)
-        poll(b,epoch,false)
+        poll(b,epoch)
     end
     function self.reconcile()
         -- Reuse only a live binding whose selected VM, active palette, creator
@@ -299,7 +317,7 @@ function M.new(runtime,a,tint)
             if runtime.perf then runtime.perf.cancel_launch(reason) end
             request=request+1
             epoch=epoch+1; self.binding=nil
-            runtime:cancel("color-ui:poll"); runtime:cancel("color-ui:open"); runtime:cancel("color-ui:install")
+            runtime:cancel("color-ui:poll"); runtime:cancel("color-ui:launch"); runtime:cancel("color-ui:open"); runtime:cancel("color-ui:install")
             runtime:after("color-ui:retire",1,function() self.close(reason) end)
             return
         end
