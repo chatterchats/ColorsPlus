@@ -148,8 +148,10 @@ function M.new(runtime,a)
                 if a.live(p) and p:IsActivated()==true then assert(not page,"Ambiguous active item page"); page=name(p) end
             end
             assert(page,"Open a customization color page first")
-            local binding=lifetime.bind(page)
-            log("CONTEXT | page=" .. page .. " | creator=" .. binding.master)
+            -- The in-game (hub) editor has no creator master; survey it unbound.
+            local bound,binding=pcall(lifetime.bind,page)
+            log("CONTEXT | page=" .. page .. " | creator=" .. (bound and binding.master
+                or ("unbound (" .. scalar(binding) .. ")")))
             local vm,root
             for _,aux in pairs(candidates("CustomizationAuxVM_C",128)) do
                 if a.live(aux) then

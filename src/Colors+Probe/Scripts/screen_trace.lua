@@ -6,6 +6,10 @@ local CLASSES={
     {"WBP_CustomCharacter_Page_Outfits_C","page"},
     {"WBP_CustomCharacter_Page_Appearance_C","page"},
     {"WBP_Customization_ItemPage_C","page"},
+    -- In-game (hub) editor screens.
+    {"WBP_CentralUITabs_C","page"},
+    {"WBP_Customization_MasterPage_C","page"},
+    {"WBP_Customization_Edit_Portrait_C","page"},
     {"BitReactorActivatableWidgetStack","stack"},
     {"BitReactorActivatableWidgetTabStack","stack"},
 }
