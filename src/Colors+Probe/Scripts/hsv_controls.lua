@@ -73,7 +73,7 @@ function M.new(ui)
         -- gradient layers. Retain the proven native hit targets above them.
         timed("ui.sv_grid_build",function()
         local grid=construct("/Script/UMG.VerticalBox",area)
-        self.grid_name=grid:GetFullName()
+        self.grid_name=identity(grid)
         anchors(area:AddChild(grid),{X=0,Y=0},{X=1,Y=1},{Left=0,Top=0,Right=0,Bottom=0})
         for r=1,M.ROWS do
             local row=construct("/Script/UMG.HorizontalBox",grid)

@@ -17,7 +17,13 @@ currently selected zone.
 
 ## Status
 
-**Current build: Colors+Probe v0.2.116 (lookup reuse after Apply, quieter logs, on-demand zones, faster startup).**
+**Current build: Colors+Probe v0.2.117 (picker opening without first-lookup object scans).**
+
+UE4SS answers repeat name lookups from its own cache, but a first lookup of a
+new object scans every UObject. v0.2.117 records the widgets the picker builds
+(and stock widgets it already holds) instead of looking them up by name.
+
+Previously (v0.2.116):
 
 v0.2.116 keeps the lookup cache during applied edits (post-Apply watch),
 logs only the first update per session, builds editor zones on demand and

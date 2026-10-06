@@ -45,6 +45,9 @@ function M.new(runtime)
         -- Only construction-time, same-call reuse. frame() releases this table
         -- before preview mutation and before any delayed input callback.
         if frame then frame.objects[name]=o end
+        -- Owned widgets are new each opening; record them so later polls never
+        -- pay a first-lookup object scan. Pinned for this picker session only.
+        if runtime.objects then runtime.objects.remember(o,true) end
         return name
     end
     -- Class/factory reuse lasts only for this synchronous opening operation.
@@ -248,6 +251,7 @@ function M.new(runtime)
         next_root_id=next_id+1
         log("OPEN CONTROLLER | root=" .. next_id)
         local pc=required(call("GetPlayerController",function() return require("UEHelpers").GetPlayerController() end),"player controller")
+        if runtime.objects then runtime.objects.remember(pc) end -- SV drag reacquires it by name
         assert(pc.bShowMouseCursor == true, "Open cursor-driven character customization first")
         local pane
         if runtime.color_ui then pane=timed("ui.prepare_pane",runtime.color_ui.prepare_picker) end

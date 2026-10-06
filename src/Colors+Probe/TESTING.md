@@ -1,4 +1,4 @@
-# Welcome to Colors+ — tester build v0.2.116
+# Welcome to Colors+ — tester build v0.2.117
 
 Colors+ lets you choose your own colors when customizing a character, instead
 of being limited to the game's existing choices. Thanks for trying it out!
@@ -14,6 +14,7 @@ along the rainbow slider on skin, clothing and other appearance colors. Also
 switch color slots, return to the selection menu and reopen the picker.
 After applying colors to several zones, browse the creator for a while:
 it should stay smooth. Loading into the game should also be quicker.
+Opening the picker should be faster too, without a hitch right after it appears.
 
 Cancel should still return your previous color; Apply should keep your latest
 choice. The Zabrak Skin Tone 4, 5 and 10 fixes are included and have passed

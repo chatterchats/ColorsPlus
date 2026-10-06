@@ -8,6 +8,13 @@
 -- before it is returned; callers keep all of their own ownership checks. An
 -- entry not verified within MAX_AGE_MS is looked up again, never touched, so
 -- no wrapper is trusted across a long unobserved gap (e.g. a GC pass).
+-- remember() records an object the caller already holds (no lookup). UE4SS
+-- answers repeat lookups from its own name cache, but each first lookup of a
+-- new object scans the whole object array (~20ms); every picker opening built
+-- ~10 new widgets and paid one scan each. Mod-owned widgets may be pinned:
+-- pinned entries survive hook invalidation (they live in the picker's own
+-- tree, attachment is checked every tick) but never a release, failed recheck
+-- or the MAX_AGE_MS window.
 local M={LIMIT=128,MAX_AGE_MS=1000}
 function M.new(lookup,clock)
     lookup=lookup or function(path) return StaticFindObject(path) end
@@ -40,8 +47,25 @@ function M.new(lookup,clock)
         end
         return value
     end
+    function self.remember(value,pinned)
+        if not entries then return end
+        local ok,full=pcall(function() return value and value:IsValid()==true and value:GetFullName() end)
+        local path=ok and type(full)=="string" and full:match("^[^ ]+ (.+)$")
+        if not path then return end
+        if not entries[path] then
+            if count>=M.LIMIT then return end
+            count=count+1
+        end
+        entries[path]={value=value,full=full,seen=clock(),pinned=pinned==true}
+    end
     function self.invalidate()
-        if entries then entries={}; count=0 end
+        if entries then
+            local kept,n={},0
+            for path,entry in pairs(entries) do
+                if entry.pinned then kept[path]=entry; n=n+1 end
+            end
+            entries,count=kept,n
+        end
         self.generation=self.generation+1
     end
     function self.hold(owner)

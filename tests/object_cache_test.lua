@@ -79,6 +79,30 @@ local renewed=obj("Border","/Engine/Transient.Slow")
 assert(aged.find(slow.path)==renewed and lookups==2 and not touched,"stale entries must be looked up without touching the wrapper")
 aged.release("picker")
 
+-- remember() records held objects without a lookup; pinned entries survive
+-- invalidation but not release, a failed recheck or the age window.
+now=0
+local seeded=cache_module.new(lookup,function() return now end)
+local owned=obj("Border","/Engine/Transient.Owned")
+local stock=obj("Border","/Engine/Transient.Stock")
+seeded.remember(owned,true) -- inactive: ignored
+seeded.hold("picker")
+seeded.remember(owned,true); seeded.remember(stock); seeded.remember(nil); seeded.remember(dead)
+lookups=0
+assert(seeded.find(owned.path)==owned and seeded.find(stock.path)==stock and lookups==0,"remembered objects need no lookup")
+seeded.invalidate()
+assert(seeded.find(owned.path)==owned and lookups==0,"pinned entries survive hook invalidation")
+assert(seeded.find(stock.path)==stock and lookups==1,"unpinned entries are dropped by invalidation")
+owned.invalid=true; local owned2=obj("Border","/Engine/Transient.Owned")
+assert(seeded.find(owned.path)==owned2 and lookups==2,"pinned entries still require a live exact identity")
+seeded.remember(owned2,true); now=2
+local touched_pinned=false; owned2.IsValid=function() touched_pinned=true; return true end
+local owned3=obj("Border","/Engine/Transient.Owned")
+assert(seeded.find(owned.path)==owned3 and not touched_pinned and lookups==3,"pinned entries obey the age window")
+seeded.remember(owned3,true); seeded.release("picker"); seeded.hold("picker")
+assert(seeded.find(owned.path)==owned3 and lookups==4,"release drops pinned entries")
+seeded.release("picker")
+
 -- Hook registry invalidates the cache in every native callback (pre and post).
 local hooks={}
 RegisterHook=function(path,a,b) hooks[path]={a,b}; return 1,2 end

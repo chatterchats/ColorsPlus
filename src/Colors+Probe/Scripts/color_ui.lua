@@ -23,6 +23,8 @@ function M.new(runtime,a,tint)
         return fn()
     end
     local function find(path) if a.find then return a.find(path) end; return StaticFindObject(path) end
+    -- Record wrappers already in hand so a first by-name lookup never scans.
+    local function remember(v) if runtime.objects then runtime.objects.remember(v) end end
     local function obj(v,label) v=a.unwrap(v); assert(a.live(v),"Color UI unavailable: " .. label); return v end
     local function name(v) return a.name(obj(v,"identity")) end
     local function fresh(full)
@@ -47,7 +49,7 @@ function M.new(runtime,a,tint)
     local function discover()
         local page,page_name
         for _,v in pairs(scan("WBP_Customization_ItemPage_C",128)) do
-            if a.live(v) and v:IsActivated()==true then assert(not page,"Ambiguous color page"); page=v; page_name=name(v) end
+            if a.live(v) and v:IsActivated()==true then assert(not page,"Ambiguous color page"); page=v; page_name=name(v); remember(v) end
         end
         assert(page,"Open a customization color selector")
         local creator=lifetime.bind(page_name) -- creator stack, not merely an inactive visible tree
@@ -55,7 +57,7 @@ function M.new(runtime,a,tint)
         local vm=fresh(vm_name); local tag=a.text(vm.SlotTag.TagName)
         assert(rules.launcher_color_slot(tag),"Selected selector is not a color palette")
         local grid=palettes.resolve(page_name,tag)
-        local grid_name=name(grid)
+        local grid_name=name(grid); remember(grid)
         local tree=assert(grid_name:match("^[^ ]+ (.+)%.PartsGridList$"),"Unexpected swatch tree")
         local current=grid; local overlay,stack,chain={},{},{}
         -- Ancestry must remain inside this exact SelectionTiles WidgetTree.
@@ -65,7 +67,7 @@ function M.new(runtime,a,tint)
             if not a.live(current) then break end
             local full=name(current); local path=full:match("^[^ ]+ (.+)$")
             if path:sub(1,#tree+1)~=tree .. "." then break end
-            chain[#chain+1]=full
+            chain[#chain+1]=full; remember(current)
             if kind(current)=="Overlay" and not overlay.name then overlay.name=full end
             if kind(current)=="VerticalBox" and not stack.name then stack.name=full end
             assert(depth<16,"Swatch ancestry limit")
@@ -161,9 +163,11 @@ function M.new(runtime,a,tint)
     end
     local function install(b)
         assert(not self.root_name,"Launcher cleanup required")
+        -- Released by retire(), which every failed install also runs.
+        if runtime.objects then runtime.objects.hold("color-ui") end
         serial=serial+1
         local root=construct("/Script/UMG.UserWidget",fresh(b.page),"ColorsPlusLauncher_Root_" .. serial)
-        self.root_name=name(root)
+        self.root_name=name(root); remember(root)
         assert(self.root_name:match(ROOT),"Unexpected launcher root")
         root:SetVisibility(4); root.bIsFocusable=false
         local tree=construct("/Script/UMG.WidgetTree",root); root.WidgetTree=tree
@@ -174,7 +178,7 @@ function M.new(runtime,a,tint)
         local footer_slot=footer:AddChild(size); footer_slot:SetHorizontalAlignment(0); footer_slot:SetVerticalAlignment(2)
         local button=construct("/Script/UMG.Button",size); size:AddChild(button)
         button.IsFocusable=false; button:SetBackgroundColor({R=.03,G=.045,B=.05,A=1})
-        self.button_name=name(button)
+        self.button_name=name(button); remember(button)
         local row=construct("/Script/UMG.HorizontalBox",button); button:AddChild(row)
         local rainbow=construct("/Script/UMG.Image",row)
         call("rainbow gradient",function() gradients.bind(rainbow,"hue") end)
@@ -189,7 +193,6 @@ function M.new(runtime,a,tint)
         slot:SetPadding({Left=0,Top=6,Right=0,Bottom=2})
         slot:SetSize({SizeRule=1,Value=1})
         self.binding=b
-        if runtime.objects then runtime.objects.hold("color-ui") end
         self.validate_picker(b)
         log("ATTACHED | slot=" .. b.tag .. " | grid=" .. b.grid .. " | overlay=" .. b.overlay .. " | stack=" .. b.stack)
         poll(b,epoch,false)
@@ -245,7 +248,7 @@ function M.new(runtime,a,tint)
             local children=a.values(call("GetAllChildren",function() return fresh(owner):GetAllChildren() end))
             assert(#children<=64,"Palette siblings limit")
             for _,child in ipairs(children) do
-                local full=name(child)
+                local full=name(child); remember(child)
                 assert(name(parent(child))==owner,"Palette child ownership changed")
                 -- Injected UserWidgets may have a different UObject outer.
                 -- Their verified panel parent defines the palette UI branch.

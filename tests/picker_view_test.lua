@@ -228,13 +228,16 @@ local held=runtime_with_clicks({})
 held.objects=assert(loadfile(scripts .. "/object_cache.lua"))().new()
 view=assert(loadfile(scripts .. "/picker_view.lua"))().new(held)
 held.objects.hold("picker")
+before=lookups
 view.frame(view.open); view.set_rgb({R=7,G=8,B=9})
 view.frame(view.read)
+local root_path=view.root_name:match("^[^ ]+ (.+)$")
+assert(not lookup_counts[root_path],"Constructed widgets are recorded, never looked up by name")
 before=lookups
 for _=1,5 do values=view.frame(view.read) end
 assert(lookups==before and values.R==7 and values.B==9,"Held polls must not repeat global lookups")
 held.objects.invalidate()
-view.frame(view.read); assert(lookups>before,"Hook boundaries must force reacquisition")
+view.frame(view.read); assert(lookups==before,"Owned picker widgets survive hook invalidation")
 before=lookups
 local held_slider=widget(view.sliders.R); held_slider.invalid=true
 local held_fresh=obj(held_slider.class,held_slider.path); held_fresh.value=99

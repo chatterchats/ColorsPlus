@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Opening without first-lookup scans — v0.2.117
+
+- Source of the installed UE4SS (`a1e7f571`, UEPseudo `885ba757`): string
+  `StaticFindObject` answers repeat lookups from UE4SS's own name cache, but
+  each first lookup of a never-found object scans the whole object array.
+  v0.2.116 opening captures showed 38-67 of our lookups per opening; picker
+  widgets are new every opening and were each looked up by name after the
+  construction frame (and again after preview-setup hook invalidation).
+- `object_cache.remember` records wrappers the mod already holds. Constructed
+  picker widgets (and the player controller) are recorded at construction;
+  mod-owned widgets are pinned for the picker session: they survive hook
+  invalidation but not release, a failed IsValid/exact-name recheck or the
+  1s verification window. Launcher widgets, the active page, palette grid,
+  ancestry and hidden siblings are recorded unpinned at discovery/install.
+- The launcher holds the cache from the start of `install` (released by
+  `retire`, which every failed install runs).
+- Not yet changed: preview setup's own hook events still discard the scalar
+  route hints, so each opening repeats 3-5 `FindAllOf` discoveries (~35-40ms
+  each on the developer machine).
+
 ### Background, logging and startup cost cuts — v0.2.116
 
 - Hold the object lookup cache while an Apply is owned. The post-Apply
