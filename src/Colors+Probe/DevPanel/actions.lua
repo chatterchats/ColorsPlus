@@ -1,7 +1,7 @@
 return {
     id = "ColorsPlusProbe",
     name = "Colors+ Probe",
-    version = "0.2.119",
+    version = "0.2.120",
     description = "Optional shortcuts for the color picker. You can also use the Custom Color button directly in character customization. The diagnostic tools are only needed when asked to help investigate a problem.",
     actions = {
         { key = "open_picker", name = "Open live color picker", category = "Colors+ Picker", danger = true,

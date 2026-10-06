@@ -9,8 +9,13 @@ local objects,files,jobs,logs={},{},{},{}
 -- The shipped picker must work without any developer RGB input file.
 local serial,writes,source_writes=0,0,0
 local on_thread=true
+-- Indexed fakes: full scans of every object ever created made this test
+-- quadratic (~50s). Indexes mirror objects; removals are honoured below.
+local by_path,by_class={},{}
 local function obj(class,path,t)
     t=t or {}; t.name=class .. " " .. path; objects[t.name]=t
+    by_path[path]=t
+    by_class[class]=by_class[class] or {}; by_class[class][t.name]=t
     function t:IsValid() assert(on_thread); return not self.invalid end
     function t:GetFullName() assert(on_thread and not self.invalid); return self.name end
     return t
@@ -215,10 +220,14 @@ page.SlotWidgetSwitcher=obj("CommonActivatableWidgetSwitcher",path(page) .. ".Sw
 local discovery_scans=0
 function FindAllOf(classname)
     if classname=="WBP_Customization_ItemPage_C" or classname=="CustomizationAuxVM_C" then discovery_scans=discovery_scans+1 end
-    local found={}; for n,v in pairs(objects) do if n:match("^([^ ]+) ")==classname then found[#found+1]=v end end
+    local found={}; for n,v in pairs(by_class[classname] or {}) do if objects[n]==v then found[#found+1]=v end end
     return found
 end
-function StaticFindObject(s) for _,v in pairs(objects) do if path(v)==s and not v.invalid then return v end end end
+function StaticFindObject(s)
+    local v=by_path[s]
+    if v and objects[v.name]==v and not v.invalid then return v end
+    for _,o in pairs(objects) do if path(o)==s and not o.invalid then return o end end
+end
 function FName(s) assert(on_thread); return s end
 local old_open,old_rename,old_remove=io.open,os.rename,os.remove
 io.open=function(p,mode)

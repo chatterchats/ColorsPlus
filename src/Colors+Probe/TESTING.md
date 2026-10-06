@@ -1,4 +1,4 @@
-# Welcome to Colors+ — tester build v0.2.119
+# Welcome to Colors+ — tester build v0.2.120
 
 Colors+ lets you choose your own colors when customizing a character, instead
 of being limited to the game's existing choices. Thanks for trying it out!
@@ -97,5 +97,5 @@ recording of your mouse movements. Error messages can include file paths on
 your computer, so you're welcome to review it before sharing. Nothing is
 uploaded automatically.
 
-If you already use SWZC Dev Panel, its extra diagnostic tools are only needed
-when we ask you to capture something specific.
+This tester build leaves out the developer diagnostic tools. If we need a
+specific capture, we'll send a separate diagnostic build.

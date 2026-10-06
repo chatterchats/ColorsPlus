@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Player/dev split and cleanup — v0.2.120
+
+- Separate player and dev builds. `ColorsPlus-Testers` contains only the
+  scripts reachable from `main.lua` without `dev_tools.lua` (37 of 56): the
+  picker, editing backend, recovery and performance log. `ColorsPlus-Dev`
+  adds probes, traces, console commands and the SWZC Dev Panel integration.
+  The packager derives the player set from module references and refuses to
+  overwrite a released version with different contents.
+- The production context-event route (skin-enable stop, backend
+  invalidation) moved from the Dev Panel bridge into `context_events.lua`;
+  dev tools wrap it via `runtime.dev_context`, isolated with `pcall`.
+- Track `DevPanel/actions.lua` (it was git-ignored although every package,
+  and the journal folder it keeps present, depends on it).
+- Removed the unexposed legacy Dev Panel writes (`apply_cyan`,
+  `apply_handoff`, `apply_blue`, `apply_rgb`) and a duplicate copy of the
+  bridge tests inside `tint_test`.
+- Tests: `tools/run-tests.sh` runs each test against its target folder; the
+  two long-standing "failures" were invocation errors (scaffold folder,
+  trailing slash) and now pass. `race_bundle_test` uses indexed fakes
+  (~52s -> ~9s); the whole suite runs in ~13s. New `context_events_test`.
+- README reduced to current status, packages and development; the former
+  running status notes moved to `docs/status-history.md`. The tester guide
+  no longer promises Dev Panel diagnostics.
+- Deliberately not changed yet: the `generic_colors` flag and legacy Clone 8
+  path. ~1,100 lines of core transaction tests (rollback, recovery, stale
+  callbacks, event ordering) still run through it; they move to the generic
+  path together with the planned wrapper-layer flattening.
+
 ### Swatches ignore the mouse while the picker launches — v0.2.119
 
 - About 1 in 7 openings (v0.2.107-v0.2.118 logs) closed immediately with
