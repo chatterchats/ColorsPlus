@@ -1,4 +1,6 @@
 local scripts=assert(arg[1])
+local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
+helpers.share_modules(scripts)
 local function load(n) return assert(loadfile(scripts .. "/" .. n .. ".lua"))() end
 local objects,files,jobs,commands,logs={},{},{},{},{}
 local function obj(n,t)

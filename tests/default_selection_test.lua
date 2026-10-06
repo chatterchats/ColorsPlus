@@ -1,5 +1,7 @@
 -- luajit tests/default_selection_test.lua src/Colors+Probe/Scripts
 local scripts=assert(arg[1])
+local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
+helpers.share_modules(scripts)
 local zones=assert(loadfile(scripts .. "/color_zone.lua"))()
 local original_open=io.open
 local files,objects,messages,jobs={},{},{},{}
@@ -91,9 +93,7 @@ function runtime:after(key,delay,cb) jobs[key]={delay=delay,cb=cb} end
 function runtime:cancel(key) jobs[key]=nil end
 local function run(k) local j=assert(jobs[k],k); jobs[k]=nil; j.cb() end
 local function has(s) for _,v in ipairs(messages) do if v:find(s,1,true) then return true end end end
-local JOURNALS={["tint_recovery.txt"]="tint",["default_selection_recovery.txt"]="selection",
-    ["editor_recovery.txt"]="editor",["zabrak_picker_recovery.txt"]="zabrak"}
-local function journal(leaf) return assert(JOURNALS[leaf],leaf) end
+local journal=helpers.journal({["tint_recovery.txt"]="tint"})
 local base,wrapped
 local function boot()
     local b={}
@@ -178,8 +178,7 @@ begin(); assert(wrapped.restore("missing roots")); restored()
 -- List order, not asset sort order / FindAllOf order, determines first swatch.
 clean(); palette={default,red,white,blue}; assert(wrapped.begin_live()); assert(current()==red)
 assert(wrapped.restore("order")); restored()
--- Any non-Default stock swatch may be the temporary selection on the generic
--- path (the retired Clone 8 test reserved Blue as its handoff donor).
+-- Any non-Default stock swatch may be the temporary selection, Blue included.
 clean(); palette={default,blue,white}; assert(wrapped.begin_live() and current()==blue)
 assert(wrapped.restore("blue first")); restored()
 clean(); widget.hidden=true; assert(not wrapped.begin_live() and current()==default and #equips==0)

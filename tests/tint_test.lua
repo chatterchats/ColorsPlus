@@ -1,5 +1,7 @@
 -- luajit tests/tint_test.lua src/Colors+Probe/Scripts
 local scripts = assert(arg[1])
+local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
+helpers.share_modules(scripts)
 local original_open = io.open
 local messages, files, jobs, objects = {}, {}, {}, {}
 local game_thread, fail_write, fail_refresh, fail_reset, alias_clone = true, false, false, false, false
@@ -169,9 +171,7 @@ local fname_constructor = FName
 local probe = assert(loadfile(scripts .. "/customization_probe.lua"))().new(runtime)
 local module = assert(loadfile(scripts .. "/tint_test.lua"))()
 local zone_module = assert(loadfile(scripts .. "/color_zone.lua"))()
-local JOURNALS = {["tint_recovery.txt"]="recovery", ["default_selection_recovery.txt"]="selection",
-    ["editor_recovery.txt"]="editor", ["zabrak_picker_recovery.txt"]="zabrak"}
-local function journal(leaf) return assert(JOURNALS[leaf], leaf) end
+local journal=helpers.journal()
 local tint = module.new(runtime, probe.access, "recovery")
 
 -- Display handoff: stock preview proxy container, data proxy and display.
@@ -333,7 +333,7 @@ do
         if case[5] then material.SlotNameTagsToApply.GameplayTags=array({tag(base .. ".Mesh"),tag(saved.horn_tag)}) end
         tiles.CurrentSlotTag=slot.SlotTag; stale.CurrentSlotTag=slot.SlotTag
         -- Real failure: Aux remains at Style while the simple panel displays
-        -- hair/lipstick Color. The default wrapper and tint engine must agree.
+        -- hair/lipstick Color. The Default selection and preview engine must agree.
         slot.CustomizationChildSlotViewModels=array({})
         case.style=obj("BitReactorCustomizationSlotViewModel " .. vm_outer .. "BitReactorCustomizationSlotViewModel_401",{
             SlotTag=tag(base .. ".Mesh"),CustomizationChildSlotViewModels=array({slot}),
@@ -394,7 +394,7 @@ do
         aux.CurrentCustomizationSlotVM=nil
         run("tint:recovery"); aux.CurrentCustomizationSlotVM=case[2]=="Color 04" and slot or case.style
         assert(not recovered.pending and files.recovery=="" and display_color==original)
-        -- v0.2.29: the selected slot's verified stock hover is settled before
+        -- The selected slot's verified stock hover is settled before
         -- donor activation. An inactive proxy may still contain the last hover.
         slot.PreviewedCustomizationPartViewModel=function() return blue_vm end
         local function hover(active)
@@ -467,8 +467,8 @@ do
 end
 aux.CurrentCustomizationSlotVM=slot; aux.RootCustomizationSlotVM=nil
 
--- v0.2.18 integration: temporary editor selection -> REAL regular tint engine
--- -> blue handoff -> RGB -> regular restore -> Default. No auxiliary roots.
+-- Default integration on the real zone: temporary editor selection -> preview
+-- engine -> palette donor -> RGB -> preview restore -> Default. No auxiliary roots.
 do
     local saved={slot_fragments=slot.GetFragments,source_fragments=source_slot.GetFragmentInstances,
         source_name=source_slot.GetFullName,display_fragments=display_slot.GetFragmentInstances,

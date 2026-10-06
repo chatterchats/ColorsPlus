@@ -1,6 +1,8 @@
 -- Real editor-session + Default-selection modules; engine and hover backend fake.
 -- luajit tests/editor_session_test.lua src/Colors+Probe/Scripts
 local scripts=assert(arg[1])
+local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
+helpers.share_modules(scripts)
 local zones=assert(loadfile(scripts .. "/color_zone.lua"))()
 local old_open=io.open
 local old_rename,old_remove=os.rename,os.remove
@@ -125,9 +127,7 @@ runtime.objects=assert(loadfile(scripts .. "/object_cache.lua"))().new(function(
 function runtime:after(k,ms,cb) jobs[k]={ms=ms,cb=cb} end
 function runtime:cancel(k) jobs[k]=nil end
 local function run(k) local job=assert(jobs[k],k); jobs[k]=nil; job.cb() end
-local JOURNALS={["tint_recovery.txt"]="tint",["default_selection_recovery.txt"]="selection",
-    ["editor_recovery.txt"]="editor",["zabrak_picker_recovery.txt"]="zabrak"}
-local function journal(leaf) return assert(JOURNALS[leaf],leaf) end
+local journal=helpers.journal({["tint_recovery.txt"]="tint"})
 local base,session
 local function boot()
     local b={}

@@ -51,6 +51,20 @@ the player-only package.
 - The widget library lookup uses a plain validity check: `a.live` rejects
   class default objects by design (caught by the launcher test).
 
+### Retired dev probes; faster, tidier tests
+
+- Removed diagnostic probes from finished investigations (Dev package only):
+  click/SV input experiments, material and stock-hover traces, Zabrak
+  capture/dispatch research, eye preview and skin-target save experiments,
+  with their tests, console commands, Dev Panel actions and the guards that
+  referred to them. About 3,900 lines. The Dev package keeps call/screen
+  tracing, the compatibility survey, the picker console and the Dev Panel.
+- Tests load each script once and share the module table, as `main.lua` does
+  in game (`tests/helpers.lua`). They had recompiled scripts on every factory
+  call: race_bundle_test made 29,307 loadfile calls. Suite: ~13s -> ~8s, with
+  race_bundle_test 10.4s -> 5.8s. Shared journal-name map; stale Clone 8 and
+  version-stamped comments updated.
+
 ### Docs cleanup
 
 - `docs/` keeps only current material: `architecture.md` (how a color edit

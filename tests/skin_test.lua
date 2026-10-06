@@ -1,5 +1,7 @@
 -- Real tint/default/editor modules with a three-fragment, five-mesh fixture.
 local scripts=assert(arg[1])
+local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
+helpers.share_modules(scripts)
 local function load(n) return assert(loadfile(scripts .. "/" .. n .. ".lua"))() end
 local bundle=load("color_fragments")
 local target=load("color_target")
@@ -214,9 +216,7 @@ local function run(k) local job=assert(jobs[k],k); jobs[k]=nil; job.fn() end
 local access=load("customization_probe").new(runtime).access
 local fragments=bundle.new(access)
 local tint,editor
-local JOURNALS={["tint_recovery.txt"]="recovery",["default_selection_recovery.txt"]="selection",
-    ["editor_recovery.txt"]="editor",["zabrak_picker_recovery.txt"]="zabrak"}
-local function journal(leaf) return assert(JOURNALS[leaf],leaf) end
+local journal=helpers.journal()
 local function boot()
     tint=load("tint_test").new(runtime,access,"recovery")
     editor=load("color_zone").new(runtime,access,journal,{preview=tint})
@@ -889,8 +889,8 @@ files.recovery=""
 for _,broken in ipairs({editor_record:gsub("^editor%-v4","editor-v3"),editor_record:gsub("br.Customization.Part.Character.Race.2B","bad",1),editor_record .. "extra\n"}) do
     files.editor=broken; boot(); editor.start(); assert(editor.blocked and not editor.applied)
 end
--- Install, refresh and restore verification on the real blue-handoff path
--- (ported from the retired Clone 8 tests). A preview copy is adopted only when
+-- Install, refresh and restore verification on the real palette-donor path.
+-- A preview copy is adopted only when
 -- it is exactly the verified clone in the preview slot. Anything ambiguous or
 -- non-original keeps the journal for a native reset; it is never adopted,
 -- overwritten or reported as cleaned up.

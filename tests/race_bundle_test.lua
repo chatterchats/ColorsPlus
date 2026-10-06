@@ -1,6 +1,8 @@
 -- Real preview/Default/editor modules exercised against captured race bundles.
 -- No native save/equip writes. Engine copies fragment arrays at install/refresh.
 local scripts=assert(arg[1])
+local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
+helpers.share_modules(scripts)
 local function load(n) return assert(loadfile(scripts .. "/" .. n .. ".lua"))() end
 local bundle=load("color_fragments")
 local target=load("color_target")
@@ -245,9 +247,7 @@ local function run(k) local job=assert(jobs[k],k); jobs[k]=nil; job.fn() end
 local access=load("customization_probe").new(runtime).access
 local fragments=bundle.new(access)
 local tint,editor,route_zabrak
-local JOURNALS={["tint_recovery.txt"]="recovery",["default_selection_recovery.txt"]="selection",
-    ["editor_recovery.txt"]="editor",["zabrak_picker_recovery.txt"]="zabrak"}
-local function journal(leaf) return assert(JOURNALS[leaf],leaf) end
+local journal=helpers.journal()
 local function boot()
     tint=load("tint_test").new(runtime,access,"recovery")
     editor=load("color_zone").new(runtime,access,journal,{preview=tint})
