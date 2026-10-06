@@ -69,7 +69,9 @@ def build(label, scripts):
     entries = {f"{PACKAGE_ROOT}/" + (p.relative_to(SOURCE).as_posix() if p.is_relative_to(SOURCE)
                else "Scripts/" + p.name): p for p in files}
     assert len(entries) == len(files)
-    assert not any(re.search(r"_recovery\.txt|\.previous|\.archive-|session", name) for name in entries)
+    # Journals and session metadata (recovery_session.txt,
+    # process_session_counter.txt), not scripts such as editor_session.lua.
+    assert not any(re.search(r"_recovery\.txt|\.previous|\.archive-|session[^/]*\.txt$", name) for name in entries)
     output = ROOT / "dist" / f"ColorsPlus-{label}-{version}.zip"
     output.parent.mkdir(exist_ok=True)
     if output.exists():
