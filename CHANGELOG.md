@@ -30,14 +30,18 @@ the player-only package.
   click route. A 500ms validation backstop replaces the input poll (skipped
   while the picker owns the pane). The rainbow gradient sits beside the
   button; the native button's caption is set after attachment.
-- Launcher layout (from in-game review): it now spans only the swatch row
-  (tile entry width, spacing and alignment inside the palette box's fixed
-  width) and stays inside the palette box. While it shows, the swatch
-  Overlay's stack slot fills the box (the tile view scrolls when tall) and the
-  launcher keeps a fixed bottom slot. The stock slot size is restored exactly
-  when the picker opens and when the launcher retires (kept across Lua
-  reloads). Unreadable layout values keep the previous full-width layout; a
-  `LAUNCHER LAYOUT` line records the values used.
+- Launcher layout (from in-game review; tree measured with a diagnostics
+  build). The palette column has no height limit: the game caps the swatch
+  SizeBox (`MaxDesiredHeight` 550, or 455 with another mod's slider row) so
+  the palette exactly fills its 563x793 background, and the launcher hung
+  below it. While the launcher shows, the cap is lowered by the launcher's
+  52px; it is restored when the picker opens and when the launcher retires,
+  only if it still holds our value. The launcher spans just the swatch row:
+  the column width (465 = 563 panel - 68 - 30 padding) is derived from the
+  live chain's desired sizes and slot padding (`palette_layout.lua`), then
+  64px tiles with 10px spacing give a 434px row starting 5px in. Slots are
+  read through `WidgetLayoutLibrary`. Unreadable values keep the full-width
+  layout; one `LAUNCHER LAYOUT` line records the values used.
 - The widget library lookup uses a plain validity check: `a.live` rejects
   class default objects by design (caught by the launcher test).
 

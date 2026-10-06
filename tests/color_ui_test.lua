@@ -103,11 +103,15 @@ local tree=tiles.path .. ".WidgetTree_6"
 local stack=object("VerticalBox",tree .. ".VerticalBox_0")
 local overlay=object("Overlay",tree .. ".Overlay_0")
 local grid=object("BitReactorTileView",tree .. ".PartsGridList")
--- Likely in-game shape: a fixed-width SizeBox wraps the tile view inside the
--- swatch overlay (SizeBox_0 / SizeBoxSlot_0 in the reference dump).
+-- In-game shape (logged on v0.3.0): Overlay_0 holds the selector stack; the
+-- stack holds SizeBox_0, whose MaxDesiredHeight caps the swatch area so the
+-- palette fits its background box. A fixed width stands in for the derived
+-- column width here (the real column derives it from the panel above).
 local grid_box=object("SizeBox",tree .. ".SizeBox_0")
 grid_box.bOverride_WidthOverride=true; grid_box.WidthOverride=480
-stack:AddChild(overlay); overlay:AddChild(grid_box); grid_box:AddChild(grid); tiles.PartsGridList=grid
+grid_box.bOverride_MaxDesiredHeight=true; grid_box.MaxDesiredHeight=550
+function grid_box:SetMaxDesiredHeight(v) self.MaxDesiredHeight=v end
+overlay:AddChild(stack); stack:AddChild(grid_box); grid_box:AddChild(grid); tiles.PartsGridList=grid
 -- Labels and a mod-added slider can sit above the nearest picker host/stack.
 -- Preserve that ancestry but hide its sibling branches, including nested UI.
 local palette_root=object("VerticalBox",tree .. ".PaletteRoot")
@@ -118,12 +122,10 @@ local recolour_slider=object("Slider",slider_box.path .. ".WidgetTree.Slider"); 
 slider_box:AddChild(recolour_slider)
 palette_root:AddChild(zone_label); palette_root:AddChild(recolour_label)
 palette_root:AddChild(slider_box)
-palette_root:AddChild(stack)
--- The swatch overlay's stack slot is stock Automatic; tiles are 75 wide, left
--- aligned, 7 items (so one full row of 6 fits the 480 box). The SizeBox sits
--- in its overlay slot with left alignment and 10px padding.
-overlay.Slot.Size={SizeRule=0,Value=1}; overlay.Slot.Parent=stack
-grid_box.Slot.HorizontalAlignment=1; grid_box.Slot.Padding={Left=10,Top=0,Right=10,Bottom=0}
+palette_root:AddChild(overlay)
+-- Tiles are 75 wide, left aligned, 7 items: one full row of 6 in 480. The
+-- swatch SizeBox sits 10px in from the stack's left edge.
+grid_box.Slot.Padding={Left=10,Top=10,Right=0,Bottom=0}
 function grid:GetEntryWidth() return 75 end
 function grid:GetNumItems() return 7 end
 grid.HorizontalEntrySpacing=0; grid.bEntrySizeIncludesEntrySpacing=false; grid.TileAlignment=3
@@ -216,18 +218,15 @@ assert(rainbow and rainbow.texture and imports==1)
 assert(rainbow.parent.SetWidthOverride_arg==42 and rainbow.parent.SetHeightOverride_arg==24)
 local launcher=find(root_name)
 assert(launcher.Slot.SetSize_arg.SizeRule==0,"Launcher keeps a fixed slot at the bottom of the palette box")
-assert(overlay.Slot.SetSize_arg.SizeRule==1,"The swatch area fills the box so the launcher cannot overflow it")
+assert(grid_box.MaxDesiredHeight==498,"The swatch cap shrinks by the launcher height so the palette fits its box")
 local launcher_size=launcher.WidgetTree.RootWidget.children[1]
-assert(launcher_size.SetWidthOverride_arg==480 and launcher_size.Slot.SetHorizontalAlignment_arg==1
-    and launcher_size.Slot.SetPadding_arg.Left==10,"Launcher mirrors the swatch box placement")
-local launcher_row=launcher_size.children[1]
-assert(launcher_row.Slot.SetPadding_arg.Left==0 and launcher_row.Slot.SetPadding_arg.Right==30,"Launcher spans exactly the six-swatch row")
+assert(launcher_size.SetWidthOverride_arg==450 and launcher_size.Slot.SetHorizontalAlignment_arg==1
+    and launcher_size.Slot.SetPadding_arg.Left==10,"Launcher spans exactly the six-swatch row")
 local layout_logged=false
 for _,line in ipairs(logs) do
-    if line:find("LAUNCHER LAYOUT | host=fill | width=450.0 left=0.0",1,true)
-        and line:find("tree=BitReactorTileView",1,true) and line:find("SizeBox[w=true/480",1,true) then layout_logged=true end
+    if line:find("LAUNCHER LAYOUT | height=cap 550->498 | width=450.0 left=10.0 column=480.0 per_line=6 align=left",1,true) then layout_logged=true end
 end
-assert(layout_logged,"Launcher layout records the measurements and tree it used")
+assert(layout_logged,"Launcher layout records the values it used")
 local footer=launcher.WidgetTree.RootWidget
 assert(footer.kind=="Overlay" and footer.visibility==4)
 assert(footer.children[1].SetHeightOverride_arg==44 and footer.children[1].Slot.SetVerticalAlignment_arg==2)
@@ -254,7 +253,7 @@ assert(ui.prepare_picker()==binding,"Opening must not depend on geometry marshal
 -- Real view fills only the verified lower selector host, without geometry calls.
 local view=assert(loadfile(scripts .. "/picker_view.lua"))().new(runtime)
 view.open(); assert(find(view.root_name).parent==overlay and view.pane_binding==binding)
-assert(overlay.Slot.SetSize_arg.SizeRule==0 and overlay.Slot.SetSize_arg.Value==1,"The picker keeps the stock swatch-area sizing")
+assert(grid_box.MaxDesiredHeight==550,"The picker keeps the stock swatch cap")
 assert(not find(view.hsv.hue_name).value_writes and not find(view.hsv.hex_name).text
     and not view.hsv.painted_h,"Build must not initialize an unused white draft")
 local native_heading=find(view.heading_name)
@@ -403,7 +402,7 @@ assert(find(view.buttons[1].name).text=="Cancel")
 click(view,1)
 local value,action=view.read(); assert(value==nil and action=="cancel")
 view.close(); assert(#overlay.children==1 and ui.root_name==root_name and grid.visibility==0)
-assert(overlay.Slot.SetSize_arg.SizeRule==1,"Closing the picker re-anchors the launcher inside the box")
+assert(grid_box.MaxDesiredHeight==498,"Closing the picker re-fits the launcher inside the box")
 assert(zone_label.visibility==0 and recolour_label.visibility==3 and slider_box.visibility==4
     and launcher.visibility==4 and recolour_slider.value==1,"Close restores every original visibility exactly")
 assert(not view.hsv,"HSV child identities retire with the owned view")
@@ -498,7 +497,7 @@ local retired_button=find(ui.button_name)
 assert(runtime.button_clicks.routes[ui.button_name],"Launcher click route is bound while attached")
 ui.context_changed("page closed"); assert(not ui.binding and not jobs["color-ui:poll"])
 stale_poll(); run("color-ui:retire"); assert(#stack.children==1 and not ui.root_name)
-assert(overlay.Slot.SetSize_arg.SizeRule==0 and overlay.Slot.SetSize_arg.Value==1,"Retiring the launcher restores stock swatch-area sizing")
+assert(grid_box.MaxDesiredHeight==550,"Retiring the launcher restores the stock swatch cap")
 assert(not runtime.button_clicks.routes[retired_button:GetFullName()],"Retiring the launcher unbinds its click route")
 hooks["/Script/CommonUI.CommonButtonBase:HandleButtonClicked"]({get=function() return retired_button end})
 assert(not jobs["color-ui:launch"] and not jobs["color-ui:open"],"A click on a retired launcher does nothing")
@@ -633,6 +632,18 @@ ui.close("HSV test ended")
 tag="br.Customization.Slot.Character.Appearance.Humanoid.FacialDetails.Group.Scar.Strength"
 vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
 assert(not pcall(ui.prepare_picker),"Manual override must refuse unrelated scalar slots")
+-- The swatch cap: lowered while a launcher shows, restored on retirement,
+-- but a cap another mod changed after us is theirs to keep.
+tag="br.Customization.Slot.Character.Hair.Hair.Color.Primary"; vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
+grid_box.MaxDesiredHeight=550; ui.close("cap baseline")
+assert(pcall(ui.reconcile) and ui.binding and grid_box.MaxDesiredHeight==498)
+ui.close("cap restore"); assert(grid_box.MaxDesiredHeight==550)
+assert(pcall(ui.reconcile) and grid_box.MaxDesiredHeight==498)
+grid_box.MaxDesiredHeight=401; ui.close("cap changed by another mod")
+assert(grid_box.MaxDesiredHeight==401,"Never overwrite a swatch cap another mod changed")
+grid_box.bOverride_MaxDesiredHeight=false; grid_box.MaxDesiredHeight=0
+assert(pcall(ui.reconcile) and ui.binding and grid_box.MaxDesiredHeight==0,"No cap: leave the swatch area alone")
+ui.close("no cap")
 -- Reload cleanup targets only exact launcher roots; no stock/mimic removal.
 local stale=object("UserWidget",page.path .. ".ColorsPlusLauncher_Root_90"); stack:AddChild(stale)
 local other=object("OtherWidget",page.path .. ".ColorsPlusLauncher_Root_91"); stack:AddChild(other)
