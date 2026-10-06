@@ -45,7 +45,6 @@ local log = module("logging").new(directory .. "../colors_plus_probe.log", runti
 runtime.log = log.write
 local perf_log = module("logging").new(directory .. "../colors_plus_performance.log", runtime.generation,{mirror=false})
 runtime.on_close = function() perf_log.close(); log.close() end
-runtime.call_trace = module("call_trace").new(runtime)
 -- Time every real lookup (cache misses and unheld calls) for tester captures.
 runtime.objects = module("object_cache").new(function(path)
     if runtime.perf then return runtime.perf.measure("lookup.static_find", StaticFindObject, path) end
@@ -108,9 +107,6 @@ if #missing == 0 then
         return false
     end)
     runtime.tint = tint
-    runtime.material_trace = module("material_trace").new(runtime, probe.access, tint.read_context)
-    runtime.material_trace.attach()
-    runtime.stock_call_trace = module("stock_call_trace").new(runtime, probe.access, tint.read_context)
     runtime.log("STARTUP | RECOVERY LOAD BEGIN")
     tint.start()
     runtime.log("STARTUP | RECOVERY LOAD RETURN")
@@ -118,18 +114,9 @@ if #missing == 0 then
     runtime.picker.start()
     runtime.color_ui = module("color_ui").new(runtime,probe.access,tint)
     runtime.color_ui.start()
-    runtime.sv_probe = module("sv_drag_probe").new(runtime)
-    runtime.sv_probe.attach()
-    runtime.click_probe = module("click_event_probe").new(runtime)
-    runtime.click_probe.attach()
     runtime.skin_enable = module("skin_enable_probe").new(runtime, probe.access)
     runtime.skin_enable.attach()
-    runtime.skin_target = module("skin_target_probe").new(runtime, probe.access, directory .. "../DevPanel/skin_target_recovery.txt")
-    runtime.skin_target.start()
-    runtime.skin_target.attach()
-    runtime.eye_preview = module("eye_preview").new(runtime, probe.access, directory .. "../DevPanel/eye_recovery.txt")
-    runtime.eye_preview.start()
-    runtime.eye_preview.attach()
+    module("context_events").attach(runtime, probe, tint)
     runtime.log("TINT | API presence checks passed | FName=" .. name_type
         .. " | constructor validation deferred to game-thread action | preview writes remain opt-in")
     else
@@ -140,17 +127,11 @@ else
     runtime.tint_disabled_reason = "required UE4SS API unavailable: " .. table.concat(missing, ", ")
     runtime.log("TINT | Disabled: " .. runtime.tint_disabled_reason)
 end
-module("picker_console").attach(runtime)
-runtime.screen_trace = module("screen_trace").new(runtime, probe.access)
-runtime.screen_trace.attach()
-runtime.color_compatibility = module("color_compatibility").new(runtime, probe.access)
-runtime.color_compatibility.attach()
--- Reload the helper factory: its old client shuts down before the new client
--- binds this runtime's scheduler. Never reuse a retired runtime adapter.
-runtime.log("STARTUP | PANEL CLIENT BEGIN")
-local client = module("SWZCDevPanel")
-rawset(_G, "ColorsPlusProbeDevPanelClient", client)
-module("dev_panel_bridge").attach(runtime, probe, tint, client)
-runtime.log("STARTUP | PANEL CLIENT RETURN")
+-- Developer diagnostics ship only in the dev package (see dev_tools.lua).
+local dev_tools = loadfile(directory .. "dev_tools.lua")
+if dev_tools then
+    dev_tools().attach(runtime, probe, tint, module, directory)
+    runtime.log("STARTUP | DEV TOOLS ATTACHED")
+end
 runtime.log("STARTUP | BOOTSTRAP COMPLETE | waiting for deferred game-thread jobs")
 return runtime

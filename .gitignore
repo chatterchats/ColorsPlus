@@ -9,3 +9,6 @@ Thumbs.db
 *.swp
 *.tmp
 /src/Colors+Probe/DevPanel/*
+# The Dev Panel action schema ships in every package (and keeps the DevPanel
+# folder, where recovery journals live, present after extraction).
+!/src/Colors+Probe/DevPanel/actions.lua

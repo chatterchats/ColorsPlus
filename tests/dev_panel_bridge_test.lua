@@ -84,7 +84,8 @@ runtime.eye_preview=nil
 
 -- Page exit cancels queued context-sensitive work, not screen tracing.
 for _,key in ipairs({"open_picker","apply_picker","capture_compat","inspect_tint","trace_materials","trace_stock_calls","trace_screens"}) do handlers[key]() end
-game_thread=true; probe.on_context_event("page closed"); game_thread=false
+assert(not probe.on_context_event,"Production context routing belongs to context_events, not the Dev Panel bridge")
+game_thread=true; runtime.dev_context.before("page closed"); runtime.dev_context.after("page closed"); game_thread=false
 for _,key in ipairs({"open_picker","apply_picker","capture_compat","inspect_tint","trace_materials","trace_stock_calls"}) do
     assert(not jobs["panel:" .. key],key .. " survives page exit")
 end

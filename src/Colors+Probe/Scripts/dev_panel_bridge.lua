@@ -19,7 +19,7 @@ function M.attach(runtime, probe, tint, client)
             runtime:after("panel:status",1,function() runtime.log("PANEL CLIENT | STATUS | " .. client.Status()) end)
         end)
     end
-    local writes={apply_cyan=true,apply_handoff=true,apply_blue=true,apply_rgb=true,open_picker=true,apply_picker=true}
+    local writes={open_picker=true,apply_picker=true}
     local stops={stop_material_trace="trace_materials",stop_stock_calls="trace_stock_calls",stop_screen_trace="trace_screens"}
     local function cancel_writes()
         for key in pairs(writes) do runtime:cancel("panel:" .. key) end
@@ -70,12 +70,6 @@ function M.attach(runtime, probe, tint, client)
         end))
     end
     register("inspect_tint", function() tint.inspect() end)
-    -- Historical handlers remain for development regression fixtures/old state
-    -- files, but are no longer advertised as current tests in the panel menu.
-    register("apply_cyan", function() tint.apply() end)
-    register("apply_handoff", function() tint.apply(true) end)
-    register("apply_blue", function() tint.apply("blue") end)
-    register("apply_rgb", function() tint.cycle_rgb() end)
     register("open_picker", function()
         if runtime.picker then runtime.picker.open() end
     end)
@@ -116,27 +110,31 @@ function M.attach(runtime, probe, tint, client)
         probe.on_stock_call = function(...)
             if runtime.stock_call_trace then runtime.stock_call_trace.slot_event(...) end
         end
-        probe.on_context_event = function(reason,identity)
-            if runtime.skin_target then runtime.skin_target.context_changed(reason) end
-            if runtime.skin_enable then runtime.skin_enable.stop(reason) end
-            if runtime.eye_preview then runtime.eye_preview.context_changed(reason) end
-            local closed=reason=="page closed" or reason=="creator closed"
-            if closed then
-                runtime:cancel("eyes:command")
-                -- A panel action may already have been handed to this runtime
-                -- but not executed. Do not open/apply it on the next screen.
-                cancel_writes()
-                for _,key in ipairs({"inspect_tint","capture_compat","trace_materials","trace_stock_calls"}) do
-                    runtime:cancel("panel:" .. key)
+        -- context_events owns the production route (skin stop, backend);
+        -- these probe/panel handlers run around it in the same order as before.
+        runtime.dev_context = {
+            before=function(reason)
+                if runtime.skin_target then runtime.skin_target.context_changed(reason) end
+                if runtime.eye_preview then runtime.eye_preview.context_changed(reason) end
+                if reason=="page closed" or reason=="creator closed" then
+                    runtime:cancel("eyes:command")
+                    -- A panel action may already have been handed to this runtime
+                    -- but not executed. Do not open/apply it on the next screen.
+                    cancel_writes()
+                    for _,key in ipairs({"inspect_tint","capture_compat","trace_materials","trace_stock_calls"}) do
+                        runtime:cancel("panel:" .. key)
+                    end
                 end
-            end
-            tint.context_changed(reason,identity)
-            if runtime.stock_call_trace and closed then runtime.stock_call_trace.stop(reason) end
-            if runtime.material_trace then
-                if closed then runtime.material_trace.stop(reason)
-                else runtime.material_trace.event("stock/UI: " .. reason) end
-            end
-        end
+            end,
+            after=function(reason)
+                local closed=reason=="page closed" or reason=="creator closed"
+                if runtime.stock_call_trace and closed then runtime.stock_call_trace.stop(reason) end
+                if runtime.material_trace then
+                    if closed then runtime.material_trace.stop(reason)
+                    else runtime.material_trace.event("stock/UI: " .. reason) end
+                end
+            end,
+        }
     end
     runtime.log("Dev Panel integration | available=" .. tostring(client.IsAvailable()) .. " | F6 > Colors+ Probe")
 end
