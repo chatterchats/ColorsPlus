@@ -124,66 +124,129 @@ function M.new(runtime,a,tint)
         local ok,grid=pcall(fresh,f.grid)
         if ok and grid:GetVisibility()==3 then grid:SetVisibility(f.original) end
     end
-    -- Palette box layout. Stock: the swatch Overlay sizes to its content and
-    -- the launcher took whatever height remained, so tall palettes pushed the
-    -- launcher below the box. While the launcher shows, the swatch Overlay
-    -- fills the box instead (its tile view scrolls) and the launcher keeps a
-    -- fixed slot at the bottom. The stock slot size survives Lua reloads and is
-    -- restored exactly when the picker opens (so its layout is unchanged) and
-    -- when the launcher retires.
+    -- Palette box layout. Stock: the swatch area sizes to its content and the
+    -- launcher took whatever height remained, so tall palettes pushed the
+    -- launcher below the box. While the launcher shows, the swatch area (the
+    -- grid's ancestor that is the selector stack's direct child) fills the box
+    -- instead (its tile view scrolls) and the launcher keeps a fixed bottom
+    -- slot. The stock slot size survives Lua reloads and is restored exactly
+    -- when the picker opens (its layout is unchanged) and when the launcher
+    -- retires. Slots are read through WidgetLayoutLibrary (the Blueprint way);
+    -- the raw Slot property is only a fallback.
     local layouts=rawget(_G,"ColorsPlusProbeLauncherLayout") or {}
     rawset(_G,"ColorsPlusProbeLauncherLayout",layouts)
     local filled
-    local function host_slot(overlay_name,stack_name)
-        local s=obj(fresh(overlay_name).Slot,"palette host slot")
-        assert(name(obj(s.Parent,"palette host parent"))==stack_name,"Palette host is not a direct child of the selector stack")
+    local SLOT_AS={VerticalBox="SlotAsVerticalBoxSlot",Overlay="SlotAsOverlaySlot",SizeBox="SlotAsSizeBoxSlot",
+        HorizontalBox="SlotAsHorizontalBoxSlot",Border="SlotAsBorderSlot",ScrollBox="SlotAsScrollBoxSlot",
+        CanvasPanel="SlotAsCanvasSlot",GridPanel="SlotAsGridSlot",UniformGridPanel="SlotAsUniformGridSlot",
+        WrapBox="SlotAsWrapBoxSlot"}
+    local function layout_library()
+        local lib=StaticFindObject("/Script/UMG.Default__WidgetLayoutLibrary")
+        assert(lib and lib:IsValid()==true,"Widget layout library unavailable")
+        return lib
+    end
+    local function slot_of(widget)
+        local holder=parent(widget); local holder_kind=kind(holder)
+        local fn=SLOT_AS[holder_kind]
+        if fn then
+            local lib=layout_library()
+            local ok,v=pcall(function() return a.unwrap(lib[fn](lib,widget)) end)
+            if ok and a.live(v) then return v,holder end
+        end
+        local ok,v=pcall(function() return a.unwrap(widget.Slot) end)
+        if ok and a.live(v) then return v,holder end
+        error("Unreadable " .. kind(widget) .. " slot in " .. holder_kind)
+    end
+    local function stack_child(b)
+        -- The grid itself, or the chain ancestor whose parent is the stack.
+        local child=b.grid
+        for _,full in ipairs(b.chain) do
+            if full==b.stack then return child end
+            child=full
+        end
+        error("Selector stack is not an ancestor of the swatch grid")
+    end
+    local function host_slot(host_name,stack_name)
+        local s,holder=slot_of(fresh(host_name))
+        assert(name(holder)==stack_name,"Swatch area is not a direct child of the selector stack")
         return s
     end
     local function fill_host(b)
         if filled then return end
-        local s=host_slot(b.overlay,b.stack)
-        if not layouts[b.overlay] then
+        local host_name=stack_child(b)
+        local s=host_slot(host_name,b.stack)
+        if not layouts[host_name] then
             local size=s.Size
             local stock={rule=tonumber(size.SizeRule),value=tonumber(size.Value)}
-            assert(stock.rule and stock.value,"Unreadable palette host size")
-            layouts[b.overlay]=stock
+            assert(stock.rule and stock.value,"Unreadable swatch area size")
+            layouts[host_name]=stock
         end
         s:SetSize({SizeRule=1,Value=1})
-        filled={overlay=b.overlay,stack=b.stack}
+        filled={host=host_name,stack=b.stack}
     end
     local function restore_host()
         local f=filled; filled=nil
-        local stock=f and layouts[f.overlay]
+        local stock=f and layouts[f.host]
         if not stock then return end
-        layouts[f.overlay]=nil
+        layouts[f.host]=nil
         -- A destroyed page has nothing left to restore.
-        local ok,s=pcall(host_slot,f.overlay,f.stack)
+        local ok,s=pcall(host_slot,f.host,f.stack)
         if ok then s:SetSize({SizeRule=stock.rule,Value=stock.value}) end
     end
-    -- The swatch row inside the palette box's fixed width, from the tile
-    -- view's entry width, spacing and alignment. Offsets are relative to the
-    -- selector stack. Unreadable values keep the full-width launcher.
+    -- The swatch row: tile entry width, spacing and alignment inside the
+    -- nearest fixed-width SizeBox above the grid. The launcher mirrors that
+    -- box (width, alignment, outer padding) and offsets its row inside it.
+    -- Without a fixed-width box the launcher keeps the full width.
     local ALIGN={[0]="evenly",[1]="fill",[2]="fill",[3]="left",[4]="right",[5]="center",[6]="fill"}
-    local function pad(slot,side)
-        local ok,v=pcall(function() return tonumber(slot.Padding[side]) end)
-        return ok and v or 0
+    local function num(fn) local ok,v=pcall(fn); return ok and tonumber(v) or nil end
+    local function pad(slot,side) return num(function() return slot.Padding[side] end) or 0 end
+    local function describe_chain(b)
+        -- One line per ancestor: kind, slot alignment/padding, size overrides.
+        local parts,w={},fresh(b.grid)
+        for _=1,8 do
+            local ok,s,holder=pcall(slot_of,w)
+            local k=kind(w)
+            local entry=k
+            if k=="SizeBox" then
+                entry=entry .. string.format("[w=%s/%s h=%s/%s]",tostring(w.bOverride_WidthOverride),
+                    tostring(num(function() return w.WidthOverride end)),tostring(w.bOverride_HeightOverride),
+                    tostring(num(function() return w.HeightOverride end)))
+            end
+            if ok then
+                entry=entry .. string.format("{h=%s pad=%s,%s,%s,%s%s}",tostring(num(function() return s.HorizontalAlignment end)),
+                    pad(s,"Left"),pad(s,"Top"),pad(s,"Right"),pad(s,"Bottom"),
+                    num(function() return s.Size.SizeRule end) and (" size=" .. num(function() return s.Size.SizeRule end)) or "")
+            else entry=entry .. "{" .. tostring(s):match("[^:]*$") .. "}" end
+            parts[#parts+1]=entry
+            if not ok or name(holder)==b.stack then break end
+            w=holder
+        end
+        return table.concat(parts," < ") .. " < stack"
     end
     local function swatch_row(b)
         local grid=fresh(b.grid)
-        local entry=tonumber(grid:GetEntryWidth())
-        local count=tonumber(grid:GetNumItems())
-        local spacing=tonumber(grid.HorizontalEntrySpacing) or 0
+        local entry=num(function() return grid:GetEntryWidth() end)
+        local count=num(function() return grid:GetNumItems() end)
+        local spacing=num(function() return grid.HorizontalEntrySpacing end) or 0
         local includes=grid.bEntrySizeIncludesEntrySpacing==true
-        local align=ALIGN[tonumber(grid.TileAlignment) or 0] or "evenly"
+        local align=ALIGN[num(function() return grid.TileAlignment end) or 0] or "evenly"
         assert(entry and entry>0 and count and count>0,"Unreadable tile entry size")
-        local tiles=obj(find(assert(b.tree:match("^(.+)%.WidgetTree[^.]*$"),"Invalid swatch owner")),"selection tiles")
-        local box=obj(obj(tiles.WidgetTree,"tiles tree").RootWidget,"palette box")
-        local stack=fresh(b.stack)
-        assert(kind(box)=="SizeBox" and box.bOverride_WidthOverride==true and name(parent(stack))==name(box),
-            "Palette box has no fixed width")
-        local stack_slot,host,grid_slot=a.unwrap(stack.Slot),a.unwrap(fresh(b.overlay).Slot),a.unwrap(grid.Slot)
-        local avail=tonumber(box.WidthOverride)-pad(stack_slot,"Left")-pad(stack_slot,"Right")
-            -pad(host,"Left")-pad(host,"Right")-pad(grid_slot,"Left")-pad(grid_slot,"Right")
+        -- Walk up to the first fixed-width SizeBox, summing padding inside it.
+        local w,inner_left,inner_right,box,box_slot=grid,0,0,nil,nil
+        for _=1,8 do
+            local s,holder=slot_of(w)
+            if name(holder)==b.stack then break end
+            if kind(holder)=="SizeBox" and holder.bOverride_WidthOverride==true then
+                inner_left=inner_left+pad(s,"Left"); inner_right=inner_right+pad(s,"Right")
+                box=holder; box_slot=slot_of(holder); break
+            end
+            inner_left=inner_left+pad(s,"Left"); inner_right=inner_right+pad(s,"Right")
+            w=holder
+        end
+        assert(box,"No fixed-width box above the swatch grid")
+        local box_width=num(function() return box.WidthOverride end)
+        assert(box_width and box_width>0,"Unreadable swatch box width")
+        local avail=box_width-inner_left-inner_right
         local gap=includes and 0 or spacing
         local pitch=entry+gap
         local per_line=math.max(1,math.floor((avail+gap)/pitch))
@@ -197,10 +260,11 @@ function M.new(runtime,a,tint)
         elseif align=="fill" then span=avail end
         -- Spacing included in the entry size surrounds each entry widget.
         if includes and spacing>0 then start=start+spacing/2; span=span-spacing end
-        assert(span>0 and avail>0,"Palette row does not fit")
-        return {left=pad(host,"Left")+pad(grid_slot,"Left")+start,width=span,
+        assert(span>0 and avail>0,"Swatch row does not fit")
+        return {box_width=box_width,box_align=num(function() return box_slot.HorizontalAlignment end) or 0,
+            box_left=pad(box_slot,"Left"),box_right=pad(box_slot,"Right"),row_left=inner_left+start,width=span,
             detail=string.format("entry=%.1f spacing=%.1f includes=%s align=%s items=%d per_line=%d box=%.1f avail=%.1f",
-                entry,spacing,tostring(includes),align,count,per_line,tonumber(box.WidthOverride),avail)}
+                entry,spacing,tostring(includes),align,count,per_line,box_width,avail)}
     end
     local function retire()
         thaw()
@@ -292,7 +356,7 @@ function M.new(runtime,a,tint)
         local size=construct("/Script/UMG.SizeBox",footer); size:SetHeightOverride(44)
         local footer_slot=footer:AddChild(size); footer_slot:SetHorizontalAlignment(0); footer_slot:SetVerticalAlignment(2)
         local footer_size=size
-        local row=construct("/Script/UMG.HorizontalBox",size); size:AddChild(row)
+        local row=construct("/Script/UMG.HorizontalBox",size); local row_slot=size:AddChild(row)
         local rainbow=construct("/Script/UMG.Image",row)
         call("rainbow gradient",function() gradients.bind(rainbow,"hue") end)
         local box=construct("/Script/UMG.SizeBox",row)
@@ -319,13 +383,18 @@ function M.new(runtime,a,tint)
         slot:SetSize(hosted and {SizeRule=0,Value=1} or {SizeRule=1,Value=1})
         local fitted,row=pcall(swatch_row,b)
         if fitted then
-            footer_size:SetWidthOverride(row.width)
-            footer_slot:SetHorizontalAlignment(1)
-            footer_slot:SetPadding({Left=row.left,Top=0,Right=0,Bottom=0})
+            -- Mirror the swatch box (width, alignment, outer padding), then
+            -- place the row inside it exactly where the swatches start.
+            footer_size:SetWidthOverride(row.box_width)
+            footer_slot:SetHorizontalAlignment(row.box_align)
+            footer_slot:SetPadding({Left=row.box_left,Top=0,Right=row.box_right,Bottom=0})
+            row_slot:SetPadding({Left=row.row_left,Top=0,Right=math.max(0,row.box_width-row.row_left-row.width),Bottom=0})
         end
-        log(string.format("LAUNCHER LAYOUT | host=%s | width=%s",
-            hosted and "fill" or ("stock (" .. tostring(host_why) .. ")"),
-            fitted and string.format("%.1f left=%.1f | %s",row.width,row.left,row.detail) or ("full (" .. tostring(row) .. ")")))
+        local chained,chain=pcall(describe_chain,b)
+        log(string.format("LAUNCHER LAYOUT | host=%s | width=%s | tree=%s",
+            hosted and "fill" or ("stock (" .. tostring(host_why):match("[^:]*$") .. ")"),
+            fitted and string.format("%.1f left=%.1f | %s",row.width,row.row_left,row.detail) or ("full (" .. tostring(row):match("[^:]*$") .. ")"),
+            chained and chain or ("unreadable (" .. tostring(chain):match("[^:]*$") .. ")")))
         -- Reacquire after native attachment/Construct before setting text.
         fresh(self.button_name):UpdateText(FText("CUSTOM COLOR"))
         local generation=epoch

@@ -103,7 +103,11 @@ local tree=tiles.path .. ".WidgetTree_6"
 local stack=object("VerticalBox",tree .. ".VerticalBox_0")
 local overlay=object("Overlay",tree .. ".Overlay_0")
 local grid=object("BitReactorTileView",tree .. ".PartsGridList")
-stack:AddChild(overlay); overlay:AddChild(grid); tiles.PartsGridList=grid
+-- Likely in-game shape: a fixed-width SizeBox wraps the tile view inside the
+-- swatch overlay (SizeBox_0 / SizeBoxSlot_0 in the reference dump).
+local grid_box=object("SizeBox",tree .. ".SizeBox_0")
+grid_box.bOverride_WidthOverride=true; grid_box.WidthOverride=480
+stack:AddChild(overlay); overlay:AddChild(grid_box); grid_box:AddChild(grid); tiles.PartsGridList=grid
 -- Labels and a mod-added slider can sit above the nearest picker host/stack.
 -- Preserve that ancestry but hide its sibling branches, including nested UI.
 local palette_root=object("VerticalBox",tree .. ".PaletteRoot")
@@ -114,14 +118,12 @@ local recolour_slider=object("Slider",slider_box.path .. ".WidgetTree.Slider"); 
 slider_box:AddChild(recolour_slider)
 palette_root:AddChild(zone_label); palette_root:AddChild(recolour_label)
 palette_root:AddChild(slider_box)
--- The SelectionTiles box: a fixed-width SizeBox directly above the stack. The
--- swatch overlay's stack slot is stock Automatic; tiles are 75 wide, left
--- aligned, 7 items (so one full row of 6 fits the 480 box).
-local palette_box=object("SizeBox",tree .. ".SizeBox_0")
-palette_box.bOverride_WidthOverride=true; palette_box.WidthOverride=480
-palette_root:AddChild(palette_box); palette_box:AddChild(stack)
-tiles.WidgetTree=object("WidgetTree",tree); tiles.WidgetTree.RootWidget=palette_box
+palette_root:AddChild(stack)
+-- The swatch overlay's stack slot is stock Automatic; tiles are 75 wide, left
+-- aligned, 7 items (so one full row of 6 fits the 480 box). The SizeBox sits
+-- in its overlay slot with left alignment and 10px padding.
 overlay.Slot.Size={SizeRule=0,Value=1}; overlay.Slot.Parent=stack
+grid_box.Slot.HorizontalAlignment=1; grid_box.Slot.Padding={Left=10,Top=0,Right=10,Bottom=0}
 function grid:GetEntryWidth() return 75 end
 function grid:GetNumItems() return 7 end
 grid.HorizontalEntrySpacing=0; grid.bEntrySizeIncludesEntrySpacing=false; grid.TileAlignment=3
@@ -216,11 +218,16 @@ local launcher=find(root_name)
 assert(launcher.Slot.SetSize_arg.SizeRule==0,"Launcher keeps a fixed slot at the bottom of the palette box")
 assert(overlay.Slot.SetSize_arg.SizeRule==1,"The swatch area fills the box so the launcher cannot overflow it")
 local launcher_size=launcher.WidgetTree.RootWidget.children[1]
-assert(launcher_size.SetWidthOverride_arg==450 and launcher_size.Slot.SetHorizontalAlignment_arg==1
-    and launcher_size.Slot.SetPadding_arg.Left==0,"Launcher spans exactly the six-swatch row")
+assert(launcher_size.SetWidthOverride_arg==480 and launcher_size.Slot.SetHorizontalAlignment_arg==1
+    and launcher_size.Slot.SetPadding_arg.Left==10,"Launcher mirrors the swatch box placement")
+local launcher_row=launcher_size.children[1]
+assert(launcher_row.Slot.SetPadding_arg.Left==0 and launcher_row.Slot.SetPadding_arg.Right==30,"Launcher spans exactly the six-swatch row")
 local layout_logged=false
-for _,line in ipairs(logs) do if line:find("LAUNCHER LAYOUT | host=fill | width=450.0 left=0.0",1,true) then layout_logged=true end end
-assert(layout_logged,"Launcher layout records the measurements it used")
+for _,line in ipairs(logs) do
+    if line:find("LAUNCHER LAYOUT | host=fill | width=450.0 left=0.0",1,true)
+        and line:find("tree=BitReactorTileView",1,true) and line:find("SizeBox[w=true/480",1,true) then layout_logged=true end
+end
+assert(layout_logged,"Launcher layout records the measurements and tree it used")
 local footer=launcher.WidgetTree.RootWidget
 assert(footer.kind=="Overlay" and footer.visibility==4)
 assert(footer.children[1].SetHeightOverride_arg==44 and footer.children[1].Slot.SetVerticalAlignment_arg==2)
@@ -257,7 +264,7 @@ assert(heading_creates==1 and native_heading.kind=="WBP_Customization_SlotSubIte
 assert(native_heading.visibility==3 and native_heading.bIsFocusable==false
     and native_heading.WidgetTree.RootWidget.children[1].kind=="Image",
     "Keep the native marker and make the decorative heading ignore input")
-assert(#overlay.children==2 and grid.visibility==2 and grid.parent==overlay,
+assert(#overlay.children==2 and grid.visibility==2 and grid.parent==grid_box,
     "Native swatches must be Hidden without removing their layout space")
 assert(zone_label.visibility==2 and recolour_label.visibility==2 and slider_box.visibility==2
     and launcher.visibility==2,"Both labels, the slider branch and our launcher must disappear")
@@ -471,8 +478,8 @@ runtime.call_trace=nil; runtime.trace_picker_initialization=nil
 -- Retired native wrappers are never retained. The path is reacquired each use.
 local retired_grid=grid
 grid=object("BitReactorTileView",retired_grid.path)
-grid.parent=overlay; tiles.PartsGridList=grid
-overlay.children[1]=grid -- a fresh native GetAllChildren call returns fresh wrappers too
+grid.parent=grid_box; tiles.PartsGridList=grid
+grid_box.children[1]=grid -- a fresh native GetAllChildren call returns fresh wrappers too
 retired_grid.IsValid=function() error("old grid wrapper touched") end
 assert(ui.validate_picker(binding)); retired_grid.IsValid=function() return false end
 local before=opens
@@ -503,11 +510,11 @@ page.active=true
 -- No borrowing a page-level parent or touching unsupported/missing ancestry.
 grid.parent=object("Overlay",page.path .. ".WidgetTree_4.PageWideOverlay")
 assert(not pcall(ui.reconcile) and #stack.children==1)
-grid.parent=overlay
+grid.parent=grid_box
 -- Failed attachment still refuses preview; removal failures retain identity.
 fail_construct="/Script/UMG.HorizontalBox"; assert(not pcall(ui.reconcile) and not ui.root_name)
 fail_construct=nil; ui.reconcile()
-grid.parent=nil; assert(not pcall(ui.prepare_picker)); grid.parent=overlay
+grid.parent=nil; assert(not pcall(ui.prepare_picker)); grid.parent=grid_box
 fail_remove=true; assert(not pcall(ui.close,"injected failure") and ui.root_name)
 assert(not pcall(ui.reconcile),"Cannot install over failed cleanup")
 fail_remove=false; ui.close("retry"); assert(not ui.root_name)
@@ -582,7 +589,7 @@ for _,slot in ipairs({"br.Customization.Slot.Character.Appearance.Humanoid.Facia
     view.close(); assert(ui.binding==binding and #stack.children==2 and #overlay.children==1)
     grid.parent=nil
     assert(not pcall(ui.validate_picker,binding),"Vitiligo/scar pane must reject changed native ancestry")
-    grid.parent=overlay; ui.close("next cosmetic"); assert(not ui.binding)
+    grid.parent=grid_box; ui.close("next cosmetic"); assert(not ui.binding)
 end
 -- Raw scar HSV controls preserve native values instead of converting them to
 -- sRGB, rendering an impossible hex swatch, or rounding untouched channels.
@@ -629,8 +636,8 @@ assert(not pcall(ui.prepare_picker),"Manual override must refuse unrelated scala
 -- Reload cleanup targets only exact launcher roots; no stock/mimic removal.
 local stale=object("UserWidget",page.path .. ".ColorsPlusLauncher_Root_90"); stack:AddChild(stale)
 local other=object("OtherWidget",page.path .. ".ColorsPlusLauncher_Root_91"); stack:AddChild(other)
-ui.cleanup(); assert(not stale.parent and other.parent==stack and grid.parent==overlay)
-assert(grid.visibility==0 and grid.parent==overlay,"Native grid remains visible and owned by its original host")
+ui.cleanup(); assert(not stale.parent and other.parent==stack and grid.parent==grid_box)
+assert(grid.visibility==0 and grid.parent==grid_box,"Native grid remains visible and owned by its original host")
 assert(zone_label.visibility==0 and recolour_label.visibility==3 and slider_box.visibility==4
     and header.visibility==0 and recolour_slider.value==1)
 print("Color UI: native heading factory/cleanup, aligned color controls, layered gradients, rainbow footer, exact/invalid hex, real Apply/Cancel, constant-cost redraw and scalar lifetimes passed")
