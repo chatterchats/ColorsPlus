@@ -17,7 +17,13 @@ currently selected zone.
 
 ## Status
 
-**Current build: Colors+Probe v0.2.115 (session-scoped object lookup reuse; self-describing performance captures).**
+**Current build: Colors+Probe v0.2.116 (lookup reuse after Apply, quieter logs, on-demand zones, faster startup).**
+
+v0.2.116 keeps the lookup cache during applied edits (post-Apply watch),
+logs only the first update per session, builds editor zones on demand and
+runs each script once per bootstrap (~2,400 -> ~70 file loads at startup).
+
+Previously (v0.2.115):
 
 Performance captures now include an `ENV` line (UE4SS/Unreal/Lua versions,
 Proton detection) and a `lookup.static_find` row with each machine's raw

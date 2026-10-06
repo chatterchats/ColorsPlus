@@ -1,8 +1,32 @@
--- Colors+Probe v0.2.115
+-- Colors+Probe v0.2.116
 -- RGB preview; Default temporarily changes the editor swatch and restores it.
-local VERSION = "0.2.115"
+local VERSION = "0.2.116"
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local directory = assert(source:match("^(.*[/\\])"), "Scripts directory unavailable")
+
+-- Run each of this mod's scripts once per bootstrap and share its module
+-- table. Modules are stateless factories (state lives in new/wrap results);
+-- per-zone stacks otherwise recompiled ~68 files each (color_rules 28x).
+-- Only this Scripts folder is memoized; this mod has its own Lua state. The
+-- original is kept across reloads so a reload never wraps the wrapper, and
+-- a fresh table per bootstrap picks up edited files.
+local original_loadfile = rawget(_G, "ColorsPlusProbeOriginalLoadfile") or loadfile
+rawset(_G, "ColorsPlusProbeOriginalLoadfile", original_loadfile)
+local loaded_modules = {}
+loadfile = function(path, ...)
+    if select("#", ...) > 0 or type(path) ~= "string" or path:sub(1, #directory) ~= directory
+        or path:sub(-4) ~= ".lua" or path:find("[/\\]", #directory + 1) then
+        return original_loadfile(path, ...)
+    end
+    local entry = loaded_modules[path]
+    if not entry then
+        local chunk, err = original_loadfile(path)
+        if not chunk then return nil, err end
+        entry = { chunk() }
+        loaded_modules[path] = entry
+    end
+    return function() return entry[1] end
+end
 
 -- Explicit paths prevent collisions with another mod's generic module names.
 local function module(name)
@@ -69,6 +93,14 @@ if #missing == 0 then
     tint = module("editor_session").wrap(zone_runtime, probe.access, journal("editor_recovery.txt"), tint)
     tint = module("zabrak_picker").wrap(zone_runtime, probe.access, journal("zabrak_picker_recovery.txt"), tint)
     return tint
+    end,function(index)
+        -- Same per-zone journals the session gate preserves/archives.
+        for _,leaf in ipairs({"tint_recovery.txt","default_selection_recovery.txt","editor_recovery.txt",
+            "editor_recovery.txt.previous","zabrak_picker_recovery.txt","zabrak_picker_recovery.txt.previous"}) do
+            local f=io.open(directory .. "../DevPanel/zone" .. index .. "_" .. leaf,"r")
+            if f then f:close(); return true end
+        end
+        return false
     end)
     runtime.tint = tint
     runtime.material_trace = module("material_trace").new(runtime, probe.access, tint.read_context)

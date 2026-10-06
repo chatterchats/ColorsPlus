@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Background, logging and startup cost cuts — v0.2.116
+
+- Hold the object lookup cache while an Apply is owned. The post-Apply
+  `editor:watch` (every 250ms per edited zone, for the whole creator visit)
+  measured ~60ms per run on a tester machine outside the picker's cache scope.
+- Log only the first live update, first RGB checkpoint trace and first Zabrak
+  verification per session. Every probe log line is flushed and mirrored to
+  the UE4SS console; drags previously wrote one or more lines per update.
+- Create editor zones on demand instead of 32 complete backend stacks at
+  startup. Zones with journals on disk (and lower zones, keeping the list
+  contiguous) are still built before recovery starts.
+- Memoize this mod's own Scripts in `main.lua`; each module runs once per
+  bootstrap. Stubbed bootstrap: 2,432 -> 69 disk loads, ~326ms -> ~10ms CPU.
+  Reload keeps the original `loadfile` and recompiles edited files.
+
 ### Self-describing performance captures — v0.2.115
 
 - Each performance capture now logs one `ENV` line after `START`: UE4SS
