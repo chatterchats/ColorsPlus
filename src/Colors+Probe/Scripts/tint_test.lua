@@ -517,8 +517,12 @@ function M.new(runtime, access, recovery_path)
                             "Untracked non-original fragment; no object modified; recovery retained")
                         log("Live slot already has original color; no fragment modified | " .. reason)
                         -- Activation may rebuild the stock fragment before cloning.
-                        -- Only the pre-cyan handoff phase may own that original copy.
+                        -- Only the pre-cyan handoff phase may own that original copy,
+                        -- or an install that changed nothing: the exact donor object
+                        -- this session activated, still at its baseline color.
                         may_reset = session.phase == "handoff" or session.phase == "prepared"
+                            or session.phase == "installing" and session.donor_fragment ~= nil
+                                and a.name(replacement) == session.donor_fragment
                     else
                         log("Owned swatch already replaced; no current fragment modified | " .. reason)
                     end
@@ -856,6 +860,7 @@ function M.new(runtime, access, recovery_path)
             assert(clone_name_for(a.name(preview), a.name(clone)), "Unexpected clone location")
             self.pending = {owner=a.name(c.owner), preview=a.name(preview), fragment=a.name(clone),
                 part=id(c.part.AssetId), materials=c.materials, original=c.original, phase="prepared", handoff=handoff_record, blue=blue, test_color=custom,profile=c.profile,
+                donor_fragment=a.name(existing), -- in memory only: proves an unchanged activation on rollback
                 context={page=c.page, slot_vm=a.name(c.slot), source=a.name(c.fragment),
                     source_slot=a.name(c.source_slot), preview_slot=a.name(preview_slot)}}
             timed("open.journal", persist, self.pending)

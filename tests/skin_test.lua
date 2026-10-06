@@ -971,5 +971,81 @@ files.recovery=""
 for _,broken in ipairs({editor_record:gsub("^editor%-v4","editor-v3"),editor_record:gsub("br.Customization.Part.Character.Race.2B","bad",1),editor_record .. "extra\n"}) do
     files.editor=broken; boot(); editor.start(); assert(editor.blocked and not editor.applied)
 end
+-- Install, refresh and restore verification on the real blue-handoff path
+-- (ported from the retired Clone 8 tests). A preview copy is adopted only when
+-- it is exactly the verified clone in the preview slot. Anything ambiguous or
+-- non-original keeps the journal for a native reset; it is never adopted,
+-- overwritten or reported as cleaned up.
+files.recovery=""; files.editor=""; files.selection=""; boot(); editor.start()
+do
+    local native_install,native_refresh=preview_slot.SetFragmentInstances,preview.RefreshCustomization
+    local native_read=preview_slot.GetFragmentInstances
+    local function rebuilt(color)
+        local cur=arrays[preview]
+        local values=make(preview,preview_slot,color,cur[1].GameplayTags.GameplayTags[1].TagName)
+        values[3].Value=cur[3].Value; values[3].MaterialTarget=copy_target(cur[3].MaterialTarget)
+        values[2].MaterialTarget=copy_target(cur[2].MaterialTarget)
+        return values
+    end
+    local function settle(reason)
+        preview_slot.SetFragmentInstances,preview.RefreshCustomization=native_install,native_refresh
+        preview_slot.GetFragmentInstances=native_read
+        vm:ResetPreviewedPart(); assert_ok(editor.restore(reason))
+        assert(not tint.pending and files.recovery=="" and not container.IsPreviewing)
+    end
+    local writes_before=source_writes
+    -- Setters that keep the submitted objects instead of copying them.
+    preview_slot.SetFragmentInstances=function(self,values) native_install(self,values); arrays[preview]=values end
+    local s=start(); assert(tint.pending==s and s.phase=="owned")
+    settle("direct install")
+    -- A setter that installs nothing: verification fails at after-install,
+    -- the untouched donor is restored and nothing is left to recover.
+    logs={}; preview_slot.SetFragmentInstances=function() end
+    assert(not editor.begin_live())
+    assert(table.concat(logs,"\n"):find("Preview verification failed at after-install",1,true))
+    assert(not tint.pending and files.recovery=="" and not container.IsPreviewing,"A no-op install leaves nothing owned")
+    preview_slot.SetFragmentInstances=native_install
+    -- Refresh replaces the installed copy with an untracked colored copy:
+    -- ambiguous, so the journal stays for a native reset.
+    logs={}; preview.RefreshCustomization=function()
+        preview.RefreshCustomization=native_refresh
+        arrays[preview]=rebuilt(arrays[preview][2].color); refresh()
+    end
+    assert(not editor.begin_live())
+    assert(table.concat(logs,"\n"):find("Preview verification failed at after-refresh",1,true))
+    assert(tint.pending and files.recovery~="","An untracked colored copy must keep the journal")
+    settle("native reset after untracked refresh copy")
+    -- Read failures after install keep the journal; recovery waits for reads.
+    logs={}; preview_slot.SetFragmentInstances=function(self,values)
+        native_install(self,values); preview_slot.GetFragmentInstances=function() error("test fragment read failed") end
+    end
+    assert(not editor.begin_live())
+    assert(table.concat(logs,"\n"):find("test fragment read failed",1,true))
+    assert(tint.pending and files.recovery~="","A failed read is never treated as cleanup")
+    settle("reads recovered")
+    -- Target drift after refresh is refused and keeps rollback safeguards.
+    logs={}; preview.RefreshCustomization=function()
+        preview.RefreshCustomization=native_refresh
+        arrays[preview][2].MaterialTarget.MaterialParameterName="Other"; refresh()
+    end
+    assert(not editor.begin_live())
+    assert(table.concat(logs,"\n"):find("Preview verification failed at after-refresh",1,true))
+    assert(tint.pending and files.recovery~="")
+    settle("target recovered")
+    -- Restore accepts a rebuilt live preview only when it already shows the
+    -- verified donor baseline, never because the detached copy was recolored.
+    s=start(); local baseline=copy(s.blue.original)
+    preview.RefreshCustomization=function() arrays[preview]=rebuilt(baseline); refresh() end
+    assert_ok(editor.restore("rebuilt at donor baseline")); assert(not tint.pending)
+    preview.RefreshCustomization=native_refresh
+    s=start(); assert_ok(tint.update_live(s,{R=.9,G=.1,B=.1,A=1}))
+    preview.RefreshCustomization=function()
+        preview.RefreshCustomization=native_refresh
+        arrays[preview]=rebuilt({R=.9,G=.1,B=.1,A=1}); refresh()
+    end
+    logs={}; assert(not editor.restore("rebuilt still custom") and tint.pending,"A custom live preview is not restored")
+    settle("native reset after failed restore verification")
+    assert(source_writes==writes_before,"Preview verification never writes the source")
+end
 io.open,os.rename,os.remove=old_open,old_rename,old_remove
 print("Skin: real preview/Apply/Restore, companions, five meshes, donor isolation, lifetime and recovery passed")

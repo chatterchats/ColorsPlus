@@ -46,3 +46,12 @@ safety the old tests protect.
 Milestones 3-6 change recovery ordering and need in-game verification of
 Cancel, Apply, Restore, reload and save across armor, hair, skin (including
 Zabrak tones 4/5/10), makeup, tattoos, horns, scars and Default/empty slots.
+
+## Findings while porting
+
+- Blue path, no-op install (fixed): when `SetFragmentInstances` installed
+  nothing, rollback logged "Preview changed externally" and left the donor
+  swatch previewing with nothing owned. Rollback in the `installing` phase now
+  resets the donor when the live fragment is the exact donor object this
+  session activated (identity recorded in memory before install; not
+  journaled, so reload recovery stays conservative).
