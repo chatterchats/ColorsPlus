@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tester release: the in-game character editor — v0.4.0
+
+- Custom colors work in the in-game (hub/barracks) character editor as well
+  as the main-menu creator. Confirmed in game: skin and tattoo (Hawks),
+  Rodian swap skin (recruit), armor with stock swatches, armor wearing
+  swatches the palette no longer offers, and a Default slot. Applied colors
+  are kept when the hub editor closes and persisted through leaving the
+  barracks and save > main menu > load.
+- The install folder is renamed `Colors_Probe` -> `ColorsPlus`; the display
+  name is "Colors+ — Custom Color Picker". There is no migration: testers
+  delete the old folder (see the tester guide).
+
+### Install folder renamed to `ColorsPlus` — v0.4.0
+
+- The packager's root folder is `ColorsPlus/` (`Colors_Probe/` through
+  v0.3.0). `modinfo.json`/`zcom-mod.json` use the display name "Colors+ —
+  Custom Color Picker". The tester guide asks updaters to delete the old
+  `Colors_Probe` (or `Colors+Probe`) folder: two copies would both hook the
+  editor. A planned in-mod migration (disable the old copy through its
+  `enabled.txt` and `mods.txt`) was dropped for three testers.
+- Unchanged: log file names, the `[Colors+Probe]` log prefix and the
+  `ColorsPlusProbe.*` Lua/shared-variable keys.
+
 ### Tester release: opening timings and click-driven launcher — v0.3.0
 
 First tester build since the performance work (v0.2.114-v0.2.120): lookup
@@ -51,7 +74,7 @@ the player-only package.
 - The widget library lookup uses a plain validity check: `a.live` rejects
   class default objects by design (caught by the launcher test).
 
-### In-game (hub) character editor (untested in game)
+### In-game (hub) character editor — v0.4.0
 
 - The hub's character editor is a separate editor with the same slots. A
   survey there found the same item page and slot view models, but a

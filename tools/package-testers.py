@@ -15,8 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src" / "ColorsPlus"
 SCRIPTS = SOURCE / "Scripts"
 DEV_SCRIPTS = ROOT / "src" / "Colors+Probe" / "Scripts"
-# Installed folder name; the rename to ColorsPlus is planned for v0.4.
-PACKAGE_ROOT = "Colors_Probe"
+# Installed folder name (Colors_Probe through v0.3.0).
+PACKAGE_ROOT = "ColorsPlus"
 version = json.loads((SOURCE / "modinfo.json").read_text())["version"]
 assert re.fullmatch(r"\d+\.\d+\.\d+", version), "Invalid package version"
 assert json.loads((SOURCE / "zcom-mod.json").read_text())["version"] == version

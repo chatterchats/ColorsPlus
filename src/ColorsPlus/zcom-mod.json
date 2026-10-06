@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "id": "community.colors-plus",
-  "name": "ColorsPlus - Custom Color Picker",
-  "version": "0.3.0",
+  "name": "Colors+ — Custom Color Picker",
+  "version": "0.4.0",
   "author": "Chats",
   "description": "Adds continuous color selection to compatible character-customizations.",
   "game": {

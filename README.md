@@ -2,7 +2,8 @@
 
 An experimental [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) Lua mod for
 **Star Wars: Zero Company** that adds a custom color picker to character
-customization. A **Custom Color** button appears under supported color
+customization, in both the main-menu creator and the in-game (barracks)
+character editor. A **Custom Color** button appears under supported color
 choices; it opens an HSV picker (color box, hue slider, hex input) with a live
 preview on the character.
 
@@ -39,8 +40,8 @@ are in [docs/practical-ue4ss-ui-modding-notes.md](docs/practical-ue4ss-ui-moddin
 ## Packages
 
 `python3 tools/package-testers.py` builds two verified ZIPs (with SHA-256
-files) in `dist/`, both with a `Colors_Probe/` root (the install folder; its
-rename to `ColorsPlus` is planned for v0.4):
+files) in `dist/`, both with a `ColorsPlus/` root (the install folder; it
+was `Colors_Probe/` through v0.3.0):
 
 - **`ColorsPlus-Testers-<version>.zip`**: the player build, exactly
   `src/ColorsPlus`: picker, editing backend, recovery, performance log,
@@ -59,9 +60,12 @@ immutable: the packager refuses to overwrite an existing ZIP with different
 contents, so bump the version in `src/ColorsPlus` (`Scripts/main.lua`,
 `modinfo.json`, `zcom-mod.json`, `TESTING.md`) first.
 
-To install, extract `Colors_Probe/` into
+To install, extract `ColorsPlus/` into
 `SWZeroCompany/Binaries/Win64/ue4ss/Mods/` and restart the game. Copy over an
-existing install rather than deleting it, so recovery files are kept.
+existing `ColorsPlus` install rather than deleting it, so recovery files are
+kept. When upgrading from v0.3.0 or earlier, delete the old `Colors_Probe`
+folder first: there is no automatic migration, and two copies would both
+hook the editor.
 
 ## Development
 
