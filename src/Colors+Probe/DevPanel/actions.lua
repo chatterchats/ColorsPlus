@@ -20,13 +20,5 @@ return {
           desc = "Only use if asked. Records information as you move between customization screens for 60 seconds. Close Dev Panel after starting, then repeat the steps that caused the problem. Does not change colors." },
         { key = "stop_screen_trace", name = "Stop screen trace", category = "Colors+ Diagnostics",
           desc = "Stop recording screen changes early. Does not change your colors or stop the normal performance log." },
-        { key = "trace_stock_calls", name = "Trace stock hover calls (60 seconds)", category = "Colors+ Diagnostics",
-          desc = "Only use if asked. Use Restore original appearance first, start this recording, then move your mouse over the game's existing color choices. The custom picker is unavailable during this 60-second recording." },
-        { key = "stop_stock_calls", name = "Stop stock hover trace", category = "Colors+ Diagnostics",
-          desc = "Stop recording color previews early so you can use the custom picker again. Does not change your appearance." },
-        { key = "trace_materials", name = "Trace materials (60 seconds)", category = "Colors+ Diagnostics",
-          desc = "Only use if asked. Records extra information about how the selected appearance is drawn for 60 seconds. Does not change colors." },
-        { key = "stop_material_trace", name = "Stop material trace", category = "Colors+ Diagnostics",
-          desc = "Stop this extra recording early. Leaves the picker and its automatic performance log alone." },
     },
 }

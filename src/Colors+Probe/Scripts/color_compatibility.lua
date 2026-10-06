@@ -13,7 +13,6 @@ function M.new(runtime,a)
     local bundle=assert(loadfile(directory .. "color_fragments.lua"))()
     local bundles=assert(loadfile(directory .. "color_bundle.lua"))()
     local rules=assert(loadfile(directory .. "color_rules.lua"))()
-    local eyes=assert(loadfile(directory .. "eye_material_probe.lua"))().new(a,runtime.log)
     local function log(s) runtime.log("COLOR COMPAT | " .. s) end
     local function object(v) v=a.unwrap(v); assert(a.live(v),"Live object unavailable"); return v end
     local function name(v) return a.name(object(v)) end
@@ -61,8 +60,8 @@ function M.new(runtime,a)
                     .. " | materials=" .. scalar(table.concat(materials,",")) .. " | mesh_tags=" .. scalar(table.concat(tags,","))
                     .. " | rgba=" .. scalar(tostring(c.R)..","..tostring(c.G)..","..tostring(c.B)..","..tostring(c.A)))
             elseif class=="Class /Script/BitReactorCore.CustomizationFragmentInstanceMaterialSwap" then
-                local read,err=pcall(eyes.inspect,f)
-                if not read then log("MATERIAL SWAP GAP | " .. scalar(err)) end
+                local read,material=pcall(function() return name(f.ReplacementMaterial) end)
+                log("NESTED SWAP | material=" .. scalar(read and material or ("unreadable: " .. tostring(material))))
             end
         end
         for _,f in ipairs(values) do
@@ -138,9 +137,6 @@ function M.new(runtime,a)
         return eligible
     end
     function self.capture()
-        if runtime.eye_preview and (runtime.eye_preview.pending or runtime.eye_preview.blocked) then
-            log("REFUSED | Stop/restore the eye probe before surveying"); return false
-        end
         if runtime.picker and runtime.picker.active or runtime.tint and
             (runtime.tint.pending or runtime.tint.applied or runtime.tint.blocked) then
             log("REFUSED | Close/restore the picker session before surveying another slot"); return false

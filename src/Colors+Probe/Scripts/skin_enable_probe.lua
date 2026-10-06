@@ -152,9 +152,6 @@ function M.new(runtime,a)
                 and bundles.zabrak_face_enable(s.profile))
     end
     function self.start(mode,session,read_context)
-        if runtime.skin_target and (runtime.skin_target.pending or runtime.skin_target.blocked) then
-            log("REFUSED | Stop/recover colors_target first"); return false
-        end
         if mode and not self.supports(session) then return true end
         if self.pending then
             if not mode or not self.pending.mode then log("Already active; stop first"); return false end

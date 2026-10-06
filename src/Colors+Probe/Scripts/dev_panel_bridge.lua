@@ -20,32 +20,14 @@ function M.attach(runtime, probe, tint, client)
         end)
     end
     local writes={open_picker=true,apply_picker=true}
-    local stops={stop_material_trace="trace_materials",stop_stock_calls="trace_stock_calls",stop_screen_trace="trace_screens"}
+    local stops={stop_screen_trace="trace_screens"}
     local function cancel_writes()
         for key in pairs(writes) do runtime:cancel("panel:" .. key) end
     end
     local function register(key, callback, independent)
         local function allowed()
-            if runtime.skin_target and (runtime.skin_target.pending or runtime.skin_target.blocked)
-                and key~="restore_tint" and key~="close_picker" and not stops[key] then
-                runtime.log("SKIN TARGET PROBE | Stop/recover colors_target first"); return false
-            end
-            if not stops[key] and runtime.eye_preview and (runtime.eye_preview.pending or runtime.eye_preview.blocked) then
-                runtime.log("EYE PREVIEW | Dev Panel action refused; use colors_eyes stop first")
-                return false
-            end
             if not tint and not independent then
                 runtime.log("TINT | Disabled: " .. (runtime.tint_disabled_reason or "tint module unavailable"))
-                return false
-            end
-            if writes[key]
-                and runtime.stock_call_trace and runtime.stock_call_trace.window then
-                runtime.log("STOCK CALL TRACE | Tint action refused during read-only stock capture; stop the trace first")
-                return false
-            end
-            if key == "trace_stock_calls" and ((runtime.picker and runtime.picker.active)
-                or (tint and (tint.pending or tint.applied or tint.blocked))) then
-                runtime.log("STOCK CALL TRACE | Restore the picker color before stock capture")
                 return false
             end
             return true
@@ -53,7 +35,7 @@ function M.attach(runtime, probe, tint, client)
         client.OnAction(key, runtime:guard(function()
             runtime.log("PANEL DISPATCH | RECEIVED | " .. key)
             if not allowed() then return end
-            if key == "restore_tint" or key == "close_picker" or key == "trace_stock_calls" then cancel_writes() end
+            if key == "restore_tint" or key == "close_picker" then cancel_writes() end
             if stops[key] then runtime:cancel("panel:" .. stops[key]) end
             if key == "stop_screen_trace" then runtime:cancel("screen-trace:command") end
             if key == "restore_tint" then runtime:cancel("tint:timeout") end
@@ -84,51 +66,21 @@ function M.attach(runtime, probe, tint, client)
     register("trace_screens", function() diagnostic("screen_trace","start") end, true)
     register("stop_screen_trace", function() diagnostic("screen_trace","stop") end, true)
     register("restore_tint", function()
-        if runtime.skin_target and not runtime.skin_target.stop("Dev Panel Restore") then return end
         if runtime.picker then runtime.picker.close("Dev Panel Restore") end
         if tint.pending or tint.applied or not runtime.picker then tint.restore("Dev Panel Restore") end
     end)
-    register("trace_materials", function()
-        if runtime.material_trace then runtime.material_trace.arm() end
-    end)
-    register("stop_material_trace", function()
-        if runtime.material_trace then runtime.material_trace.stop("panel") end
-    end)
-    register("trace_stock_calls", function()
-        if runtime.stock_call_trace then
-            cancel_writes()
-            runtime.stock_call_trace.arm()
-        end
-    end)
-    register("stop_stock_calls", function()
-        if runtime.stock_call_trace then runtime.stock_call_trace.stop("panel") end
-    end)
     if tint then
-        probe.on_stock_call = function(...)
-            if runtime.stock_call_trace then runtime.stock_call_trace.slot_event(...) end
-        end
-        -- context_events owns the production route (skin stop, backend);
-        -- these probe/panel handlers run around it in the same order as before.
+        -- context_events owns the production route (skin stop, backend); this
+        -- runs first so queued panel work never lands on the next screen.
         runtime.dev_context = {
             before=function(reason)
-                if runtime.skin_target then runtime.skin_target.context_changed(reason) end
-                if runtime.eye_preview then runtime.eye_preview.context_changed(reason) end
                 if reason=="page closed" or reason=="creator closed" then
-                    runtime:cancel("eyes:command")
                     -- A panel action may already have been handed to this runtime
                     -- but not executed. Do not open/apply it on the next screen.
                     cancel_writes()
-                    for _,key in ipairs({"inspect_tint","capture_compat","trace_materials","trace_stock_calls"}) do
+                    for _,key in ipairs({"inspect_tint","capture_compat"}) do
                         runtime:cancel("panel:" .. key)
                     end
-                end
-            end,
-            after=function(reason)
-                local closed=reason=="page closed" or reason=="creator closed"
-                if runtime.stock_call_trace and closed then runtime.stock_call_trace.stop(reason) end
-                if runtime.material_trace then
-                    if closed then runtime.material_trace.stop(reason)
-                    else runtime.material_trace.event("stock/UI: " .. reason) end
                 end
             end,
         }

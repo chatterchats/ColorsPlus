@@ -185,23 +185,11 @@ function M.new(runtime,tint,view,rgb_input)
         end)
     end
     local function open()
-        if runtime.sv_probe and (runtime.sv_probe.active or runtime.sv_probe.root_name) then
-            log("OPEN REFUSED | Close colors_sv input test first"); return false
-        end
-        if runtime.skin_target and (runtime.skin_target.pending or runtime.skin_target.blocked) then
-            log("OPEN REFUSED | Stop/recover colors_target first"); return false
-        end
         if runtime.skin_enable and runtime.skin_enable.pending and not runtime.skin_enable.pending.mode then
             log("OPEN REFUSED | Restore the skin-enable test first"); return false
         end
-        if runtime.eye_preview and (runtime.eye_preview.pending or runtime.eye_preview.blocked) then
-            log("OPEN REFUSED | Stop/restore the eye probe first"); return false
-        end
         if self.active then log("Already open"); return false end
         if tint.pending or tint.blocked then log("OPEN REFUSED | Restore pending tint/recovery first"); return false end
-        if runtime.stock_call_trace and runtime.stock_call_trace.window then
-            log("OPEN REFUSED | Stop read-only stock capture first"); return false
-        end
         log("OPEN BEGIN")
         -- Released by close(), including every failed or refused opening.
         if runtime.objects then runtime.objects.hold("picker") end

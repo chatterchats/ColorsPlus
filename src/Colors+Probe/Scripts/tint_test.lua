@@ -25,12 +25,6 @@ function M.new(runtime, access, recovery_path)
         if runtime.perf then return runtime.perf.measure(label,fn,...) end
         return fn(...)
     end
-    local function trace(method, reason)
-        if not runtime.material_trace then return end
-        -- Optional diagnostics cannot bypass or abort tint cleanup.
-        local ok, err = pcall(function() runtime.material_trace[method](reason) end)
-        if not ok then log("Material trace unavailable | " .. tostring(err)) end
-    end
     local function object(value, label)
         local result = a.unwrap(value)
         assert(a.live(result), "Required live object unavailable: " .. (label or "unnamed read"))
@@ -506,7 +500,6 @@ function M.new(runtime, access, recovery_path)
         end)
         self.busy = false
         if not ok then log("RESTORE FAILED | " .. tostring(err) .. " | Do not save; leave/reopen customization or restart the game") end
-        trace("event", "after restore: " .. (reason or "panel"))
         -- Every successful preview end, including timeout, context and failure
         -- rollbacks started here, gives the zone its cleanup turn (Default).
         if ok and self.after_restore then return self.after_restore(reason) end
@@ -667,12 +660,6 @@ function M.new(runtime, access, recovery_path)
         return binding -- returned reader scope stays synchronous; internal hint is draft-owned
     end
     local function apply(requested_color, input_mode)
-        if runtime.skin_target and (runtime.skin_target.pending or runtime.skin_target.blocked) then
-            log("REFUSED | Stop/recover colors_target first"); return false
-        end
-        if runtime.eye_preview and (runtime.eye_preview.pending or runtime.eye_preview.blocked) then
-            log("APPLY REFUSED | Stop/restore the eye probe first"); return
-        end
         if self.blocked then log("APPLY REFUSED | " .. self.blocked); return end
         if self.pending then log("APPLY REFUSED | Restore the previous test first"); return end
         self.busy = true
@@ -726,7 +713,6 @@ function M.new(runtime, access, recovery_path)
             -- An inactive proxy can retain the last native hovered swatch. It
             -- is not the visible baseline and will be replaced by our donor.
             local preview, preview_slot, existing = timed("open.proxy", resolve_proxy, c, nil, true)
-            trace("capture", "before custom RGB")
             assert(rules.color(c.original,c.profile.slot,c.profile.parameter),"Unsupported original value")
             -- Check file access before any color write.
             timed("open.journal", persist, nil)
@@ -810,8 +796,6 @@ function M.new(runtime, access, recovery_path)
             schedule_display_check(session)
             log("PREVIEW APPLIED | custom_linear_rgba=" .. rgba(chosen) .. " | original_linear_rgba=" .. rgba(c.original)
                 .. " | source unchanged | preview=" .. session.preview .. " | auto-restore=15s | visual confirmation required")
-            trace("capture", "after custom RGB refresh")
-            trace("event", "custom RGB settled")
         end)
         if not ok then
             log("APPLY REFUSED/FAILED | " .. tostring(err))

@@ -80,6 +80,8 @@ function M.prepare(runtime,directory)
         local mode=same_process and "same-process-reload" or "first-attach/new-process"
         log("CLASSIFIED | " .. mode .. " | " .. shared .. " | recovery_authorized=" .. tostring(authorized))
         local quarantined=false
+        -- The eye and skin-target journals belong to retired dev probes; they are
+        -- still archived so a leftover from an older dev build is never stranded.
         local leaves={"tint_recovery.txt","default_selection_recovery.txt","editor_recovery.txt","editor_recovery.txt.previous",
             "eye_recovery.txt","eye_recovery.txt.previous","skin_target_recovery.txt","skin_target_recovery.txt.previous",
             "zabrak_picker_recovery.txt","zabrak_picker_recovery.txt.previous"}

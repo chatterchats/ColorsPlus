@@ -48,11 +48,6 @@ local view={
 }
 local picker=module.new(runtime,tint,view,rgb)
 runtime.picker=picker
-runtime.sv_probe={active={}}
-assert(not picker.open() and calls.open==0,"Input-only probe excludes live tint")
-runtime.sv_probe={root_name="retained root"}
-assert(not picker.open() and calls.open==0,"Failed probe cleanup excludes live tint")
-runtime.sv_probe=nil
 assert(picker.open() and picker.active and calls.open==1)
 assert(runtime.perf.window.mode=="picker" and not jobs["perf:expiry"])
 assert(runtime.perf.window.rows["ui.open"] and runtime.perf.window.rows["picker.open"],"Opening must be included in automatic capture")
@@ -89,11 +84,8 @@ assert(picker.open()); tint.pending.live=nil; run()
 assert(not picker.active and not tint.pending)
 assert(picker.open()); tint.restore(); before=calls.restore; run()
 assert(not picker.active and calls.restore==before)
--- Existing recovery and read-only stock capture refuse opening.
+-- Existing recovery refuses opening.
 tint.blocked="recovery"; assert(not picker.open()); tint.blocked=nil
-runtime.stock_call_trace={window={}}; assert(not picker.open()); runtime.stock_call_trace=nil
-runtime.eye_preview={pending={}}; before=calls.open; assert(not picker.open() and calls.open==before)
-runtime.eye_preview={blocked="recovery"}; assert(not picker.open()); runtime.eye_preview=nil
 -- Startup cleanup is delayed game-thread work and never removes an open picker.
 StaticConstructObject=function() end
 picker.start(); assert(calls.cleanup==0); jobs["picker:startup"].cb(); assert(calls.cleanup==1)

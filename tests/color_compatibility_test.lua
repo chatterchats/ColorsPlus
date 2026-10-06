@@ -118,13 +118,12 @@ fragments={nested_slot}; logs={}; command(); run()
 assert(has("NESTED SLOT | tag=br.Customization.Slot.Character.Eyes.Iris") and has("visible_in_ui=false") and has("NESTED COLOR"))
 local swapclass=obj("Class /Script/BitReactorCore.CustomizationFragmentInstanceMaterialSwap")
 local materialclass=obj("Class /Script/Engine.MaterialInstanceConstant")
-local eye_material=obj("MaterialInstanceConstant /Game/Test.EyeMaterial",{
-    GetClass=function() return materialclass end,VectorParameterValues={},ScalarParameterValues={},TextureParameterValues={}})
+local eye_material=obj("MaterialInstanceConstant /Game/Test.EyeMaterial",{GetClass=function() return materialclass end})
 local swap=obj("CustomizationFragmentInstanceMaterialSwap /Game/Test.EyeSwap",{
     GetClass=function() return swapclass end,GetOwningCustomizationInstance=function() return owner end,
     MaterialTarget=fragment.MaterialTarget,ReplacementMaterial=eye_material})
 children={swap}; logs={}; command(); run()
-assert(has("EYE MATERIAL | SWAP") and has("MaterialInstanceConstant /Game/Test.EyeMaterial") and has("RESULT | UNVERIFIED"))
+assert(has("NESTED SWAP | material=MaterialInstanceConstant /Game/Test.EyeMaterial") and has("RESULT | UNVERIFIED"))
 children={nested_slot}; logs={}; command(); run(); assert(has("Nested slot cycle/alias"))
 children={fragment}; fragments={fragment}
 -- Active-page palette ownership resolves a stale visible palette, while truly

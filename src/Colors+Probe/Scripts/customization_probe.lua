@@ -303,10 +303,6 @@ function M.new(runtime)
     end
     for _, event in ipairs({ "EquipCustomizationPart", "PreviewCustomizationPart", "ResetPreviewedPart", "ResetToDefault" }) do
         specs[#specs + 1] = { SLOT .. event, function(context, ...)
-            if self.on_stock_call then
-                local ok, err = pcall(self.on_stock_call, event, context, ...)
-                if not ok then log("Stock call trace error: " .. tostring(err)) end
-            end
             local object = unwrap(context)
             runtime:after("install", 1, self.install)
             context_event(object, event)

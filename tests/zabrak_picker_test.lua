@@ -89,7 +89,7 @@ local function reset()
     baseline={values[1],values[2],values[3],values[4]}
     local _,_,description=codec.new(a).read(values,{slot=SKIN})
     profile={slot=SKIN,bundle=description}
-    runtime.skin_target=nil; runtime.picker=nil; runtime.skin_enable=nil; runtime.eye_preview=nil; runtime.stock_call_trace=nil
+    runtime.picker=nil; runtime.skin_enable=nil
     runtime.call_trace=nil
     runtime.tint={read_context=function() return {owner=owner,source_slot=slot,part={AssetId=part},profile=profile} end}
 end

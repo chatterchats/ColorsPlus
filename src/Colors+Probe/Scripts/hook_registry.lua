@@ -111,14 +111,9 @@ function M.start(key)
     function self:teardown()
         assert(not (self.tint and self.tint.source_owned),
             "Close CP and Restore applied Zabrak skin before reloading; runtime remains active")
-        assert(not (self.skin_target and self.skin_target.dispatch and
-            (self.skin_target.dispatch.pending or self.skin_target.dispatch.blocked)),
-            "Stop/recover colors_zabrak before reloading; runtime remains active")
         assert(not (self.skin_enable and self.skin_enable.pending),
             "Close the picker and Restore applied skin (or stop the manual skin test) before reloading; runtime remains active")
         self.log("TEARDOWN | BEGIN")
-        if self.click_probe then self.click_probe.stop("runtime teardown") end
-        if self.sv_probe then assert(self.sv_probe.close("runtime teardown"),"SV input probe cleanup failed") end
         if self.color_ui then
             if self.picker then assert(self.picker.close("runtime teardown"),"Picker cleanup failed; reload stopped") end
             self.color_ui.close("runtime teardown")
