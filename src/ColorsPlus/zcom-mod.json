@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "id": "community.colors-plus",
-  "name": "Colors+",
-  "version": "0.1.0",
+  "name": "ColorsPlus - Custom Color Picker",
+  "version": "0.3.0",
   "author": "Chats",
-  "description": "Adds continuous color selection to compatible character-customization tint zones.",
+  "description": "Adds continuous color selection to compatible character-customizations.",
   "game": {
     "appId": 2075800,
     "testedBuilds": [

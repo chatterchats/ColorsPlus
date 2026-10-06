@@ -1,4 +1,4 @@
--- luajit tests/rgb_input_test.lua src/Colors+Probe/Scripts
+-- Run: tools/run-tests.sh rgb_input
 local input = assert(loadfile(assert(arg[1]) .. "/rgb_input.lua"))()
 local function near(a,b) assert(math.abs(a-b) < 1e-9, tostring(a) .. " ~= " .. tostring(b)) end
 local c, label = input.parse(" 255, 128, 32\r\n")

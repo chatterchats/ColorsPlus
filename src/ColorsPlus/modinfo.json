@@ -1,0 +1,9 @@
+{
+  "title": "ColorsPlus - Custom Color Picker",
+  "version": "0.3.0",
+  "author": "Chats",
+  "description": "Adds continuous color selection to compatible character-customizations.",
+  "launchers": [
+    "steam"
+  ]
+}

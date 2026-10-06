@@ -1,5 +1,5 @@
 -- Real editor-session + Default-selection modules; engine and hover backend fake.
--- luajit tests/editor_session_test.lua src/Colors+Probe/Scripts
+-- Run: tools/run-tests.sh editor_session
 local scripts=assert(arg[1])
 local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
 helpers.share_modules(scripts)

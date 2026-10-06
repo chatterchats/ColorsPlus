@@ -1,9 +1,0 @@
-{
-  "title": "Colors+",
-  "version": "0.1.0",
-  "author": "Chats",
-  "description": "Adds continuous color selection to compatible character-customization tint zones.",
-  "launchers": [
-    "steam"
-  ]
-}

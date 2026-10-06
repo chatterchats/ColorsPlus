@@ -1,7 +1,8 @@
 # Architecture
 
-How Colors+Probe edits a color, and why it is shaped this way. Source lives
-in `src/Colors+Probe/Scripts`; tests in `tests/` (`tools/run-tests.sh`).
+How Colors+ edits a color, and why it is shaped this way. The mod lives in
+`src/ColorsPlus/Scripts`, developer tools in `src/Colors+Probe/Scripts`; tests
+in `tests/` (`tools/run-tests.sh`).
 
 ## Overview
 
@@ -14,8 +15,9 @@ in `src/Colors+Probe/Scripts`; tests in `tests/` (`tools/run-tests.sh`).
   the active zone only through its public surface: `begin_live`,
   `update_live`, `check_live`, `apply_live`, `cancel_live`, `restore`,
   `context_changed`, plus `pending`/`applied`/`blocked`/`busy`.
-- `dev_tools.lua` (Dev package only) attaches probes, traces and the SWZC Dev
-  Panel; the Testers package is the scripts reachable from `main.lua` without it.
+- `dev_tools.lua` (Dev package only, from `src/Colors+Probe`) attaches traces,
+  the compatibility survey, the picker console and the SWZC Dev Panel. The
+  Testers package is exactly `src/ColorsPlus`.
 
 ## A zone (`color_zone.lua`)
 

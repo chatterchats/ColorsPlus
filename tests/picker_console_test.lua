@@ -1,4 +1,4 @@
--- luajit tests/picker_console_test.lua src/Colors+Probe/Scripts
+-- Run: tools/run-tests.sh picker_console
 local scripts=assert(arg[1])
 local registry=assert(loadfile(scripts .. "/hook_registry.lua"))()
 local console=assert(loadfile(scripts .. "/picker_console.lua"))()

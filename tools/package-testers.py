@@ -1,8 +1,9 @@
-"""Build clean player and dev ZIPs from an allowlist, never the live mod directory.
+"""Build clean player and dev ZIPs from source, never the live mod directory.
 
-Player package: the scripts reachable from main.lua without dev_tools.lua
-(picker, editing backend, recovery, automatic performance log).
-Dev package: every script, including probes, traces and Dev Panel integration.
+src/ColorsPlus is the mod: the Testers package is exactly its files.
+src/Colors+Probe/Scripts holds developer tools (probes, traces, Dev Panel
+integration). The Dev package overlays them into the same Scripts folder:
+UE4SS gives every mod its own Lua state, so the tools must run inside the mod.
 """
 from pathlib import Path
 import hashlib
@@ -11,8 +12,11 @@ import re
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "src" / "Colors+Probe"
+SOURCE = ROOT / "src" / "ColorsPlus"
 SCRIPTS = SOURCE / "Scripts"
+DEV_SCRIPTS = ROOT / "src" / "Colors+Probe" / "Scripts"
+# Installed folder name; the rename to ColorsPlus is planned for v0.4.
+PACKAGE_ROOT = "Colors_Probe"
 version = json.loads((SOURCE / "modinfo.json").read_text())["version"]
 assert re.fullmatch(r"\d+\.\d+\.\d+", version), "Invalid package version"
 assert json.loads((SOURCE / "zcom-mod.json").read_text())["version"] == version
@@ -30,28 +34,41 @@ DEV_ENTRY = "dev_tools"
 REFERENCE = re.compile(r'module\("(\w+)"\)|"(\w+)\.lua"')
 
 
+def references(path):
+    return {m.group(1) or m.group(2) for m in REFERENCE.finditer(path.read_text())}
+
+
 def player_scripts():
-    """Scripts transitively referenced from main.lua, never entering dev_tools."""
-    available = {p.stem for p in SCRIPTS.glob("*.lua")}
+    """Every mod script, checked to be reachable from main.lua and to need no
+    developer script (main.lua loads dev_tools.lua only when present)."""
+    mod = {p.stem: p for p in SCRIPTS.glob("*.lua")}
+    dev = {p.stem for p in DEV_SCRIPTS.glob("*.lua")}
+    assert not mod.keys() & dev, f"Script in both trees: {sorted(mod.keys() & dev)}"
+    assert DEV_ENTRY in dev
     seen, pending = set(), ["main"]
     while pending:
         name = pending.pop()
         if name in seen:
             continue
         seen.add(name)
-        text = (SCRIPTS / f"{name}.lua").read_text()
-        for match in REFERENCE.finditer(text):
-            ref = match.group(1) or match.group(2)
-            if ref == DEV_ENTRY or ref not in available:
+        for ref in references(mod[name]):
+            if ref == DEV_ENTRY or ref not in mod and ref not in dev:
                 continue
+            assert ref in mod, f"{name}.lua needs developer script {ref}.lua"
             pending.append(ref)
-    return sorted(SCRIPTS / f"{name}.lua" for name in seen)
+    assert seen == mod.keys(), f"Unreachable mod scripts: {sorted(mod.keys() - seen)}"
+    return sorted(mod.values())
+
+
+def dev_scripts():
+    return sorted(DEV_SCRIPTS.glob("*.lua"))
 
 
 def build(label, scripts):
     files = COMMON + scripts
     assert all(p.is_file() and not p.is_symlink() for p in files)
-    entries = {"Colors_Probe/" + p.relative_to(SOURCE).as_posix(): p for p in files}
+    entries = {f"{PACKAGE_ROOT}/" + (p.relative_to(SOURCE).as_posix() if p.is_relative_to(SOURCE)
+               else "Scripts/" + p.name): p for p in files}
     assert len(entries) == len(files)
     assert not any("recovery" in name and not name.endswith(".lua") for name in entries)
     output = ROOT / "dist" / f"ColorsPlus-{label}-{version}.zip"
@@ -77,8 +94,6 @@ def build(label, scripts):
 
 
 player = player_scripts()
-assert SCRIPTS / f"{DEV_ENTRY}.lua" not in player, "Player package must not contain dev tools"
-everything = sorted(SCRIPTS.glob("*.lua"))
 build("Testers", player)
-build("Dev", everything)
-print("Dev-only scripts: " + ", ".join(p.stem for p in everything if p not in player))
+build("Dev", player + dev_scripts())
+print("Dev-only scripts: " + ", ".join(p.stem for p in dev_scripts()))

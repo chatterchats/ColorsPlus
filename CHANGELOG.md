@@ -51,6 +51,23 @@ the player-only package.
 - The widget library lookup uses a plain validity check: `a.live` rejects
   class default objects by design (caught by the launcher test).
 
+### Source split: the mod in `src/ColorsPlus`, dev tools in `src/Colors+Probe`
+
+- `src/ColorsPlus` holds the mod (37 scripts, assets, manifests, tester guide,
+  `DevPanel/actions.lua`) and is exactly the Testers package. It replaces the
+  0.1.0 bootstrap placeholder (`src/Colors+`) and its test.
+- `src/Colors+Probe/Scripts` keeps only developer tools (`dev_tools`,
+  `call_trace`, `screen_trace`, `color_compatibility`, `picker_console`, the
+  Dev Panel client and bridge). The Dev package overlays them into the mod's
+  `Scripts/` folder; a separate UE4SS mod would run in its own Lua state and
+  could not reach the picker's runtime.
+- The packager checks that every mod script is reachable from `main.lua` and
+  that none needs a developer script. `tools/run-tests.sh` runs the tests
+  against the Dev layout in a temporary folder and accepts test names.
+- Manifests now name the mod "ColorsPlus - Custom Color Picker"
+  (`community.colors-plus`). The install folder stays `Colors_Probe/` until
+  the v0.4 rename.
+
 ### Retired dev probes; faster, tidier tests
 
 - Removed diagnostic probes from finished investigations (Dev package only):

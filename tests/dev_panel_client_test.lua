@@ -1,5 +1,5 @@
 -- Exercise the supplied helper against an in-memory file protocol.
--- luajit tests/dev_panel_client_test.lua src/Colors+Probe/Scripts
+-- Run: tools/run-tests.sh dev_panel_client
 local scripts=assert(arg[1])
 local original_open,original_loadfile,original_print=io.open,loadfile,print
 local manifest=assert(original_loadfile(scripts .. "/../DevPanel/actions.lua"))()

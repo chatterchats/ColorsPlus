@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 const check = process.argv.includes('--check');
 const args = process.argv.slice(2).filter(x => x !== '--check');
 assert(args.length <= 1, 'Expected at most one Assets directory');
-const output = args[0] ?? fileURLToPath(new URL('../src/Colors+Probe/Assets/', import.meta.url));
+const output = args[0] ?? fileURLToPath(new URL('../src/ColorsPlus/Assets/', import.meta.url));
 function crc32(data) {
   let crc = 0xffffffff;
   for (const byte of data) {

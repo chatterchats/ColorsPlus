@@ -1,4 +1,4 @@
--- Run: luajit tests/probe_test.lua "src/Colors+Probe/Scripts"
+-- Run: tools/run-tests.sh probe
 local scripts = assert(arg[1], "pass probe Scripts directory")
 local messages, hooks, commands, queue, cancelled = {}, {}, {}, {}, {}
 local next_id, blueprint_ready, native_unhooks, console_count = 0, false, 0, 0
