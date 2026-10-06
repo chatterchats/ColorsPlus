@@ -178,7 +178,14 @@ local function boot()
     function base.restore() return true end
     function base.context_changed() end
     function base.start() end
-    worker=load("zabrak_picker").wrap(runtime,a,"journal",base)
+    function base.invalidate_context_lookup() end
+    function base.pending() end; function base.applied() end
+    function base.blocked() end; function base.busy() end
+    -- The zone's regular backend is faked: these tests cover the route and
+    -- the zone's choice between the two.
+    worker=load("color_zone").new(runtime,a,function(leaf)
+        assert(leaf=="zabrak_picker_recovery.txt",leaf); return "journal"
+    end,{regular=base})
     runtime.tint=worker
     runtime.skin_enable={stop=function() return true end,start=function() error("No MID workaround permitted") end}
     return worker

@@ -74,7 +74,7 @@ function StaticFindObject(p)
 end
 function FName(s) return s end
 io.open=function(p,mode)
-    if mode=="r" and files[p]==nil then return nil end
+    if mode=="r" and files[p]==nil then return nil,p .. ": No such file or directory",2 end
     if mode=="w" and fail_write then return nil end
     if mode=="w" then files[p]="" end
     return {read=function() return files[p] end,write=function(self,s)

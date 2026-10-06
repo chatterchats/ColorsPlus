@@ -1,8 +1,12 @@
--- Route Zabrak skins with material swaps through source-owned transactions.
--- Other slots retain the existing editor backend. No native refs across jobs.
+-- Zabrak skins with material swaps take a source-owned route: the preview
+-- cannot clone their swap bundles, so drafts edit the source directly under
+-- zabrak_picker_source's journal. color_zone asks claim() on every opening and
+-- sends this route's drafts here; every other slot uses the regular steps.
+-- zone: the owning color zone (context reads; Restore/Cancel run through it
+-- so the regular steps always follow). No native refs across jobs.
 local M={}
 local SKIN="br.Customization.Slot.Character.Appearance.Humanoid.Head.Face.SkinTone"
-function M.wrap(runtime,a,path,base)
+function M.new(runtime,a,path,zone)
     local directory=debug.getinfo(1,"S").source:gsub("^@",""):match("^(.*[/\\])")
     local engine=assert(loadfile(directory .. "zabrak_picker_source.lua"))().new(runtime,a,path)
     local lifetime=assert(loadfile(directory .. "creator_lifetime.lua"))().new(a,runtime.log)
@@ -10,15 +14,16 @@ function M.wrap(runtime,a,path,base)
     local bundles=assert(loadfile(directory .. "color_bundle.lua"))()
     local draft,applied,binding,busy
     local context_epoch=0
-    local self=setmetatable({}, {__index=function(_,k)
-        if k=="pending" then return draft or engine.blocked and engine.pending or base.pending end
-        if k=="applied" then return applied or base.applied end
-        if k=="blocked" then return engine.blocked or base.blocked end
-        if k=="busy" then return busy or engine.busy or base.busy end
-        if k=="source_owned" then return engine.pending or engine.blocked end
-        return base[k]
-    end})
+    local self={}
+    -- State the zone combines with its regular steps.
+    function self.draft() return draft end
+    function self.pending() return draft or engine.blocked and engine.pending end
+    function self.applied() return applied end
+    function self.blocked() return engine.blocked end
+    function self.busy() return busy or engine.busy end
+    function self.source_owned() return engine.pending or engine.blocked end
     local function log(s) runtime.log("ZABRAK CP | " .. s) end
+    self.log=log
     local function timed(label,fn,...)
         if runtime.perf then return runtime.perf.measure(label,fn,...) end
         return fn(...)
@@ -67,16 +72,17 @@ function M.wrap(runtime,a,path,base)
             end)
             if not ok then
                 if engine.release_replaced("watch: " .. tostring(err)) then clear_visit()
-                else self.restore("creator/source changed: " .. tostring(err)) end
+                else zone.restore("creator/source changed: " .. tostring(err)) end
                 return
             end
             watch()
         end)
     end
-    function self.begin_live()
-        if self.blocked or self.pending or self.busy then return nil end
-        local read,c=pcall(base.read_context)
-        if not read or not selected_zabrak(c) then return base.begin_live() end
+    -- Opening: nil leaves the slot to the regular steps, false refuses, and a
+    -- context means this route opens it (begin).
+    function self.claim()
+        local read,c=pcall(zone.read_context)
+        if not read or not selected_zabrak(c) then return nil end
         -- read_context has already checked the live source, roles, companions
         -- and targets. The asset name alone does not imply a MaterialSwap:
         -- tester Skin Tone 1 (Hum_Zabrak_0A0) contains only tags/color/scalar.
@@ -84,7 +90,7 @@ function M.wrap(runtime,a,path,base)
         -- Swap bundles still pass the engine's exact four-role/order/target
         -- checks below; never retry another backend after a failed mutation.
         local description=bundles.parse(c.profile.bundle)
-        if not description then log("OPEN REFUSED | missing verified Zabrak bundle"); return nil end
+        if not description then log("OPEN REFUSED | missing verified Zabrak bundle"); return false end
         local count,swaps=0,0
         for row in description.signature:gmatch("[^;]+") do
             count=count+1
@@ -93,8 +99,10 @@ function M.wrap(runtime,a,path,base)
         log("ROUTE | backend=" .. (swaps==0 and "regular" or "source-swap")
             .. " | fragments=" .. count .. " | swaps=" .. swaps .. " | part=" .. asset(c.part.AssetId)
             .. " | layout=" .. description.signature)
-        if swaps==0 then return base.begin_live() end
-        if base.applied then log("OPEN REFUSED | another zone owns this worker"); return nil end
+        if swaps==0 then return nil end
+        return c
+    end
+    function self.begin(c)
         busy=true
         local session
         local ok,err=pcall(function()
@@ -122,47 +130,44 @@ function M.wrap(runtime,a,path,base)
         busy=false
         if not ok then
             log("OPEN FAILED | " .. tostring(err))
-            self.restore("failed opening rollback")
+            zone.restore("failed opening rollback")
             return nil
         end
         return session
     end
     local function check_selected(s)
-        assert(s==draft and s.live and not self.blocked,"Draft ended/blocked")
+        assert(s==draft and s.live and not zone.blocked,"Draft ended/blocked")
         local epoch=context_epoch
         assert(lifetime.page_active(binding.creator,s.page),"Selected creator page changed")
         local c
-        if s.selected_context and type(base.read_selected_context)=="function" then
-            c=timed("zupdate.context_bound",base.read_selected_context,s.selected_context)
-        else c=timed("zupdate.context_discover",base.read_context) end
+        if s.selected_context then
+            c=timed("zupdate.context_bound",zone.read_selected_context,s.selected_context)
+        else c=timed("zupdate.context_discover",zone.read_context) end
         assert(c.page==s.page and name(c.slot)==s.vm and name(c.owner)==s.owner
             and selected_zabrak(c),"Selected skin page changed")
         local route=s.selected_context
-        if not route and type(base.bind_selected_context)=="function" then route=base.bind_selected_context(c) end
+        if not route then route=zone.bind_selected_context(c) end
         assert(epoch==context_epoch,"Context changed during selected validation")
         s.selected_context=route -- scalar identities only; scoped to this draft
     end
-    function self.check_live(s)
-        if s~=draft then return base.check_live(s) end
+    function self.check(s)
         return pcall(function()
             timed("zupdate.source_guard",check_source)
             check_selected(s)
         end)
     end
-    function self.update_live(s,chosen)
-        if s~=draft then return base.update_live(s,chosen) end
-        local healthy,why=timed("zupdate.validate",self.check_live,s)
-        if not healthy then log("UPDATE REFUSED | " .. tostring(why)); self.cancel_live("draft context changed"); return false end
+    function self.update(s,chosen)
+        local healthy,why=timed("zupdate.validate",self.check,s)
+        if not healthy then log("UPDATE REFUSED | " .. tostring(why)); zone.cancel_live("draft context changed"); return false end
         busy=true
         local ok=timed("zupdate.core",engine.update,chosen)
         if ok then s.test_color=copy(chosen) end
         busy=false
-        if not ok then self.restore("RGB failure rollback") end
+        if not ok then zone.restore("RGB failure rollback") end
         return ok,ok -- successful updates include full live-context validation
     end
-    function self.apply_live(s)
-        if s~=draft then return base.apply_live(s) end
-        local healthy,why=self.check_live(s)
+    function self.apply(s)
+        local healthy,why=self.check(s)
         if not healthy then log("APPLY REFUSED | " .. tostring(why)); return false end
         check_source()
         if not same(engine.pending.chosen,s.test_color) then return false end
@@ -173,8 +178,7 @@ function M.wrap(runtime,a,path,base)
         log("APPLIED | source RGB/order/enable targets retained for creator visit; no save calls")
         return true
     end
-    function self.cancel_live(reason)
-        if not draft then return base.cancel_live and base.cancel_live(reason) or base.restore(reason) end
+    function self.cancel(reason)
         if busy then return false end
         local s=draft
         runtime:cancel("zabrak-cp:draft-timeout")
@@ -190,6 +194,7 @@ function M.wrap(runtime,a,path,base)
         end
         return ok
     end
+    -- Restore's first step; the zone continues with its regular steps.
     function self.restore(reason)
         if busy then return false end
         if engine.pending or engine.blocked then
@@ -200,21 +205,24 @@ function M.wrap(runtime,a,path,base)
             clear_visit()
         end
         if not engine.pending and not engine.blocked and (draft or binding) then clear_visit() end
-        return base.restore(reason)
+        return true
     end
-    function self.context_changed(reason,identity)
-        -- Invalidate even when synchronous source writes suppress restoration.
-        -- The next check rediscovers; no cached route crosses a native event.
+    -- Invalidate even when synchronous source writes suppress restoration.
+    -- The next check rediscovers; no cached route crosses a native event.
+    -- Returns false while this route's own writes are running (ignore them).
+    function self.invalidate()
         context_epoch=context_epoch+1
         if draft then draft.selected_context=nil end
-        if busy then return end
-        base.context_changed(reason,identity)
+        return not busy
+    end
+    -- After the regular steps saw the event: verify or end this route's visit.
+    function self.context_changed(reason,identity)
         if not engine.pending or engine.blocked then return end
         if reason=="creator closed" then
             if identity and binding and identity~=binding.creator.master then return end
             local expected=binding
             runtime:after("zabrak-cp:exit",1,function()
-                if binding==expected then self.restore(reason) end
+                if binding==expected then zone.restore(reason) end
             end)
             return
         end
@@ -226,7 +234,7 @@ function M.wrap(runtime,a,path,base)
             local ok,err=pcall(check_source)
             if not ok then
                 if engine.release_replaced("native context: " .. tostring(err)) then clear_visit()
-                else self.restore("context verification failed") end
+                else zone.restore("context verification failed") end
                 return
             end
             -- Covering a hovered stock tile with CP emits ResetPreviewedPart.
@@ -238,19 +246,13 @@ function M.wrap(runtime,a,path,base)
                     -- check_source above already ran in this callback; do not
                     -- repeat it through check_live or cache it across ticks.
                     local healthy,why=pcall(check_selected,s)
-                    if not healthy then self.cancel_live(reason .. ": " .. tostring(why))
+                    if not healthy then zone.cancel_live(reason .. ": " .. tostring(why))
                     elseif reason=="ResetPreviewedPart" then log("HOVER RESET | kept verified draft") end
-                else self.cancel_live(reason) end
+                else zone.cancel_live(reason) end
             end
         end)
     end
-    function self.start() base.start(); engine.start() end
-    -- Inclusive per-layer opening time for the performance log; no behavior change.
-    local timed_begin_live=self.begin_live
-    function self.begin_live(...)
-        if runtime.perf then return runtime.perf.measure("begin.zabrak",timed_begin_live,...) end
-        return timed_begin_live(...)
-    end
+    function self.start() engine.start() end
     return self
 end
 return M

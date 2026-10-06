@@ -251,7 +251,6 @@ local function journal(leaf) return assert(JOURNALS[leaf],leaf) end
 local function boot()
     tint=load("tint_test").new(runtime,access,"recovery")
     editor=load("color_zone").new(runtime,access,journal,{preview=tint})
-    if route_zabrak then editor=load("zabrak_picker").wrap(runtime,access,"zabrak",editor) end
 end
 local function assert_ok(ok) assert(ok,table.concat(logs,"\n")) end
 local function start()
@@ -331,8 +330,8 @@ local cases={
     {"Ovissian02",ovissian_02,false,nil,ovissian_01},
     {"TogrutaFaceMarkings",marking("MI_Head",face),false,"br.Customization.Slot.Character.Appearance.Humanoid.Head.Markings.Color"},
     {"TogrutaLekkuMarkings",marking("MI_Lekku",lekku),false,"br.Customization.Slot.Character.Lekku.Markings.Color"},
-    {"Hum_Zabrak_1A",{{class="GameplayTags"},skin({"MI_Head","MI_Body"},1,six),
-        scalar({"MI_Head","MI_Body"},{"br.Customization.Slot.Character.Outfit"}),swap}},
+    -- Zabrak skins with a material swap (the face-MID layout) always take the
+    -- zone's source route: zabrak_picker_test and skin_enable_probe_test.
     {"BlushMode1",blush(1),false,blush_tag,blush(0)},
     {"BlushMode0",blush(0),false,blush_tag,blush(1)},
     {"ScarTint1",scar_tint(1),false,scar_tag,scar_tint(.25)},
@@ -343,8 +342,8 @@ local cases={
     {"IrisShared",iris_tint("Both",1),false,"br.Customization.Slot.Character.Appearance.Humanoid.Head.Eyes.IrisTint",iris_tint("Both",.4)},
     {"ScarPaletteFresh",scar_palette(fresh_swatch,fresh_tint,1),false,scar_tag,scar_palette(silver_swatch,silver_tint,.25)},
     {"ScarPaletteSilver",scar_palette(silver_swatch,silver_tint,.25),false,scar_tag,scar_palette(fresh_swatch,fresh_tint,1)},
-    -- Tester 0A0 shape, routed through the actual Zabrak wrapper as well as
-    -- preview/editor/recovery. Scalar targets stay untouched by this route.
+    -- Tester 0A0 shape: the zone's Zabrak route declines it (no swap), so it
+    -- runs through preview/editor/recovery. Scalar targets stay untouched by this route.
     {"Hum_Zabrak_0A",{{class="GameplayTags"},skin({"MI_Head","MI_Body"},1,six),
         scalar({"MI_Head","MI_Body"},six)},false,nil,nil,true},
     {"ZabrakTone4",{{class="GameplayTags"},skin({"MI_Head","MI_Body"},1,six),
@@ -597,7 +596,7 @@ do
         {"Vitiligo",{{class="MaterialColor",parameter="Vitilago Color Override",materials={"MI_Head","MI_Lekku"},
             meshes={face[1],horns[1],lekku[1]}}},false,load("color_rules").VITILIGO},
         {"ScarTint",scar_tint(1),false,scar_tag,scar_tint(.25)},
-        cases[21],cases[22],cases[23],cases[24],cases[25],cases[26],
+        cases[20],cases[21],cases[22],cases[23],cases[24],cases[25],
     }
     for _,case in ipairs(simple) do
         original.A=case[1]=="Freckles" and .9900000095367432 or 1
@@ -723,86 +722,6 @@ do
         assert(not editor.update_live(s,bad) and source_writes==n and not tint.pending); original_matches(before)
     end
 end
--- Captured Zabrak parent-target layout uses the existing transient face MID
--- path. Refresh leaves the face stock-colored despite fragment RGB: the
--- post-refresh MID handoff owns temporary face RGB plus the enable switch.
-do
-    reset(cases[16]); local before=originals()
-    local scalar_value,scalar_writes=0,0
-    local midclass=obj("Class","/Script/Engine.MaterialInstanceDynamic")
-    local meshclass=obj("Class","/Script/Engine.MeshComponent")
-    local parent=obj("MaterialInstanceConstant","/Game/Test.ZabrakHead")
-    local mid=obj("MaterialInstanceDynamic",path(display) .. ".FaceMID",{Parent=parent,GetClass=function() return midclass end})
-    function mid:K2_GetScalarParameterValue(p) assert(p=="Enable Tinting"); return scalar_value end
-    function mid:SetScalarParameterValue(p,v) assert(p=="Enable Tinting"); scalar_value=v; scalar_writes=scalar_writes+1 end
-    local mesh=obj("MeshComponent",path(display) .. ".br.Customization.Slot.Character.Appearance.Humanoid.Head.Face.Mesh_6",{GetOwner=function() return display end})
-    function mesh:GetMaterialIndex(p) assert(p=="MI_Head"); return 0 end
-    function mesh:GetMaterial(i) assert(i==0); return mid end
-    function mesh:IsVisible() return true end
-    function mid:GetOuter() return mesh end
-    local stock_rgb=copy(before[2])
-    local face_rgb=copy(stock_rgb)
-    parent.VectorParameterValues={{ParameterInfo={Name="Skin Coloration",Association=2,Index=-1},ParameterValue=copy(stock_rgb)}}
-    function mid:K2_GetVectorParameterValue(p) assert(p=="Skin Coloration"); return copy(face_rgb) end
-    function mid:SetVectorParameterValue(p,v) assert(p=="Skin Coloration"); face_rgb=copy(v) end
-    local function face_matches(v)
-        for _,k in ipairs({"R","G","B","A"}) do assert(math.abs(face_rgb[k]-v[k])<0.00001,"Face MID RGB mismatch") end
-    end
-    local decoy=obj("MeshComponent",path(display) .. ".br.Customization.Slot.Character.Horns.Mesh_6",{GetOwner=function() return display end})
-    function decoy:GetMaterialIndex(p) assert(p=="MI_Head"); return 0 end
-    function decoy:IsVisible() return true end
-    function decoy:GetMaterial() error("Wrong component material acquired") end
-    function display:K2_GetComponentsByClass(c) assert(c==meshclass); return {decoy,mesh} end
-    local original_refresh=refresh
-    refresh=function() scalar_value=0; face_rgb=copy(stock_rgb); original_refresh() end
-    runtime.tint=editor
-    runtime.skin_enable=load("skin_enable_probe").new(runtime,access)
-    local function draft()
-        local s=start(); runtime.picker={active={session=s}}; return s
-    end
-    local s=draft(); assert(scalar_value==1 and runtime.skin_enable.pending); face_matches(s.test_color)
-    assert_ok(editor.update_live(s,violet)); assert(scalar_value==1); face_matches(violet); original_matches(before)
-    assert_ok(editor.cancel_live("Zabrak Cancel")); assert(scalar_value==0 and not runtime.skin_enable.pending)
-    face_matches(stock_rgb)
-    s=draft(); assert(not jobs["tint:timeout"]); assert_ok(tint.restore("external backend restore")); run("skin-enable:watch")
-    assert(scalar_value==0 and not runtime.skin_enable.pending and not tint.pending)
-    face_matches(stock_rgb)
-    s=draft(); assert_ok(editor.update_live(s,orange)); assert_ok(editor.apply_live(s))
-    assert(scalar_value==1 and editor.applied and not editor.applied.skin_target); check_source(orange)
-    face_matches(orange)
-    assert(#arrays[owner][3].MaterialTarget.SlotNameTagsToApply.GameplayTags==1,"Zabrak source scalar target was edited")
-    assert_ok(runtime.skin_enable.stop("radial transition")); editor.context_changed("page closed"); run("editor:watch")
-    assert(scalar_value==1 and editor.applied); check_source(orange)
-    face_matches(orange)
-    -- Stock hover wins; idle applied face tint resumes only on our source.
-    assert_ok(runtime.skin_enable.stop("stock hover")); container.IsPreviewing=true; display.ClonedFromCharacter=data_actor
-    run("editor:watch"); assert(scalar_value==0 and not runtime.skin_enable.pending)
-    face_matches(stock_rgb)
-    vm:ResetPreviewedPart(); run("editor:watch"); assert(scalar_value==1)
-    face_matches(orange)
-    -- A native hover reusing the exact MID still wins, without being mistaken
-    -- for an idle foreign edit or recolored by the rendering handoff.
-    container.IsPreviewing=true; display.ClonedFromCharacter=data_actor
-    face_rgb=copy(violet)
-    run("editor:watch")
-    assert(not runtime.skin_enable.pending and editor.applied); face_matches(violet)
-    vm:ResetPreviewedPart(); run("editor:watch")
-    assert(scalar_value==1 and editor.applied); face_matches(orange)
-    s=draft(); assert_ok(editor.cancel_live("discard second draft")); assert(scalar_value==1); check_source(orange)
-    face_matches(orange)
-    assert_ok(editor.restore("Zabrak Restore")); assert(scalar_value==0); original_matches(before)
-    face_matches(stock_rgb)
-    -- Material destruction/replacement cannot transfer scalar restoration.
-    s=draft(); local n=scalar_writes; mesh.invalid=true
-    assert_ok(runtime.skin_enable.stop("destroyed face")); assert(scalar_writes==n)
-    mesh.invalid=nil; assert_ok(editor.cancel_live("retired face draft"))
-    -- Failed enable after a partial setter restores the switch and RGB preview.
-    local setter=mid.SetScalarParameterValue
-    function mid:SetScalarParameterValue(p,v) setter(self,p,v); if v==1 then error("Zabrak partial enable") end end
-    assert(not editor.begin_live() and not tint.pending and not runtime.skin_enable.pending and scalar_value==0)
-    mid.SetScalarParameterValue=setter
-    runtime.skin_enable=nil; runtime.tint=nil; runtime.picker=nil; refresh=original_refresh
-end
 -- Marking pairs and the read-only iris companion must remain the captured
 -- shape. Reject unknown or changed companions without attempting setters.
 local function refuses(case,mutate)
@@ -821,19 +740,19 @@ refuses(cases[12],function(a) a[6].MaterialTarget.MaterialParameterName="Unknown
 refuses(cases[12],function(a) a[6].MaterialTarget.MaterialSlotNames={"MI_Head"} end)
 refuses(cases[12],function(a) a[6].MaterialTarget.SlotNameTagsToApply.GameplayTags={tag(core[5])} end)
 refuses(cases[12],function(a) a[6].Value=math.huge end)
-for _,case in ipairs({cases[17],cases[18]}) do
+for _,case in ipairs({cases[16],cases[17]}) do
     refuses(case,function(a) a[2].MaterialTarget.MaterialParameterName="Unknown Blend Mode" end)
     refuses(case,function(a) a[2].MaterialTarget.MaterialSlotNames={"MI_Other"} end)
     refuses(case,function(a) a[2].MaterialTarget.SlotNameTagsToApply.GameplayTags={tag(core[1])} end)
     refuses(case,function(a) a[2].Value=math.huge end)
     refuses(case,function(a) a[3]=a[2] end)
 end
-reset(cases[17]); local blush_session=start(); assert_ok(editor.update_live(blush_session,orange)); local blend_writes=writes
+reset(cases[16]); local blush_session=start(); assert_ok(editor.update_live(blush_session,orange)); local blend_writes=writes
 arrays[preview][2].Value=.5
 assert(not editor.update_live(blush_session,violet) and writes==blend_writes,"Changed blush blend mode was overwritten")
 arrays[preview][2].Value=1
 assert_ok(editor.cancel_live("repaired blush blend mode"))
-for _,case in ipairs({cases[19],cases[20]}) do
+for _,case in ipairs({cases[18],cases[19]}) do
     refuses(case,function(a) a[1].MaterialTarget.MaterialParameterName="Scar HSV Shift" end)
     refuses(case,function(a) a[2].MaterialTarget.MaterialParameterName="Scar Strength" end)
     refuses(case,function(a) a[2].MaterialTarget.MaterialSlotNames={"MI_Other"} end)
@@ -842,9 +761,9 @@ for _,case in ipairs({cases[19],cases[20]}) do
     refuses(case,function(a) a[2].Value=math.huge end)
     refuses(case,function(a) a[3]=a[2] end)
 end
-reset(cases[19]); local invalid_profile={slot=scar_tag,parameter="Scar HSV Shift",mesh=face[1],asset="CustomizationPartDefinition:CPD_H_Head"}
+reset(cases[18]); local invalid_profile={slot=scar_tag,parameter="Scar HSV Shift",mesh=face[1],asset="CustomizationPartDefinition:CPD_H_Head"}
 -- The new scar helper is an immutable companion, never the editable color.
-for _,case in ipairs({cases[25],cases[26]}) do
+for _,case in ipairs({cases[24],cases[25]}) do
     refuses(case,function(a) a[3]=nil end)
     refuses(case,function(a) a[1],a[2]=a[2],a[1] end)
     refuses(case,function(a) a[1].MaterialTarget.MaterialParameterName="MM Scar Tint" end)
@@ -881,7 +800,7 @@ for _,case in ipairs({cases[25],cases[26]}) do
 end
 -- The rebuilt eye shader exposes these four captured color/amount pairs.
 -- Amounts and side-specific material targets must survive every ownership check.
-for i=21,24 do
+for i=20,23 do
     local case=cases[i]
     refuses(case,function(a) a[2]=nil end)
     refuses(case,function(a) a[3]=a[2] end)
@@ -889,13 +808,13 @@ for i=21,24 do
     refuses(case,function(a) a[1].MaterialTarget.MaterialParameterName="MM Unknown Iris" end)
     refuses(case,function(a) a[2].MaterialTarget.MaterialParameterName="Enable Tinting" end)
     refuses(case,function(a) a[2].MaterialTarget.MaterialSlotNames={"MI_Head"} end)
-    refuses(case,function(a) a[1].MaterialTarget.MaterialSlotNames={i==21 and "MI_EyeRight" or "MI_EyeLeft"} end)
+    refuses(case,function(a) a[1].MaterialTarget.MaterialSlotNames={i==20 and "MI_EyeRight" or "MI_EyeLeft"} end)
     refuses(case,function(a) a[1].MaterialTarget.SlotNameTagsToApply.GameplayTags={tag(core[1])} end)
     refuses(case,function(a) a[2].Value=-.1 end)
     refuses(case,function(a) a[2].Value=1.1 end)
     refuses(case,function(a) a[2].Value=math.huge end)
     reset(case); local source_value=layout[2].value
-    local wrong=part(20,"CPD_COS_" .. (i==23 and "IrisTint_" or "IrisInner_") .. "Blue")
+    local wrong=part(20,"CPD_COS_" .. (i==22 and "IrisTint_" or "IrisInner_") .. "Blue")
     palette={wrong,stock,shade}
     local s=start(); assert(s.blue.part=="CustomizationPartDefinition:" .. iris_rules.iris(selected_tag).prefix .. "Blue")
     assert(arrays[preview][2].Value==source_value,"Iris donor amount replaced the selected amount")
@@ -912,7 +831,7 @@ for i=21,24 do
     arrays[owner][1].MaterialTarget.MaterialSlotNames=layout[1].materials
     assert_ok(editor.restore("iris eye target repaired")); original_matches(before)
 end
-reset(cases[19])
+reset(cases[18])
 local color_rules=load("color_rules")
 assert(color_rules.color(silver_tint,scar_tag,"MM Scar Tint"))
 assert(not color_rules.input_color(silver_tint,scar_tag,"MM Scar Tint"))
@@ -926,7 +845,7 @@ assert(not color_rules.color({R=0,G=0,B=0,A=.99},scar_tag,"Scar HSV Shift"))
 local rgb_guard=start(); invalid_profile.bundle=rgb_guard.profile.bundle
 assert(not color_rules.hsv(invalid_profile) and not target.valid(invalid_profile),"HSV profile accepted an RGB companion bundle")
 assert_ok(editor.cancel_live("scar mode guard"))
-reset(cases[19]); local scar_session=start(); assert_ok(editor.update_live(scar_session,orange)); local strength_writes=writes
+reset(cases[18]); local scar_session=start(); assert_ok(editor.update_live(scar_session,orange)); local strength_writes=writes
 arrays[preview][2].Value=.5
 assert(not editor.update_live(scar_session,violet) and writes==strength_writes,"Changed scar tint strength was overwritten")
 arrays[preview][2].Value=1

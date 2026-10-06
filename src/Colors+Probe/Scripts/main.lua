@@ -84,9 +84,7 @@ if #missing == 0 then
     tint = module("multi_editor").new(runtime,function(zone_runtime,index)
     local prefix=index==1 and "" or ("zone" .. index .. "_")
     local function journal(leaf) return directory .. "../DevPanel/" .. prefix .. leaf end
-    local tint = module("color_zone").new(zone_runtime, probe.access, journal)
-    tint = module("zabrak_picker").wrap(zone_runtime, probe.access, journal("zabrak_picker_recovery.txt"), tint)
-    return tint
+    return module("color_zone").new(zone_runtime, probe.access, journal)
     end,function(index)
         -- Same per-zone journals the session gate preserves/archives. Readers
         -- treat an empty journal as nothing to recover, but any ".previous"
