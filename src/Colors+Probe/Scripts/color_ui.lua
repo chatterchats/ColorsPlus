@@ -178,6 +178,31 @@ function M.new(runtime,a,tint)
         capped=name(host)
         return stock,ours
     end
+    -- Another mod (e.g. a character-creator overhaul adding rows above the
+    -- swatches) may re-apply its own cap after ours. Adopt its value as the
+    -- stock cap and lower it again; back off after a few corrections rather
+    -- than fight a widget that keeps resetting it.
+    local MAX_RECAPS=3
+    local function refresh_cap(b)
+        if not capped then
+            local ok,stock,ours=pcall(cap_host,b) -- a cap may only appear later
+            if ok then log(string.format("LAUNCHER LAYOUT | height=cap %s->%s (appeared later)",tostring(stock),tostring(ours))) end
+            return
+        end
+        local record=layouts[capped]
+        local ok,host=pcall(fresh,capped)
+        if not record or not ok then return end
+        local current=num(function() return host.MaxDesiredHeight end)
+        if current==nil or current==record.ours or host.bOverride_MaxDesiredHeight~=true then return end
+        record.recaps=(record.recaps or 0)+1
+        if record.recaps>MAX_RECAPS then
+            if record.recaps==MAX_RECAPS+1 then log("LAUNCHER LAYOUT | height=left to another widget (keeps resetting the cap)") end
+            return
+        end
+        record.stock=current; record.ours=math.max(current-LAUNCHER_HEIGHT,LAUNCHER_HEIGHT)
+        host:SetMaxDesiredHeight(record.ours)
+        log(string.format("LAUNCHER LAYOUT | height=re-cap %s->%s (changed by another widget)",tostring(current),tostring(record.ours)))
+    end
     local function restore_host()
         local host_name=capped; capped=nil
         local record=host_name and layouts[host_name]
@@ -284,13 +309,17 @@ function M.new(runtime,a,tint)
     end
     -- Backstop only: native context hooks drive reconciliation, and a launch
     -- validates afresh. This catches a pane changed without a hooked event.
-    local function poll(b,generation)
-        runtime:after("color-ui:poll",500,function()
+    local function poll(b,generation,delay)
+        runtime:after("color-ui:poll",delay or 500,function()
             if generation~=epoch or self.binding~=b then return end
             -- The picker validates this exact binding on every UI read.
             if self.picker_owner or runtime.picker.active then poll(b,generation); return end
             local ok,err=pcall(self.validate_picker,b)
-            if ok then poll(b,generation); return end
+            if ok then
+                local refreshed,why=pcall(refresh_cap,b)
+                if not refreshed then log("LAUNCHER LAYOUT | height check failed | " .. tostring(why):match("[^:]*$")) end
+                poll(b,generation); return
+            end
             log("RETIRED | " .. tostring(err))
             if runtime.picker.active then runtime.picker.close("color pane context ended") end
             local removed,why=pcall(retire)
@@ -355,7 +384,8 @@ function M.new(runtime,a,tint)
         self.binding=b
         self.validate_picker(b)
         log("ATTACHED | slot=" .. b.tag .. " | grid=" .. b.grid .. " | overlay=" .. b.overlay .. " | stack=" .. b.stack)
-        poll(b,epoch)
+        -- First check soon: other widgets settle their layout after the page builds.
+        poll(b,epoch,100)
     end
     function self.reconcile()
         -- Reuse only a live binding whose selected VM, active palette, creator

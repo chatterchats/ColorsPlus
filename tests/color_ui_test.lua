@@ -230,7 +230,14 @@ assert(layout_logged,"Launcher layout records the values it used")
 local footer=launcher.WidgetTree.RootWidget
 assert(footer.kind=="Overlay" and footer.visibility==4)
 assert(footer.children[1].SetHeightOverride_arg==44 and footer.children[1].Slot.SetVerticalAlignment_arg==2)
+assert(jobs["color-ui:poll"].delay==100,"The first layout check runs soon after the page builds")
+-- Another widget (e.g. a creator overhaul) re-applies its own cap after ours:
+-- adopt its value as stock and lower it again; then follow it back.
+grid_box.MaxDesiredHeight=455; run("color-ui:poll")
+assert(grid_box.MaxDesiredHeight==403,"A cap reset by another widget is adopted and lowered again")
 assert(jobs["color-ui:poll"].delay==500,"Launcher validation is a slow backstop, not an input poll")
+run("color-ui:poll"); assert(grid_box.MaxDesiredHeight==403,"Our own cap is not re-lowered")
+grid_box.MaxDesiredHeight=550; run("color-ui:poll"); assert(grid_box.MaxDesiredHeight==498)
 launch_click(); assert(grid.visibility==0 and not jobs["color-ui:open"],"No widget work inside the native click stack")
 run("color-ui:launch"); assert(opens==0 and jobs["color-ui:open"].delay==100)
 assert(grid.visibility==3,"Swatches stop taking the mouse from the launch click")
@@ -639,6 +646,9 @@ grid_box.MaxDesiredHeight=550; ui.close("cap baseline")
 assert(pcall(ui.reconcile) and ui.binding and grid_box.MaxDesiredHeight==498)
 ui.close("cap restore"); assert(grid_box.MaxDesiredHeight==550)
 assert(pcall(ui.reconcile) and grid_box.MaxDesiredHeight==498)
+-- A widget that keeps resetting the cap wins after three corrections.
+for i=1,4 do grid_box.MaxDesiredHeight=500+i; run("color-ui:poll") end
+assert(grid_box.MaxDesiredHeight==504,"Back off instead of fighting a widget that keeps resetting the cap")
 grid_box.MaxDesiredHeight=401; ui.close("cap changed by another mod")
 assert(grid_box.MaxDesiredHeight==401,"Never overwrite a swatch cap another mod changed")
 grid_box.bOverride_MaxDesiredHeight=false; grid_box.MaxDesiredHeight=0

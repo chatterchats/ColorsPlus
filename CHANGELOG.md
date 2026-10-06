@@ -42,6 +42,12 @@ the player-only package.
   64px tiles with 10px spacing give a 434px row starting 5px in. Slots are
   read through `WidgetLayoutLibrary`. Unreadable values keep the full-width
   layout; one `LAUNCHER LAYOUT` line records the values used.
+- Coexist with mods that manage the same cap (Maddie's character-creator
+  overhaul re-applies 455 after its extra rows are built). The launcher's
+  backstop check (first at 100ms, then every 500ms while it shows) adopts a
+  cap changed by another widget as the new stock value and lowers it again,
+  backing off after three corrections instead of fighting a widget that keeps
+  resetting it. A cap that only appears later is picked up the same way.
 - The widget library lookup uses a plain validity check: `a.live` rejects
   class default objects by design (caught by the launcher test).
 
