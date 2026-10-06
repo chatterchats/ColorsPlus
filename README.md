@@ -14,8 +14,11 @@ and armor colors, hair, skin (including race-specific skin bundles such as
 Zabrak tones), makeup, tattoos, horns and scar HSV adjustments. The base
 game's eye choices are not supported.
 
-- **Apply Color** keeps the choice for the current editor visit; save the
-  character normally to keep it. **Cancel** returns to the previous color.
+- **Apply Color** keeps the choice for the current editor visit. In the
+  main-menu creator, save the character normally to keep it; leaving without
+  saving restores the original. In the in-game (hub) editor, leaving the
+  editor keeps it (the hub has no separate save step). **Cancel** returns to
+  the previous color.
 - Unfinished edits are journaled under `Recovery/` and restored after a Lua
   reload; journals from a previous game process are archived, never replayed.
 - The picker writes `colors_plus_performance.log` automatically (5-second

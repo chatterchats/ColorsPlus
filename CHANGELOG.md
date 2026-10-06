@@ -67,6 +67,15 @@ the player-only package.
   edit never mixes objects from both editors.
 - `button_class` loads the launcher/picker button class through UE4SS
   `LoadAsset` when it is missing (the hub does not load it).
+- Leaving the hub editor keeps an applied color instead of restoring it:
+  the first in-game test showed Apply working, then Colors+ restoring the
+  original as the editor closed, because the hub has no Save step. A hub
+  visit end (aux-VM clear, closed menu, another tab) now verifies the source
+  still holds the color, releases ownership and clears the journals. An open
+  draft ends first (the Zabrak route returns to the applied color), a later
+  stock edit is left alone, explicit Restore still restores, and a failed
+  keep falls back to restoring. `AFTER KEEP` lines at +2s/+10s log whether
+  the game kept the color. Apply refuses a character from the other editor.
 - Dev tools: `colors_compat` surveys without a creator binding and logs the
   preview links and button class; `colors_screens` traces the hub screens.
 

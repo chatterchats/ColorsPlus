@@ -30,7 +30,10 @@ local function regular_backend(runtime,a,journal,preview_part)
     local editor=load("editor_session.lua").new(runtime,a,journal("editor_recovery.txt"))
     local opening=false -- an opening is running: its native events and rollbacks are ours
     local timed=timer(runtime)
-    local restore_regular -- defined with Apply; the watch below needs it first
+    local restore_regular,keep_regular -- defined with Apply; the watch below needs them first
+    -- Hub editor visits end by keeping the applied color: the hub has no Save
+    -- step, leaving the editor is how its changes stick.
+    local function hub_visit(record) return record and record.creator and record.creator.tab~=nil end
     local function regular_pending() return preview.pending or (not selection.held and selection.record()) end
     local function regular_blocked() return editor.blocked or selection.blocked or preview.blocked end
     local function skin_stop(reason)
@@ -82,7 +85,11 @@ local function regular_backend(runtime,a,journal,preview_part)
                 return
             end
             local ok,err,external=editor.check_applied(s)
-            if not ok then restore_regular("editor context ended/changed: " .. tostring(err),external); return end
+            if not ok then
+                local why="editor context ended/changed: " .. tostring(err)
+                if hub_visit(s) and not external then keep_regular(why) else restore_regular(why,external) end
+                return
+            end
             -- Rendering availability is not ownership of the source RGB. Keep
             -- the verified Apply through navigation gaps; never undo it solely
             -- because the preview/display object is temporarily absent.
@@ -132,6 +139,33 @@ local function regular_backend(runtime,a,journal,preview_part)
         editor.busy=false
         if not ok then editor.fail(err) end
         return ok
+    end
+    -- An open draft still ends first; a source replaced by a later stock edit
+    -- is left alone. Any failure falls back to the normal restore.
+    keep_regular=function(reason)
+        if editor.busy then return false end
+        local record=editor.record()
+        if not hub_visit(record) then return restore_regular(reason) end
+        editor.busy=true
+        local ok,err=pcall(function()
+            runtime:cancel("editor:watch"); runtime:cancel("editor:recovery")
+            assert(skin_stop(reason),"Skin display restore failed")
+            assert(end_preview(reason),"Finish hover recovery before keeping")
+            local outcome=editor.keep(record)
+            -- The temporary stock swatch now carries the kept color (or was
+            -- replaced); never re-equip Default over it.
+            selection.forget()
+            editor.clear()
+            editor.log("KEPT | " .. tostring(reason) .. " | " .. (outcome=="kept"
+                and "hub editor; applied color left on the character" or "later stock edit preserved"))
+            if outcome=="kept" then editor.observe_kept(record) end
+        end)
+        editor.busy=false
+        if not ok then
+            editor.log("KEEP FAILED | " .. tostring(err) .. " | restoring")
+            return restore_regular(reason)
+        end
+        return true
     end
     local function cancel_regular(reason)
         if not skin_stop(reason or "picker Cancel") then return false end
@@ -222,7 +256,8 @@ local function regular_backend(runtime,a,journal,preview_part)
         if record then record.render_failures=0 end -- event-driven retry after a bounded display wait
         if reason=="creator closed" then
             if identity and record and record.creator and identity~=record.creator.master then return end
-            restore_regular(reason); return
+            if hub_visit(record) then keep_regular(reason) else restore_regular(reason) end
+            return
         end
         if reason=="page closed" then
             -- Discard an open draft, but do not undo an already-applied source

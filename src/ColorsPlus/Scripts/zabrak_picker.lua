@@ -12,6 +12,7 @@ function M.new(runtime,a,path,zone)
     local lifetime=assert(loadfile(directory .. "creator_lifetime.lua"))().new(a,runtime.log)
     local targets=assert(loadfile(directory .. "color_target.lua"))().new(a)
     local bundles=assert(loadfile(directory .. "color_bundle.lua"))()
+    local worlds=assert(loadfile(directory .. "editor_worlds.lua"))()
     local draft,applied,binding,busy
     local context_epoch=0
     local self={}
@@ -62,6 +63,15 @@ function M.new(runtime,a,path,zone)
         if draft then draft.live=false end
         draft=nil; applied=nil; binding=nil
     end
+    -- A hub visit with an applied color ends by keeping it; an open draft
+    -- over it is cancelled back to the applied color first.
+    local function end_visit(reason)
+        if applied and binding and binding.creator.tab then
+            if draft then self.cancel(reason) end
+            if not draft and engine.keep(reason) then clear_visit(); return end
+        end
+        zone.restore(reason)
+    end
     local function watch()
         runtime:after("zabrak-cp:watch",250,function()
             if not engine.pending or busy or engine.blocked then return end
@@ -72,7 +82,7 @@ function M.new(runtime,a,path,zone)
             end)
             if not ok then
                 if engine.release_replaced("watch: " .. tostring(err)) then clear_visit()
-                else zone.restore("creator/source changed: " .. tostring(err)) end
+                else end_visit("creator/source changed: " .. tostring(err)) end
                 return
             end
             watch()
@@ -108,6 +118,7 @@ function M.new(runtime,a,path,zone)
         local ok,err=pcall(function()
             if runtime.skin_enable then assert(runtime.skin_enable.stop("Zabrak source picker"),"Restore display probe first") end
             local creator=lifetime.bind(c.page)
+            assert((worlds.owner(name(c.owner))=="hub")==(creator.tab~=nil),"Character belongs to the other editor")
             if applied then
                 check_source()
                 assert(name(c.owner)==applied.owner and name(c.slot)==applied.vm
@@ -222,7 +233,7 @@ function M.new(runtime,a,path,zone)
             if identity and binding and identity~=binding.creator.master then return end
             local expected=binding
             runtime:after("zabrak-cp:exit",1,function()
-                if binding==expected then zone.restore(reason) end
+                if binding==expected then end_visit(reason) end
             end)
             return
         end

@@ -404,6 +404,77 @@ do
     draft=assert(session.begin_live()); assert(draft.preview_policy=="hsv")
     assert(session.cancel_live("native HSV cadence"))
 end
+-- In-game (hub) editor: the same character slots on a live HUB_Root actor,
+-- hosted by the hub menu with customization as its tab. Leaving keeps Apply.
+local HUB="/Game/Game/Maps/Hub/HUB_Root.HUB_Root:PersistentLevel.Char_Hero_HAWKS_Control_C_0.CustomizationInstance"
+local function rehome(o,from,to)
+    objects[o.name]=nil; o.name=o.name:sub(1,#o.name-#o.name:match("^[^ ]+ (.+)$")) .. to .. o.name:match("^[^ ]+ (.+)$"):sub(#from+1)
+    objects[o.name]=o
+end
+local tabs=obj("WBP_CentralUITabs_C " .. host .. ".WBP_CentralUITabs_C_7",{IsActivated=function(self) return not self.inactive end})
+local tab_stack=obj("BitReactorActivatableWidgetTabStack " .. host .. ".WBP_CentralUITabs_C_7.WidgetTree_8.TabStack",
+    {GetActiveWidget=function(self) return self.top end})
+local hub_master=obj("WBP_Customization_MasterPage_C " .. host .. ".WBP_CentralUITabs_C_7.WidgetTree_8.WBP_Customization_MasterPage_C_9",
+    {IsActivated=function(self) return not self.inactive end})
+local armory=obj("WBP_TabbedMenu_Armory_C " .. host .. ".WBP_CentralUITabs_C_7.WidgetTree_8.WBP_TabbedMenu_Armory_C_10")
+tabs.TabStack=tab_stack
+-- A main-menu character never applies through the hub menu.
+clean(); stack.WidgetList={tabs,page}; stack.top=page; tabs.inactive=true; tab_stack.top=hub_master
+local cross=assert(session.begin_live()); session.update_live(cross,orange)
+assert(not session.apply_live(cross) and equal(source_rgb,red) and not session.applied)
+assert(table.concat(logs,"\n"):find("other editor",1,true))
+for _,o in ipairs({owner,slot,mesh,fragment,horns}) do rehome(o,PREFIX,HUB) end
+local function hub_clean(default)
+    clean(default)
+    tabs.inactive=true; tabs.invalid=nil; tabs.TabStack=tab_stack; tab_stack.top=hub_master; hub_master.inactive=nil
+    stack.WidgetList={tabs,page}; stack.top=page
+end
+local function kept(default,message)
+    assert(not session.applied and not session.pending and not jobs["editor:watch"],message)
+    assert(equal(source_rgb,orange),message .. ": applied color kept")
+    assert(default or vm.EquippedCustomizationPartViewModel==stock,message .. ": swatch kept")
+    assert(vm.EquippedCustomizationPartViewModel~=none,message .. ": never back to Default")
+    assert(files.editor=="" and (files.selection==nil or files.selection==""),message .. ": journals cleared")
+end
+for _,default in ipairs({false,true}) do
+    -- Exit through the aux VM clear (the hub's ClearCustomizationAuxData).
+    hub_clean(default); apply()
+    assert(table.concat(logs,"\n"):find("hub editor; kept when the visit ends",1,true))
+    -- Back to the master page and in again is still the same visit.
+    page.inactive=true; stack.WidgetList={tabs}; stack.top=tabs; tabs.inactive=nil
+    session.context_changed("page closed"); run("editor:watch"); assert(session.applied)
+    hub_clean(default); apply()
+    local equipped=vm.EquippedCustomizationPartViewModel
+    session.context_changed("creator closed")
+    kept(default,"hub exit"); assert(vm.EquippedCustomizationPartViewModel==equipped,"temporary swatch stays")
+    assert(table.concat(logs,"\n"):find("KEPT | creator closed | hub editor",1,true))
+    run("editor:kept-check:2000")
+    assert(logs[#logs]:find("AFTER KEEP | +2s",1,true) and logs[#logs]:find("still_applied=true",1,true))
+    source_rgb=copy(violet); run("editor:kept-check:10000")
+    assert(logs[#logs]:find("still_applied=false",1,true),"Observation reports, never writes")
+    assert(equal(source_rgb,violet))
+end
+-- The watch: menu closed, another hub tab, or the menu leaves the stack.
+for _,leave in ipairs({
+    function() tab_stack.top=armory end,
+    function() stack.WidgetList={page} end,
+    function() stack.WidgetList={}; stack.top=nil end}) do
+    hub_clean(); apply(); leave(); run("editor:watch")
+    kept(false,"hub visit end")
+end
+-- A later stock edit is preserved, never recolored or reverted.
+hub_clean(); apply(); source_rgb=copy(violet); session.context_changed("creator closed")
+assert(not session.applied and equal(source_rgb,violet))
+-- An open draft at exit ends; the earlier Apply is kept.
+hub_clean(); apply(); local hub_draft=assert(session.begin_live()); session.update_live(hub_draft,violet)
+session.context_changed("creator closed")
+assert(not base.pending and not session.applied and equal(source_rgb,orange))
+-- Explicit Restore still restores in the hub.
+hub_clean(); apply(); assert(session.restore("Restore")); assert(equal(source_rgb,red) and not session.applied)
+-- A failed keep falls back to the normal restore path.
+hub_clean(); apply(); fail_preview_restore=true; session.context_changed("creator closed")
+assert(table.concat(logs,"\n"):find("KEEP FAILED",1,true))
 io.open=old_open
 os.rename,os.remove=old_rename,old_remove
+print("Editor Apply (hub): exit keeps Apply, same-visit navigation, watch ends, stock edits, drafts, Restore and cross-editor refusal passed")
 print("Editor Apply: source ownership, Default, reopen/cancel/external restore, slot/exit, replacement, rollback and reload tests passed")

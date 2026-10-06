@@ -230,6 +230,7 @@ function M.new(runtime,a,path)
             vm=name(c.slot),part=id(c.part.AssetId),page=c.page,materials=c.materials,original=copy(c.original),profile=c.profile}
         s.creator=s.creator or lifetime.bind(c.page)
         assert(lifetime.active(s.creator),"Creator not active")
+        assert((worlds.owner(s.owner)=="hub")==(s.creator.tab~=nil),"Character belongs to the other editor")
         s.previous=copy(c.original); s.chosen=copy(session.test_color)
         if s.profile.bundle and not s.bundle_ids then
             s.bundle_ids=fragments.identities(c.source_slot:GetFragmentInstances())
@@ -265,7 +266,8 @@ function M.new(runtime,a,path)
         assert(fragments.matches(installed,s.profile,s.chosen),"Apply companion color readback failed")
     end
     function self.log_applied(s)
-        log("APPLIED | linear_rgba=" .. encoded(s.chosen) .. " | creator=" .. s.creator.master .. " | creator visit only; no save; restores on exit")
+        log("APPLIED | linear_rgba=" .. encoded(s.chosen) .. " | creator=" .. s.creator.master
+            .. (s.creator.tab and " | hub editor; kept when the visit ends" or " | creator visit only; no save; restores on exit"))
     end
     -- Watch: the applied source still holds our color and the visit continues.
     -- Returns ok, error, and whether the source was changed by someone else.
@@ -285,6 +287,28 @@ function M.new(runtime,a,path)
         assert(same(color(f),s.chosen),"Applied skin source changed")
     end
     function self.restore_source(s) return restore_source(s) end
+    -- Hub editor: leaving the editor is the game's own commit, so an applied
+    -- color is kept rather than restored. "kept" only when the verified
+    -- source still holds it; otherwise a later stock edit replaced it.
+    function self.keep(s)
+        local f=source(s)
+        if not f or not same(color(f),s.chosen) or not fragments.matches(f,s.profile,s.chosen) then return "replaced" end
+        return "kept"
+    end
+    -- Read-only: does the game keep the color once the editor is gone?
+    function self.observe_kept(s)
+        for _,delay in ipairs({2000,10000}) do
+            runtime:after("editor:kept-check:" .. delay,delay,function()
+                local ok,result=pcall(function()
+                    local f=source(s)
+                    if not f then return "source replaced" end
+                    local now=color(f)
+                    return "rgba=" .. encoded(now) .. " | still_applied=" .. tostring(same(now,s.chosen))
+                end)
+                log("AFTER KEEP | +" .. (delay/1000) .. "s | " .. (ok and result or ("unreadable: " .. tostring(result))))
+            end)
+        end
+    end
     function self.owns_context(c,s) return name(c.owner)==s.owner and name(c.slot)==s.vm end
     function self.clear() persist(nil); record=nil; self.blocked=nil; hold_lookups(false) end
     function self.fail(err)

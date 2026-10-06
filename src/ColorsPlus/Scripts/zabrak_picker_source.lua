@@ -399,6 +399,21 @@ function M.new(runtime,a,path)
     end
     -- Clear a retired source only after a live lookup proves it is not our set.
     -- Never recolor/restore/adopt a stock edit or another race's replacement.
+    -- Hub editor exit: the applied source (RGB, order, targets) stays for the
+    -- game to commit. Only an owned source that still holds the applied RGB.
+    function self.keep(reason)
+        if self.busy or self.hold or self.blocked or not self.pending or self.pending.phase~="owned" then return false end
+        calls=0
+        local ok,err=pcall(function()
+            local s=self.pending
+            local c=assert(call("keep source readback",function() return source(s) end),"Source unavailable")
+            assert(same(color(c.values[2]),s.chosen),"Source no longer holds the applied color")
+            commit(nil)
+            log("KEPT | hub editor; applied source left on the character | " .. tostring(reason))
+        end)
+        if not ok then log("KEEP REFUSED | " .. tostring(err)) end
+        return ok
+    end
     function self.release_replaced(reason)
         if self.busy or self.hold or self.blocked or not self.pending or self.pending.phase~="owned" then return false end
         calls=0

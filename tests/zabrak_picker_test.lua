@@ -487,5 +487,53 @@ assert(not worker.begin_live() and writes==0 and not files.journal and forbidden
 assert(contains("SWAP TARGET | part=CustomizationPartDefinition:CPD_H_SkinTone_Hum_Zabrak_1B0 | order=4,1,2,3"))
 assert(contains("|MI_Head,MI_Body | expected=Skin Coloration|"))
 assert(contains("Unsupported recovery swap target"))
+-- In-game (hub) editor: the hub menu hosts the editor; leaving keeps Apply.
+local tabs=obj("WBP_CentralUITabs_C " .. host .. ".WBP_CentralUITabs_C_7",{IsActivated=function(self) return not self.inactive end})
+local tab_stack=obj("BitReactorActivatableWidgetTabStack " .. host .. ".WBP_CentralUITabs_C_7.WidgetTree_8.TabStack",
+    {GetActiveWidget=function(self) return self.top end})
+local hub_master=obj("WBP_Customization_MasterPage_C " .. host .. ".WBP_CentralUITabs_C_7.WidgetTree_8.WBP_Customization_MasterPage_C_9",
+    {IsActivated=function(self) return not self.inactive end})
+local armory=obj("WBP_TabbedMenu_Armory_C " .. host .. ".WBP_CentralUITabs_C_7.WidgetTree_8.WBP_TabbedMenu_Armory_C_10")
+tabs.TabStack=tab_stack
+local function hub_boot()
+    reset(); boot(); stack.WidgetList={tabs,page}; stack.top=page; tabs.inactive=true; tab_stack.top=hub_master
+end
+-- A main-menu character never opens through the hub menu.
+hub_boot(); assert(not worker.begin_live() and writes==0 and not worker.pending)
+assert(contains("other editor"))
+local MAIN=owner.n:match("^[^ ]+ (.+)$")
+local HUB="/Game/Game/Maps/Hub/HUB_Root.HUB_Root:PersistentLevel.Char_Hero_Humanoid_C_0.CustomizationInstance"
+local function rehome(o)
+    local class,path=o.n:match("^([^ ]+) (.+)$")
+    objects[path]=nil; path=HUB .. path:sub(#MAIN+1); o.n=class .. " " .. path; objects[path]=o
+end
+rehome(owner); rehome(slot); for _,m in pairs(mesh_slots) do rehome(m) end
+local function hub_kept(message)
+    assert(not worker.applied and not worker.pending and not worker.source_owned,message)
+    assert(equal(current("MaterialColor").color,orange),message .. ": applied color kept")
+    assert(files.journal=="" and contains("KEPT | hub editor"),message .. ": journal cleared")
+end
+local function hub_apply()
+    hub_boot(); draft=assert(worker.begin_live(),errors()); assert(worker.update_live(draft,orange))
+    assert(worker.apply_live(draft))
+end
+-- Back to the master page is the same visit; leaving keeps the color.
+hub_apply()
+stack.WidgetList={tabs}; stack.top=tabs; tabs.inactive=nil; page.inactive=true
+worker.context_changed("page closed"); run("zabrak-cp:context"); run("zabrak-cp:watch")
+assert(worker.applied and equal(current("MaterialColor").color,orange))
+stack.WidgetList={tabs,page}; stack.top=page; tabs.inactive=true; page.inactive=false
+local count=writes
+worker.context_changed("creator closed"); run("zabrak-cp:exit")
+hub_kept("hub exit"); assert(writes==count,"Keeping writes nothing")
+-- Another hub tab ends the visit through the watch.
+hub_apply(); tab_stack.top=armory; run("zabrak-cp:watch"); hub_kept("hub tab change")
+-- An open draft over an Apply returns to the applied color, then keeps it.
+hub_apply(); draft=assert(worker.begin_live()); assert(worker.update_live(draft,violet))
+worker.context_changed("creator closed"); run("zabrak-cp:exit"); hub_kept("draft over Apply")
+-- A draft without Apply still restores the original source.
+hub_boot(); draft=assert(worker.begin_live()); assert(worker.update_live(draft,violet))
+worker.context_changed("creator closed"); run("zabrak-cp:exit"); original_source()
 io.open,os.rename,os.remove=original.open,original.rename,original.remove
+print("Zabrak CP (hub): exit/tab change keep Apply, drafts return to Apply, unapplied drafts restore, cross-editor refusal passed")
 print("Zabrak CP: arbitrary RGB, rebuilt Start/Restore, extended idle drafts, Apply/reopen/Cancel, radial/hover no repaint, creator exit, saved-layout baseline, recovery/retirement, disk failure and reload holds passed")
