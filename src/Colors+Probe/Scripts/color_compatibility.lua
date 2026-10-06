@@ -32,7 +32,10 @@ function M.new(runtime,a)
                 log("PALETTE ITEM | index=" .. item.index .. " | asset=" .. item.asset)
             end
         end
-        return #items>1
+        -- Alternatives are other swatches; the equipped one may not be offered.
+        local current=id(vm.EquippedCustomizationPartViewModel.AssetId); local others=0
+        for _,item in ipairs(items) do if not item.empty and item.asset~=current then others=others+1 end end
+        return others>0
     end
     local function nested(values)
         local visited,total={},0

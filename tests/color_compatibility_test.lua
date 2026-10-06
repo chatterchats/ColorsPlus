@@ -94,7 +94,9 @@ command(); run(); assert(has("RESULT | CANDIDATE") and has("parameter=Root Color
 logs={}; fragments={}; command(); run(); assert(has("EMPTY/DEFAULT"))
 logs={}; fragments={fragment,fragment}; command(); run(); assert(has("RESULT | UNVERIFIED"))
 logs={}; fragments={fragment}; color.A=0; command(); run(); assert(has("normalized_opaque=false") and has("RESULT | UNVERIFIED")); color.A=1
-logs={}; palette={donor}; command(); run(); assert(has("PALETTE GAP") and has("RESULT | UNVERIFIED")); palette={part,donor}
+-- An unoffered equipped swatch (hub armor) is logged; the donor is an alternative.
+logs={}; palette={donor}; command(); run(); assert(has("not a palette item") and has("RESULT | CANDIDATE")); palette={part,donor}
+logs={}; palette={part}; command(); run(); assert(has("RESULT | UNVERIFIED")); palette={part,donor}
 logs={}; r.tint={applied={}}; local before=reads; command(); run(); assert(reads==before and has("REFUSED")); r.tint=nil
 logs={}; lists.CustomizationAuxVM_C={aux,aux}; command(); run(); assert(has("FAILED |") and has("Ambiguous selected slot"))
 lists.CustomizationAuxVM_C={aux}
@@ -145,7 +147,9 @@ assert(target_module.valid(profile) and targets.target(fragment,profile)=="MI_Ha
 assert(targets.donor(vm,page.full)==donor)
 donor.AssetId=asset("CPD_Hair_None")
 assert(not pcall(targets.donor,vm,page.full)); donor.AssetId=asset("CPD_Hair_Blue")
-palette={donor}; assert(not pcall(targets.palette,vm,page.full)); palette={part,donor}
+palette={donor}; assert(not pcall(targets.palette,vm,page.full,true),"strict: equipped must be offered")
+assert(#targets.palette(vm,page.full)==1 and targets.donor(vm,page.full)==donor,"unoffered equipped swatch keeps its donor")
+palette={part,donor}
 local original_parameter=profile.parameter; profile.parameter="wrong"
 assert(not pcall(targets.target,fragment,profile)); profile.parameter=original_parameter
 fragment.MaterialTarget.SlotNameTagsToApply.GameplayTags={mesh_tag,mesh_tag}

@@ -99,7 +99,7 @@ function M.new(runtime,a,path,preview)
         return v
     end
     local function first_swatch(vm)
-        local items,grid=targets.palette(vm,page())
+        local items,grid=targets.palette(vm,page(),true)
         for _,item in ipairs(items) do
             if not is_default(item.asset) and rules.preview_asset(a.text(vm.SlotTag.TagName),item.asset) then
                 return item.object,grid,item.index

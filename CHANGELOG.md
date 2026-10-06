@@ -78,14 +78,17 @@ the player-only package.
   the game kept the color. Apply refuses a character from the other editor.
   Confirmed in game: hub skin and tattoo colors persist outside the editor
   and through save > main menu > load; Rodian (swap) skin works.
-- Hub armor colors refused to open (`Equipped item absent from active
-  palette`) until a swatch was picked from the grid: the equipped swatch VM
-  was not one of the palette's items by identity (likely a save-loaded VM).
-  The palette check now accepts the single palette item with the equipped
-  asset (logged as `matched by asset`); none or several still refuse, and
-  the refusal names the equipped VM and asset.
-- Dev tools: `colors_compat` surveys without a creator binding and logs the
-  preview links and button class; `colors_screens` traces the hub screens.
+- Hub armor slots wearing a swatch the palette does not offer refused to
+  open (`Equipped item absent from active palette`): Hawks' Main Color
+  (`NeutralGrey_10`) and Tertiary Accent (`Blue_16`), with no palette item
+  of either asset, likely equipped under a swatch-unlocker mod and kept in
+  the save. Picking a stock swatch made them work. The grid is already bound
+  to the slot by the exact page/panel/tiles walk and slot tag, the preview
+  borrows another swatch, and Cancel/Restore write the source RGB, so an
+  unoffered equipped swatch is now logged (`not a palette item`) instead of
+  refused. Default selection keeps the strict check (it re-equips the
+  Default item from the palette). The survey counts alternatives as other
+  swatches.
 
 ### Dev Panel integration removed; journals move to `Recovery/`
 

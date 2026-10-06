@@ -163,20 +163,19 @@ refuse(function()
     end
     root.CustomizationChildSlotViewModels=branches
 end,function() root.CustomizationChildSlotViewModels={style,color,tips} end,"node limit")
-refuse(function() items={other} end,function() items={selected,other} end,"Equipped item absent")
--- A save-loaded character (hub editor) can hold its own VM for a palette
--- asset. Accept only the single palette item with that asset, and log it.
+-- An outfit can wear a swatch the palette does not offer (hub armor:
+-- asset_matches=0). The grid stays bound by the exact tiles walk and tag;
+-- the miss is logged, not refused.
 do
+    items={other}
+    assert(resolve()==color and logs[#logs]:find("not a palette item",1,true)
+        and logs[#logs]:find("asset_matches=0",1,true))
+    local palette=target.palette(color,page.full); assert(#palette==1 and palette[1].object==other)
     local loaded=part(1); objects[loaded.full]=nil
     loaded.full=loaded.full:gsub("_1$","_901"); objects[loaded.full]=loaded
     color.EquippedCustomizationPartViewModel=loaded; tips.EquippedCustomizationPartViewModel=loaded
-    assert(resolve()==color and logs[#logs]:find("matched by asset; identity differs",1,true))
-    local palette=target.palette(color,page.full); assert(#palette==2)
-    assert(logs[#logs]:find("index=0",1,true))
-    refuse(function() items={other} end,function() items={selected,other} end,"asset_matches=0")
-    local twin=part(1); objects[twin.full]=nil; twin.full=twin.full:gsub("_1$","_902"); objects[twin.full]=twin
-    refuse(function() items={selected,twin,other} end,function() items={selected,other} end,"asset_matches=2")
-    items={selected,twin,other}; assert(not pcall(target.palette,color,page.full),"Ambiguous asset match"); items={selected,other}
+    items={selected,other}
+    target.palette(color,page.full); assert(logs[#logs]:find("asset_matches=1",1,true))
     color.EquippedCustomizationPartViewModel=selected; tips.EquippedCustomizationPartViewModel=selected
 end
 refuse(function() tiles.hidden=true end,function() tiles.hidden=nil end,"found 0")

@@ -116,23 +116,21 @@ function M.new(a,logger)
         assert(empty or asset(value),"Invalid palette asset")
         return value,empty
     end
-    -- The equipped swatch is normally one of the palette's own items. A
-    -- character loaded from a save (seen in the hub editor) can hold its own
-    -- swatch VM for the same asset until a swatch is equipped from the grid.
-    -- Accept that only as the single palette item with the equipped asset;
-    -- the palette is already bound to this slot by its tiles' slot tag.
-    local function asset_match(grid,count,host,equipped,current)
-        local wanted=id(equipped.AssetId); local match,matches=nil,0
+    -- The equipped swatch is normally one of the palette's own items, but a
+    -- character can wear one the palette does not offer (hub: Hawks' armor
+    -- wears NeutralGrey_10 and Blue_16, asset_matches=0, likely equipped
+    -- under a swatch-unlocker mod and kept in the save). The grid is bound
+    -- to this slot by the exact page/panel/tiles walk and its slot tag, the
+    -- preview borrows another swatch, and Cancel/Restore write the source
+    -- RGB, so an unoffered swatch is logged, not refused.
+    local function unoffered(grid,count,host,equipped,current)
+        local wanted=id(equipped.AssetId); local matches=0
         for i=0,count-1 do
-            local item=object(grid:GetItemAt(i))
-            local value,empty=palette_part(item,host)
-            if not empty and value==wanted then match=i; matches=matches+1 end
+            local value,empty=palette_part(object(grid:GetItemAt(i)),host)
+            if not empty and value==wanted then matches=matches+1 end
         end
-        assert(matches==1,"Equipped item absent from active palette | equipped=" .. current
-            .. " | asset=" .. wanted .. " | asset_matches=" .. matches)
-        if logger then logger("PALETTE | equipped swatch matched by asset; identity differs | asset=" .. wanted
-            .. " | equipped=" .. current .. " | index=" .. match) end
-        return match
+        if logger then logger("PALETTE | equipped swatch is not a palette item | asset=" .. wanted
+            .. " | asset_matches=" .. matches .. " | equipped=" .. current) end
     end
     local last_selection
     function self.selected(vm,page,root)
@@ -256,7 +254,9 @@ function M.new(a,logger)
             end
         end
     end
-    function self.palette(vm,page)
+    -- strict: the equipped swatch must be a palette item (Default selection
+    -- re-equips it from the palette).
+    function self.palette(vm,page,strict)
         local slot=a.text(vm.SlotTag.TagName); local owner=assert(outer(name(vm)),"Invalid slot VM location")
         local current=name(vm.EquippedCustomizationPartViewModel)
         local grid=palettes.resolve(page,slot); local count=grid:GetNumItems()
@@ -269,7 +269,8 @@ function M.new(a,logger)
             found=found or full==current
             items[#items+1]={object=item,asset=value,index=i,name=full,empty=empty}
         end
-        if not found then asset_match(grid,count,owner,object(vm.EquippedCustomizationPartViewModel),current) end
+        assert(found or not strict,"Equipped item absent from active palette")
+        if not found then unoffered(grid,count,owner,object(vm.EquippedCustomizationPartViewModel),current) end
         return items,name(grid)
     end
     function self.equipped_in_palette(vm,grid)
@@ -283,7 +284,7 @@ function M.new(a,logger)
         if type(index)=="number" and index%1==0 and index>=0 and index<count then
             assert(name(grid:GetItemAt(index))==full and grid:GetIndexForItem(item)==index,"Palette order changed")
         else
-            asset_match(grid,count,host,item,full)
+            unoffered(grid,count,host,item,full)
         end
         assert(name(vm.EquippedCustomizationPartViewModel)==full,"Equipped item changed during palette verification")
     end
