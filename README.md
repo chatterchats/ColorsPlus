@@ -17,7 +17,13 @@ currently selected zone.
 
 ## Status
 
-**Current build: Colors+Probe v0.2.118 (lookup hints survive non-structural events).**
+**Current build: Colors+Probe v0.2.119 (swatches ignore the mouse while the picker launches).**
+
+Hovering the swatches while pressing Custom Color could preview a swatch just
+after the picker's preview session began, closing the picker. The swatch grid
+now ignores the mouse from the press until the picker hides it.
+
+Previously (v0.2.118):
 
 Scalar page/VM lookup hints are now retired only when the page, creator or
 slot category changes; other notifications still refuse lookups in flight.

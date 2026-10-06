@@ -198,9 +198,22 @@ local footer=launcher.WidgetTree.RootWidget
 assert(footer.kind=="Overlay" and footer.visibility==4)
 assert(footer.children[1].SetHeightOverride_arg==44 and footer.children[1].Slot.SetVerticalAlignment_arg==2)
 run("color-ui:poll"); assert(opens==0 and jobs["color-ui:open"].delay==100)
+assert(grid.visibility==3,"Swatches stop taking the mouse from the launch press")
 run("color-ui:open"); assert(opens==1)
+assert(grid.visibility==0,"Launch completion restores input the picker never took over")
 run("color-ui:poll"); assert(not jobs["color-ui:open"],"Held click cannot repeat")
 runtime.picker.close()
+-- A refused launch restores the stock swatch input.
+button.pressed=false; run("color-ui:poll"); button.pressed=true; run("color-ui:poll")
+assert(grid.visibility==3 and jobs["color-ui:open"])
+local validate_launch=ui.validate_picker
+ui.validate_picker=function() error("launch refused for test") end
+run("color-ui:open"); ui.validate_picker=validate_launch
+assert(grid.visibility==0 and opens==1,"A refused launch restores swatch input")
+-- The real picker below opens while input is paused; hiding must record the
+-- stock value (checked when the view closes), not the temporary pause.
+button.pressed=false; run("color-ui:poll"); button.pressed=true; run("color-ui:poll")
+assert(grid.visibility==3); runtime:cancel("color-ui:open")
 assert(ui.prepare_picker()==binding,"Opening must not depend on geometry marshalling")
 -- Real view fills only the verified lower selector host, without geometry calls.
 local view=assert(loadfile(scripts .. "/picker_view.lua"))().new(runtime)

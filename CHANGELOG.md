@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Swatches ignore the mouse while the picker launches — v0.2.119
+
+- About 1 in 7 openings (v0.2.107-v0.2.118 logs) closed immediately with
+  `preview ended`: moving the mouse over the swatches during launch made the
+  game preview a swatch, or hiding a hovered swatch made Slate deliver its
+  mouse-leave reset on a later frame. Either arrived after the preview
+  session started, read as a context change and force-restored.
+- On the launch press the swatch grid becomes HitTestInvisible (still drawn),
+  so those events land during the 100ms launch delay, before any session.
+  `hide_palette` restores the stock value first in the same synchronous call,
+  so the hidden-palette record and restore keep the original. A refused,
+  failed or abandoned launch, and launcher retirement, restore it too.
+
 ### Lookup hints survive non-structural events — v0.2.118
 
 - v0.2.117 openings (developer machine, 5 opens) still spent ~180ms of ~431ms

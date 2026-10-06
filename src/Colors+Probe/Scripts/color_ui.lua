@@ -97,7 +97,31 @@ function M.new(runtime,a,tint)
         visibility.validate(b)
         return true
     end
+    -- From the launch press until the picker hides the palette, the swatch
+    -- grid ignores the mouse (HitTestInvisible: still drawn). Slate delivers a
+    -- hover preview, or the mouse-leave reset of hiding a hovered swatch, on a
+    -- later frame; arriving after the preview session started it read as a
+    -- context change and closed the picker. Now those land during the 100ms
+    -- launch delay, before any session. Scalar identity/original only.
+    local frozen
+    local function freeze(b)
+        if frozen then return end
+        local grid=fresh(b.grid)
+        local original=grid:GetVisibility()
+        if original~=0 and original~=4 then return end -- already ignores the mouse
+        frozen={grid=b.grid,original=original}
+        grid:SetVisibility(3)
+        log("PALETTE INPUT PAUSED | launch pending")
+    end
+    local function thaw()
+        local f=frozen; frozen=nil
+        if not f then return end
+        -- A destroyed or replaced grid has nothing left to restore.
+        local ok,grid=pcall(fresh,f.grid)
+        if ok and grid:GetVisibility()==3 then grid:SetVisibility(f.original) end
+    end
     local function retire()
+        thaw()
         if runtime.perf then runtime.perf.cancel_launch("launcher retired before opening") end
         if runtime.objects then runtime.objects.release("color-ui") end
         epoch=epoch+1
@@ -140,15 +164,19 @@ function M.new(runtime,a,tint)
                 local now=button:IsPressed()==true
                 if now and not pressed and not runtime.picker.active then
                     if runtime.perf then runtime.perf.begin_picker("Custom Color button",b.tag) end
+                    local paused,why=pcall(freeze,b)
+                    if not paused then log("PALETTE INPUT PAUSE FAILED | " .. tostring(why)) end
                     -- Defer opening until the native press frame has retired.
                     runtime:after("color-ui:open",100,function()
-                        if generation~=epoch or self.binding~=b then return end
+                        if generation~=epoch or self.binding~=b then thaw(); return end
                         local valid,why=pcall(self.validate_picker,b)
                         if valid then log("LAUNCH | " .. b.tag); runtime.picker.open()
                         else
                             log("LAUNCH REFUSED | " .. tostring(why))
                             if runtime.perf then runtime.perf.cancel_launch("launch refused: " .. tostring(why)) end
                         end
+                        -- No-op after a successful open (hide_palette took over).
+                        thaw()
                     end)
                 end
                 poll(b,generation,now)
@@ -231,6 +259,9 @@ function M.new(runtime,a,tint)
         return b
     end
     function self.hide_palette(b,root_name)
+        -- Restore the true original first, in this same synchronous call, so
+        -- the visibility record and later restore keep the stock value.
+        thaw()
         self.validate_picker(b)
         -- Hide disjoint native branches beside the grid's ancestry. This also
         -- covers mod-added labels/sliders without guessing their names, while

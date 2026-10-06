@@ -1,6 +1,6 @@
--- Colors+Probe v0.2.118
+-- Colors+Probe v0.2.119
 -- RGB preview; Default temporarily changes the editor swatch and restores it.
-local VERSION = "0.2.118"
+local VERSION = "0.2.119"
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local directory = assert(source:match("^(.*[/\\])"), "Scripts directory unavailable")
 
