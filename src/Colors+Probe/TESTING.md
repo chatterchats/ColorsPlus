@@ -21,6 +21,10 @@ This update is all about speed and smoothness:
   swatches while it opens.
 - **The Custom Color button now uses the game's own button style.** Tell us
   if it looks out of place or doesn't respond to a click.
+- **Tidier editing code behind the scenes.** The part of the mod that
+  previews, applies and undoes colors was reorganized. Nothing should look
+  different, so tell us if Cancel, Apply, leaving the creator or restarting
+  ever leaves a color other than the one you expected.
 
 Please try leaving the picker open untouched, dragging colors on skin,
 clothing and other appearance options, switching color slots, and reopening
