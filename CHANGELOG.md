@@ -30,6 +30,14 @@ the player-only package.
   click route. A 500ms validation backstop replaces the input poll (skipped
   while the picker owns the pane). The rainbow gradient sits beside the
   button; the native button's caption is set after attachment.
+- Launcher layout (from in-game review): it now spans only the swatch row
+  (tile entry width, spacing and alignment inside the palette box's fixed
+  width) and stays inside the palette box. While it shows, the swatch
+  Overlay's stack slot fills the box (the tile view scrolls when tall) and the
+  launcher keeps a fixed bottom slot. The stock slot size is restored exactly
+  when the picker opens and when the launcher retires (kept across Lua
+  reloads). Unreadable layout values keep the previous full-width layout; a
+  `LAUNCHER LAYOUT` line records the values used.
 - The widget library lookup uses a plain validity check: `a.live` rejects
   class default objects by design (caught by the launcher test).
 

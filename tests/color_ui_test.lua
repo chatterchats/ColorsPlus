@@ -113,7 +113,18 @@ local slider_box=object("WBP_COS_SliderRow_C","/Engine/Transient.InjectedSlider_
 local recolour_slider=object("Slider",slider_box.path .. ".WidgetTree.Slider"); recolour_slider.value=1
 slider_box:AddChild(recolour_slider)
 palette_root:AddChild(zone_label); palette_root:AddChild(recolour_label)
-palette_root:AddChild(slider_box); palette_root:AddChild(stack)
+palette_root:AddChild(slider_box)
+-- The SelectionTiles box: a fixed-width SizeBox directly above the stack. The
+-- swatch overlay's stack slot is stock Automatic; tiles are 75 wide, left
+-- aligned, 7 items (so one full row of 6 fits the 480 box).
+local palette_box=object("SizeBox",tree .. ".SizeBox_0")
+palette_box.bOverride_WidthOverride=true; palette_box.WidthOverride=480
+palette_root:AddChild(palette_box); palette_box:AddChild(stack)
+tiles.WidgetTree=object("WidgetTree",tree); tiles.WidgetTree.RootWidget=palette_box
+overlay.Slot.Size={SizeRule=0,Value=1}; overlay.Slot.Parent=stack
+function grid:GetEntryWidth() return 75 end
+function grid:GetNumItems() return 7 end
+grid.HorizontalEntrySpacing=0; grid.bEntrySizeIncludesEntrySpacing=false; grid.TileAlignment=3
 local header=object("TextBlock",page.path .. ".WidgetTree_4.SlotHeader")
 local tag="br.Customization.Slot.Character.Hair.Hair.Color.Primary"
 local vm=object("BitReactorCustomizationSlotViewModel","/Engine/Transient.GameEngine_0:BP_BrunoGameInstance_C_0.BitReactorCustomizationSlotViewModel_7")
@@ -202,7 +213,14 @@ end
 assert(rainbow and rainbow.texture and imports==1)
 assert(rainbow.parent.SetWidthOverride_arg==42 and rainbow.parent.SetHeightOverride_arg==24)
 local launcher=find(root_name)
-assert(launcher.Slot.SetSize_arg.SizeRule==1,"Launcher must absorb unused selector space")
+assert(launcher.Slot.SetSize_arg.SizeRule==0,"Launcher keeps a fixed slot at the bottom of the palette box")
+assert(overlay.Slot.SetSize_arg.SizeRule==1,"The swatch area fills the box so the launcher cannot overflow it")
+local launcher_size=launcher.WidgetTree.RootWidget.children[1]
+assert(launcher_size.SetWidthOverride_arg==450 and launcher_size.Slot.SetHorizontalAlignment_arg==1
+    and launcher_size.Slot.SetPadding_arg.Left==0,"Launcher spans exactly the six-swatch row")
+local layout_logged=false
+for _,line in ipairs(logs) do if line:find("LAUNCHER LAYOUT | host=fill | width=450.0 left=0.0",1,true) then layout_logged=true end end
+assert(layout_logged,"Launcher layout records the measurements it used")
 local footer=launcher.WidgetTree.RootWidget
 assert(footer.kind=="Overlay" and footer.visibility==4)
 assert(footer.children[1].SetHeightOverride_arg==44 and footer.children[1].Slot.SetVerticalAlignment_arg==2)
@@ -229,6 +247,7 @@ assert(ui.prepare_picker()==binding,"Opening must not depend on geometry marshal
 -- Real view fills only the verified lower selector host, without geometry calls.
 local view=assert(loadfile(scripts .. "/picker_view.lua"))().new(runtime)
 view.open(); assert(find(view.root_name).parent==overlay and view.pane_binding==binding)
+assert(overlay.Slot.SetSize_arg.SizeRule==0 and overlay.Slot.SetSize_arg.Value==1,"The picker keeps the stock swatch-area sizing")
 assert(not find(view.hsv.hue_name).value_writes and not find(view.hsv.hex_name).text
     and not view.hsv.painted_h,"Build must not initialize an unused white draft")
 local native_heading=find(view.heading_name)
@@ -377,6 +396,7 @@ assert(find(view.buttons[1].name).text=="Cancel")
 click(view,1)
 local value,action=view.read(); assert(value==nil and action=="cancel")
 view.close(); assert(#overlay.children==1 and ui.root_name==root_name and grid.visibility==0)
+assert(overlay.Slot.SetSize_arg.SizeRule==1,"Closing the picker re-anchors the launcher inside the box")
 assert(zone_label.visibility==0 and recolour_label.visibility==3 and slider_box.visibility==4
     and launcher.visibility==4 and recolour_slider.value==1,"Close restores every original visibility exactly")
 assert(not view.hsv,"HSV child identities retire with the owned view")
@@ -471,6 +491,7 @@ local retired_button=find(ui.button_name)
 assert(runtime.button_clicks.routes[ui.button_name],"Launcher click route is bound while attached")
 ui.context_changed("page closed"); assert(not ui.binding and not jobs["color-ui:poll"])
 stale_poll(); run("color-ui:retire"); assert(#stack.children==1 and not ui.root_name)
+assert(overlay.Slot.SetSize_arg.SizeRule==0 and overlay.Slot.SetSize_arg.Value==1,"Retiring the launcher restores stock swatch-area sizing")
 assert(not runtime.button_clicks.routes[retired_button:GetFullName()],"Retiring the launcher unbinds its click route")
 hooks["/Script/CommonUI.CommonButtonBase:HandleButtonClicked"]({get=function() return retired_button end})
 assert(not jobs["color-ui:launch"] and not jobs["color-ui:open"],"A click on a retired launcher does nothing")

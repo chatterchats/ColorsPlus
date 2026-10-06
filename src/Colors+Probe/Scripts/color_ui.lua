@@ -124,8 +124,87 @@ function M.new(runtime,a,tint)
         local ok,grid=pcall(fresh,f.grid)
         if ok and grid:GetVisibility()==3 then grid:SetVisibility(f.original) end
     end
+    -- Palette box layout. Stock: the swatch Overlay sizes to its content and
+    -- the launcher took whatever height remained, so tall palettes pushed the
+    -- launcher below the box. While the launcher shows, the swatch Overlay
+    -- fills the box instead (its tile view scrolls) and the launcher keeps a
+    -- fixed slot at the bottom. The stock slot size survives Lua reloads and is
+    -- restored exactly when the picker opens (so its layout is unchanged) and
+    -- when the launcher retires.
+    local layouts=rawget(_G,"ColorsPlusProbeLauncherLayout") or {}
+    rawset(_G,"ColorsPlusProbeLauncherLayout",layouts)
+    local filled
+    local function host_slot(overlay_name,stack_name)
+        local s=obj(fresh(overlay_name).Slot,"palette host slot")
+        assert(name(obj(s.Parent,"palette host parent"))==stack_name,"Palette host is not a direct child of the selector stack")
+        return s
+    end
+    local function fill_host(b)
+        if filled then return end
+        local s=host_slot(b.overlay,b.stack)
+        if not layouts[b.overlay] then
+            local size=s.Size
+            local stock={rule=tonumber(size.SizeRule),value=tonumber(size.Value)}
+            assert(stock.rule and stock.value,"Unreadable palette host size")
+            layouts[b.overlay]=stock
+        end
+        s:SetSize({SizeRule=1,Value=1})
+        filled={overlay=b.overlay,stack=b.stack}
+    end
+    local function restore_host()
+        local f=filled; filled=nil
+        local stock=f and layouts[f.overlay]
+        if not stock then return end
+        layouts[f.overlay]=nil
+        -- A destroyed page has nothing left to restore.
+        local ok,s=pcall(host_slot,f.overlay,f.stack)
+        if ok then s:SetSize({SizeRule=stock.rule,Value=stock.value}) end
+    end
+    -- The swatch row inside the palette box's fixed width, from the tile
+    -- view's entry width, spacing and alignment. Offsets are relative to the
+    -- selector stack. Unreadable values keep the full-width launcher.
+    local ALIGN={[0]="evenly",[1]="fill",[2]="fill",[3]="left",[4]="right",[5]="center",[6]="fill"}
+    local function pad(slot,side)
+        local ok,v=pcall(function() return tonumber(slot.Padding[side]) end)
+        return ok and v or 0
+    end
+    local function swatch_row(b)
+        local grid=fresh(b.grid)
+        local entry=tonumber(grid:GetEntryWidth())
+        local count=tonumber(grid:GetNumItems())
+        local spacing=tonumber(grid.HorizontalEntrySpacing) or 0
+        local includes=grid.bEntrySizeIncludesEntrySpacing==true
+        local align=ALIGN[tonumber(grid.TileAlignment) or 0] or "evenly"
+        assert(entry and entry>0 and count and count>0,"Unreadable tile entry size")
+        local tiles=obj(find(assert(b.tree:match("^(.+)%.WidgetTree[^.]*$"),"Invalid swatch owner")),"selection tiles")
+        local box=obj(obj(tiles.WidgetTree,"tiles tree").RootWidget,"palette box")
+        local stack=fresh(b.stack)
+        assert(kind(box)=="SizeBox" and box.bOverride_WidthOverride==true and name(parent(stack))==name(box),
+            "Palette box has no fixed width")
+        local stack_slot,host,grid_slot=a.unwrap(stack.Slot),a.unwrap(fresh(b.overlay).Slot),a.unwrap(grid.Slot)
+        local avail=tonumber(box.WidthOverride)-pad(stack_slot,"Left")-pad(stack_slot,"Right")
+            -pad(host,"Left")-pad(host,"Right")-pad(grid_slot,"Left")-pad(grid_slot,"Right")
+        local gap=includes and 0 or spacing
+        local pitch=entry+gap
+        local per_line=math.max(1,math.floor((avail+gap)/pitch))
+        local n=math.min(per_line,count)
+        local start,span=0,n*pitch-gap
+        if align=="right" then start=avail-span
+        elseif align=="center" then start=(avail-span)/2
+        elseif align=="evenly" then
+            local extra=(avail+gap-per_line*pitch)/per_line
+            start=extra/2; span=n*(pitch+extra)-extra-gap
+        elseif align=="fill" then span=avail end
+        -- Spacing included in the entry size surrounds each entry widget.
+        if includes and spacing>0 then start=start+spacing/2; span=span-spacing end
+        assert(span>0 and avail>0,"Palette row does not fit")
+        return {left=pad(host,"Left")+pad(grid_slot,"Left")+start,width=span,
+            detail=string.format("entry=%.1f spacing=%.1f includes=%s align=%s items=%d per_line=%d box=%.1f avail=%.1f",
+                entry,spacing,tostring(includes),align,count,per_line,tonumber(box.WidthOverride),avail)}
+    end
     local function retire()
         thaw()
+        restore_host()
         if runtime.perf then runtime.perf.cancel_launch("launcher retired before opening") end
         if runtime.objects then runtime.objects.release("color-ui") end
         epoch=epoch+1
@@ -212,6 +291,7 @@ function M.new(runtime,a,tint)
         local footer=construct("/Script/UMG.Overlay",tree); tree.RootWidget=footer; footer:SetVisibility(4)
         local size=construct("/Script/UMG.SizeBox",footer); size:SetHeightOverride(44)
         local footer_slot=footer:AddChild(size); footer_slot:SetHorizontalAlignment(0); footer_slot:SetVerticalAlignment(2)
+        local footer_size=size
         local row=construct("/Script/UMG.HorizontalBox",size); size:AddChild(row)
         local rainbow=construct("/Script/UMG.Image",row)
         call("rainbow gradient",function() gradients.bind(rainbow,"hue") end)
@@ -233,7 +313,19 @@ function M.new(runtime,a,tint)
         local button_slot=row:AddChild(button); button_slot:SetSize({SizeRule=1,Value=1}); button_slot:SetVerticalAlignment(2)
         local slot=fresh(b.stack):AddChild(root)
         slot:SetPadding({Left=0,Top=6,Right=0,Bottom=2})
-        slot:SetSize({SizeRule=1,Value=1})
+        -- Fixed slot at the bottom of a filling swatch area; if the stock host
+        -- cannot be changed, keep the original remaining-space launcher.
+        local hosted,host_why=pcall(fill_host,b)
+        slot:SetSize(hosted and {SizeRule=0,Value=1} or {SizeRule=1,Value=1})
+        local fitted,row=pcall(swatch_row,b)
+        if fitted then
+            footer_size:SetWidthOverride(row.width)
+            footer_slot:SetHorizontalAlignment(1)
+            footer_slot:SetPadding({Left=row.left,Top=0,Right=0,Bottom=0})
+        end
+        log(string.format("LAUNCHER LAYOUT | host=%s | width=%s",
+            hosted and "fill" or ("stock (" .. tostring(host_why) .. ")"),
+            fitted and string.format("%.1f left=%.1f | %s",row.width,row.left,row.detail) or ("full (" .. tostring(row) .. ")")))
         -- Reacquire after native attachment/Construct before setting text.
         fresh(self.button_name):UpdateText(FText("CUSTOM COLOR"))
         local generation=epoch
@@ -280,6 +372,7 @@ function M.new(runtime,a,tint)
         -- Restore the true original first, in this same synchronous call, so
         -- the visibility record and later restore keep the stock value.
         thaw()
+        restore_host() -- the picker keeps the stock swatch-area sizing
         self.validate_picker(b)
         -- Hide disjoint native branches beside the grid's ancestry. This also
         -- covers mod-added labels/sliders without guessing their names, while
@@ -311,6 +404,10 @@ function M.new(runtime,a,tint)
     function self.release_picker(b)
         visibility.restore() -- Keep the verified launcher when the pane closes.
         self.picker_owner=nil
+        if self.binding then
+            local ok,why=pcall(fill_host,self.binding)
+            if not ok then log("LAUNCHER LAYOUT | host=stock | " .. tostring(why)) end
+        end
     end
     function self.context_changed(reason)
         if reason=="page closed" or reason=="creator closed" then
