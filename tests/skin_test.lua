@@ -214,10 +214,13 @@ local function run(k) local job=assert(jobs[k],k); jobs[k]=nil; job.fn() end
 local access=load("customization_probe").new(runtime).access
 local fragments=bundle.new(access)
 local tint,editor
+local JOURNALS={["tint_recovery.txt"]="recovery",["default_selection_recovery.txt"]="selection",
+    ["editor_recovery.txt"]="editor",["zabrak_picker_recovery.txt"]="zabrak"}
+local function journal(leaf) return assert(JOURNALS[leaf],leaf) end
 local function boot()
     tint=load("tint_test").new(runtime,access,"recovery")
-    local defaults=load("default_selection").wrap(runtime,access,"selection",tint,tint)
-    editor=load("editor_session").wrap(runtime,access,"editor",defaults)
+    local zone=load("color_zone").new(runtime,access,journal,{preview=tint})
+    editor=load("editor_session").wrap(runtime,access,"editor",zone)
 end
 local function assert_ok(ok) assert(ok,table.concat(logs,"\n")) end
 local function start()

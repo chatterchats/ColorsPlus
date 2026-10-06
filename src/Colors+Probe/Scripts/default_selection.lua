@@ -1,6 +1,7 @@
--- Default fallback: temporarily equip a stock swatch in the editor, then use
--- the regular RGB preview. Restore the preview BEFORE re-equipping Default.
--- No save APIs; two independent journals preserve the two cleanup obligations.
+-- Default and empty slots have no fragment for the preview to clone. The zone
+-- temporarily equips a stock swatch for the visit, previews that, and returns
+-- the slot to Default after the preview ends (color_zone sequences this).
+-- No save APIs; the journal records intent before every editor mutation.
 local M={}
 local VM="^BitReactorCustomizationSlotViewModel /Engine/Transient%.GameEngine_%d+:BP_BrunoGameInstance_C_%d+%.BitReactorCustomizationSlotViewModel_%d+$"
 local PART="^BitReactorCustomizationPartViewModel /Engine/Transient%.GameEngine_%d+:BP_BrunoGameInstance_C_%d+%.BitReactorCustomizationPartViewModel_%d+$"
@@ -8,21 +9,19 @@ local EMPTY_PART="^BitReactorNoneCustomizationPartViewModel /Engine/Transient%.G
 local OWNER="^CustomizationInstance /Game/Game/Maps/MainMenu/MainMenu%.MainMenu:PersistentLevel%.Char_Hero_Humanoid_C_%d+%.CustomizationInstance$"
 local function outer(full) return full:match("^[^ ]+ (.+)%.BitReactorCustomization%w+ViewModel_%d+$")
     or full:match("^[^ ]+ (.+)%.BitReactorNoneCustomizationPartViewModel_%d+$") end
-function M.wrap(runtime,a,path,regular,base)
-    local selection,blocked,busy,held
+function M.new(runtime,a,path,preview)
+    -- record: the journaled temporary selection. held: an Apply keeps it for
+    -- the creator visit. busy: our own equip is running (ignore its events).
+    local self={busy=false,held=false}
+    local selection
     local directory=debug.getinfo(1,"S").source:gsub("^@",""):match("^(.*[/\\])")
     local targets=assert(loadfile(directory .. "color_target.lua"))().new(a,runtime.log)
     local rules=assert(loadfile(directory .. "color_rules.lua"))()
     local lifetime=assert(loadfile(directory .. "creator_lifetime.lua"))().new(a)
     local function valid_tag(s) return type(s)=="string" and s:match("^br%.Customization%.Slot%.Character%.[%w_.]+$") end
     local function is_default(s) return s=="None:None" or s:match("_None$")~=nil end
-    local self=setmetatable({}, {__index=function(_,key)
-        if key=="pending" then return base.pending or (not held and selection) end
-        if key=="blocked" then return blocked or base.blocked end
-        if key=="busy" then return busy or base.busy end
-        return base[key]
-    end})
     local function log(s) runtime.log("DEFAULT SELECTION | " .. s) end
+    self.log=log
     local function object(v,label)
         v=a.unwrap(v); assert(a.live(v),"Unavailable " .. (label or "Default selection object")); return v
     end
@@ -139,11 +138,12 @@ function M.wrap(runtime,a,path,regular,base)
             "Default selection owner changed")
         return owner,slot
     end
-    local function restore_selection(reason)
-        if not selection then return not blocked end
-        local s=selection; busy=true
+    -- Only after the preview ended: the hover must never outlive its baseline.
+    function self.restore(reason)
+        if not selection then return not self.blocked end
+        local s=selection; self.busy=true
         local ok,err=pcall(function()
-            assert(not blocked and not base.blocked and not base.pending,"Finish RGB/legacy recovery before restoring Default")
+            assert(not self.blocked and not preview.blocked and not preview.pending,"Finish RGB/legacy recovery before restoring Default")
             local vm=find(s.slot_vm)
             assert(a.text(vm.SlotTag.TagName)==s.tag,"Recorded Default slot changed")
             local current=equipped(vm)
@@ -175,94 +175,73 @@ function M.wrap(runtime,a,path,regular,base)
             persist(nil); selection=nil
             log("RESTORED | equipped Default; no accent override | " .. tostring(reason))
         end)
-        busy=false
+        self.busy=false
         if not ok then log("RESTORE FAILED | " .. tostring(err) .. " | recovery retained; do not save") end
         return ok
     end
-    -- Regular tint timeout/context/error callbacks call regular.restore directly.
-    -- Intercept that one boundary so Default restoration cannot be skipped when
-    -- the RGB session ends before the picker notices it.
-    local regular_restore=regular.restore
-    regular.restore=function(reason)
-        local ok=regular_restore(reason)
-        if ok and selection and not busy and not held then return restore_selection(reason) end
-        return ok
+    function self.record() return selection end
+    -- Apply retains the temporary stock selection for the creator visit, not
+    -- its hover preview; the zone releases this hold on exit/recovery.
+    function self.hold(value) self.held=value==true end
+    function self.forget()
+        -- Only after the zone proves the live source was replaced by a later
+        -- stock edit. Never re-equip Default over that user's new choice.
+        persist(nil); selection=nil; self.held=false
     end
-    function self.restore(reason)
-        local ok=base.restore(reason)
-        if ok and selection and not held then return restore_selection(reason) end
-        return ok and not blocked
-    end
-    -- Session Apply retains the temporary stock selection, not its hover preview.
-    -- The outer editor-session owner must release this hold on exit/recovery.
-    function self.hold_selection(value) held=value==true end
-    function self.forget_selection()
-        -- Only after the outer owner proves the live source was replaced by a
-        -- later stock edit. Never re-equip Default over that user's new choice.
-        persist(nil); selection=nil; held=false
-    end
-    function self.selected_slot_identity()
-        if runtime.perf then return runtime.perf.measure("context.selected_slot",function() return name(selected()) end) end
-        return name(selected())
-    end
-    function self.begin_live()
-        if self.pending or self.blocked then return nil end
-        busy=true
-        local session
-        local ok,err=pcall(function()
-            local vm=selected()
-            if held and selection then
-                assert(name(vm)==selection.slot_vm,"Applied Default selection context changed")
-                selection.page=page() -- item page may be recreated within the same creator
-                verify_bound(selection,vm)
-            end
-            if not is_default(equipped(vm)) then session=base.begin_live(); return end
-            local active_page=page()
-            local slot_tag=a.text(vm.SlotTag.TagName)
-            assert(name(vm):match(VM) and valid_tag(slot_tag),"Select a color slot")
-            assert(equipped(vm)~="None:None" or rules.empty_editable_slot(slot_tag),"Empty slot is not a supported color zone")
-            lifetime.bind(active_page)
-            assert(#a.values(vm:GetFragments())==0,"Default has unexpected fragments")
-            local original=part(vm.EquippedCustomizationPartViewModel,vm)
-            local chosen,grid,index=first_swatch(vm)
-            local s={slot_vm=name(vm),default_vm=name(original),temp_vm=name(chosen),temp_part=id(chosen.AssetId),
-                page=active_page,opening=true,tag=slot_tag}
-            persist(s); selection=s -- durable intent BEFORE any editor mutation
-            log("CALL | EquipCustomizationPart | temporary=" .. s.temp_part .. " | index=" .. index .. " | list=" .. grid)
-            vm:EquipCustomizationPart(chosen)
-            assert(name(selected())==s.slot_vm and page()==active_page and equipped(vm)==s.temp_part,
-                "Temporary selection did not settle on the same slot")
-            -- Reuse the already-proven fragment/owner/armor/target verification.
-            local context=regular.read_context()
-            assert(name(context.slot)==s.slot_vm and id(context.part.AssetId)==s.temp_part,"Temporary selection context changed")
-            s.owner=name(context.owner); s.source_slot=name(context.source_slot)
-            assert(s.owner:match(OWNER),"Unsupported temporary selection owner")
-            persist(s)
-            session=assert(base.begin_live(),"Regular RGB preview could not start")
-            session.perf_selection="Default"
-            s.opening=nil
-            log("LIVE START | temporarily equipped stock swatch; closing restores Default; no save")
-        end)
-        busy=false
-        if not ok then
-            log("OPEN FAILED | " .. tostring(err)); self.restore("picker opening failed")
-            if selection then selection.opening=nil end
-            return nil
+    function self.selected_slot_identity() return name(selected()) end
+    -- Opening step: when the selected slot shows Default, journal the intent,
+    -- equip the first previewable stock swatch and bind its owner. Returns
+    -- true when a temporary selection now needs the preview; the zone calls
+    -- opened() once the preview started, or restores on any failure.
+    function self.prepare()
+        local vm=selected()
+        if self.held and selection then
+            assert(name(vm)==selection.slot_vm,"Applied Default selection context changed")
+            selection.page=page() -- item page may be recreated within the same creator
+            verify_bound(selection,vm)
         end
-        return session
+        if not is_default(equipped(vm)) then return false end
+        local active_page=page()
+        local slot_tag=a.text(vm.SlotTag.TagName)
+        assert(name(vm):match(VM) and valid_tag(slot_tag),"Select a color slot")
+        assert(equipped(vm)~="None:None" or rules.empty_editable_slot(slot_tag),"Empty slot is not a supported color zone")
+        lifetime.bind(active_page)
+        assert(#a.values(vm:GetFragments())==0,"Default has unexpected fragments")
+        local original=part(vm.EquippedCustomizationPartViewModel,vm)
+        local chosen,grid,index=first_swatch(vm)
+        local s={slot_vm=name(vm),default_vm=name(original),temp_vm=name(chosen),temp_part=id(chosen.AssetId),
+            page=active_page,opening=true,tag=slot_tag}
+        persist(s); selection=s -- durable intent BEFORE any editor mutation
+        log("CALL | EquipCustomizationPart | temporary=" .. s.temp_part .. " | index=" .. index .. " | list=" .. grid)
+        vm:EquipCustomizationPart(chosen)
+        assert(name(selected())==s.slot_vm and page()==active_page and equipped(vm)==s.temp_part,
+            "Temporary selection did not settle on the same slot")
+        -- Reuse the already-proven fragment/owner/armor/target verification.
+        local context=preview.read_context()
+        assert(name(context.slot)==s.slot_vm and id(context.part.AssetId)==s.temp_part,"Temporary selection context changed")
+        s.owner=name(context.owner); s.source_slot=name(context.source_slot)
+        assert(s.owner:match(OWNER),"Unsupported temporary selection owner")
+        persist(s)
+        return true
+    end
+    function self.opened()
+        selection.opening=nil
+        log("LIVE START | temporarily equipped stock swatch; closing restores Default; no save")
+    end
+    function self.open_failed(err)
+        log("OPEN FAILED | " .. tostring(err))
+    end
+    function self.open_ended()
+        -- Only the synchronous opening attempt may undo an unbound equip.
+        if selection then selection.opening=nil end
     end
     function self.invalidate_context_lookup(reason)
         lookup_revision=lookup_revision+1 -- refuses lookups in flight
         -- Stored hints survive non-structural events: selected() revalidates
         -- page, auxiliary VM, slot VM identity and tag before every use.
         if rules.structural_context(reason) then lookup_route=nil end
-        if base.invalidate_context_lookup then base.invalidate_context_lookup(reason) end
     end
-    function self.context_changed(reason)
-        self.invalidate_context_lookup(reason)
-        if busy then return end -- ignore only our synchronous equip/reset events
-        base.context_changed(reason)
-    end
+    -- Reads the journal; the zone schedules the restore when one was found.
     function self.start()
         local f=io.open(path,"r")
         if f then
@@ -284,25 +263,10 @@ function M.wrap(runtime,a,path,regular,base)
                     selection={slot_vm=v[2],default_vm=v[3],temp_vm=v[4],temp_part=v[5],
                         owner=bound and v[6] or nil,source_slot=bound and v[7] or nil,tag=v[9]}
                 end)
-                if not ok then blocked=tostring(err); log("RECOVERY BLOCKED | " .. blocked) end
+                if not ok then self.blocked=tostring(err); log("RECOVERY BLOCKED | " .. self.blocked) end
             end
         end
-        base.start()
-        if selection then
-            runtime:after("selection:recovery",50,function()
-                if selection then self.restore("reload recovery") end
-            end)
-        end
-    end
-    function self.inspect(...)
-        if selection or blocked then log("Finish Default selection recovery first"); return false end
-        return base.inspect(...)
-    end
-    -- Inclusive per-layer opening time for the performance log; no behavior change.
-    local timed_begin_live=self.begin_live
-    function self.begin_live(...)
-        if runtime.perf then return runtime.perf.measure("begin.default_selection",timed_begin_live,...) end
-        return timed_begin_live(...)
+        return selection~=nil
     end
     return self
 end

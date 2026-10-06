@@ -2,7 +2,7 @@
 -- luajit tests/editor_session_test.lua src/Colors+Probe/Scripts
 local scripts=assert(arg[1])
 local editor=assert(loadfile(scripts .. "/editor_session.lua"))()
-local defaults=assert(loadfile(scripts .. "/default_selection.lua"))()
+local zones=assert(loadfile(scripts .. "/color_zone.lua"))()
 local old_open=io.open
 local old_rename,old_remove=os.rename,os.remove
 local files,objects,jobs,logs={},{},{},{}
@@ -126,6 +126,9 @@ runtime.objects=assert(loadfile(scripts .. "/object_cache.lua"))().new(function(
 function runtime:after(k,ms,cb) jobs[k]={ms=ms,cb=cb} end
 function runtime:cancel(k) jobs[k]=nil end
 local function run(k) local job=assert(jobs[k],k); jobs[k]=nil; job.cb() end
+local JOURNALS={["tint_recovery.txt"]="tint",["default_selection_recovery.txt"]="selection",
+    ["editor_recovery.txt"]="editor",["zabrak_picker_recovery.txt"]="zabrak"}
+local function journal(leaf) return assert(JOURNALS[leaf],leaf) end
 local base,selection,session
 local function boot()
     local b={}
@@ -136,11 +139,14 @@ local function boot()
             fragment=fragment,page=page.name,materials=table.concat(fragment.MaterialTarget.MaterialSlotNames,","),original=copy(source_rgb),
             profile=targets.read(fragment,ACCENT,owner)}
     end
-    function b.restore()
+    function b.restore(reason)
         if fail_preview_restore then return false end
         if b.pending then b.pending.live=nil end
-        b.pending=nil; files.tint=""; runtime:cancel("tint:timeout"); return true
+        b.pending=nil; files.tint=""; runtime:cancel("tint:timeout")
+        if b.after_restore then return b.after_restore(reason) end -- as the real engine does
+        return true
     end
+    function b.invalidate_context_lookup() end
     function b.begin_live()
         local c=b.read_context(); assert(not b.pending)
         b.pending={live=true,test_color=copy(orange),original=c.original,profile=c.profile}; files.tint="preview"
@@ -148,6 +154,12 @@ local function boot()
     end
     function b.check_live(s) return s==b.pending and s and s.live,"inactive preview" end
     function b.update_live(s,c) assert(b.check_live(s)); s.test_color=copy(c); return true end
+    -- As the engine: the consumer runs after a successful update; receipt only if it returns true.
+    function b.update_live_scoped(s,c,consumer)
+        if not b.update_live(s,c) then return false end
+        local completed,result=pcall(consumer,function() return b.read_context() end)
+        return completed and result==true
+    end
     function b.verify_editor_display() assert(not b.pending,"Return display to source first"); assert(not fail_display,"Display color mismatch"); return true end
     function b.context_changed(reason)
         if b.pending then runtime:after("tint:context",1,function() b.restore(reason) end) end
@@ -157,7 +169,7 @@ local function boot()
             b.pending={live=false}; runtime:after("tint:recovery",1,function() b.restore("recovery") end)
         end
     end
-    local d=defaults.wrap(runtime,a,"selection",b,b)
+    local d=zones.new(runtime,a,journal,{preview=b})
     local s=editor.wrap(runtime,a,"editor",d)
     base,selection,session=b,d,s; return s
 end

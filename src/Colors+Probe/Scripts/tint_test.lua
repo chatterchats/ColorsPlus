@@ -507,6 +507,9 @@ function M.new(runtime, access, recovery_path)
         self.busy = false
         if not ok then log("RESTORE FAILED | " .. tostring(err) .. " | Do not save; leave/reopen customization or restart the game") end
         trace("event", "after restore: " .. (reason or "panel"))
+        -- Every successful preview end, including timeout, context and failure
+        -- rollbacks started here, gives the zone its cleanup turn (Default).
+        if ok and self.after_restore then return self.after_restore(reason) end
         return ok
     end
     function self.read_context()

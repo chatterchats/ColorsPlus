@@ -1,6 +1,6 @@
 -- luajit tests/default_selection_test.lua src/Colors+Probe/Scripts
 local scripts=assert(arg[1])
-local module=assert(loadfile(scripts .. "/default_selection.lua"))()
+local zones=assert(loadfile(scripts .. "/color_zone.lua"))()
 local original_open=io.open
 local files,objects,messages,jobs={},{},{},{}
 local fail_write,fail_equip,fail_restore,fail_preview,fail_context,fail_clear
@@ -91,6 +91,9 @@ function runtime:after(key,delay,cb) jobs[key]={delay=delay,cb=cb} end
 function runtime:cancel(key) jobs[key]=nil end
 local function run(k) local j=assert(jobs[k],k); jobs[k]=nil; j.cb() end
 local function has(s) for _,v in ipairs(messages) do if v:find(s,1,true) then return true end end end
+local JOURNALS={["tint_recovery.txt"]="tint",["default_selection_recovery.txt"]="selection",
+    ["editor_recovery.txt"]="editor",["zabrak_picker_recovery.txt"]="zabrak"}
+local function journal(leaf) return assert(JOURNALS[leaf],leaf) end
 local base,wrapped
 local function boot()
     local b={}
@@ -99,11 +102,14 @@ local function boot()
         assert(current()~=default)
         return {slot=slot,part=current(),owner=owner,source_slot=source}
     end
-    function b.restore()
+    function b.restore(reason)
         if fail_restore then return false end
         if b.pending then b.pending.live=false end
-        b.pending=nil; files.tint=""; return true
+        b.pending=nil; files.tint=""
+        if b.after_restore then return b.after_restore(reason) end -- as the real engine does
+        return true
     end
+    function b.invalidate_context_lookup() end
     function b.begin_live()
         assert(current()~=default,"Must equip a stock swatch before using regular preview")
         b.pending={live=true,test_color={R=1,G=.2,B=.1,A=1}}
@@ -123,7 +129,7 @@ local function boot()
         end
     end
     function b.inspect() return "regular" end
-    local w=module.wrap(runtime,a,"selection",b,b)
+    local w=zones.new(runtime,a,journal,{preview=b})
     base,wrapped=b,w; return w
 end
 function slot:EquipCustomizationPart(p)

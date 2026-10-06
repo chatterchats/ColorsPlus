@@ -168,6 +168,10 @@ getmetatable(FName).__metatable = false
 local fname_constructor = FName
 local probe = assert(loadfile(scripts .. "/customization_probe.lua"))().new(runtime)
 local module = assert(loadfile(scripts .. "/tint_test.lua"))()
+local zone_module = assert(loadfile(scripts .. "/color_zone.lua"))()
+local JOURNALS = {["tint_recovery.txt"]="recovery", ["default_selection_recovery.txt"]="selection",
+    ["editor_recovery.txt"]="editor", ["zabrak_picker_recovery.txt"]="zabrak"}
+local function journal(leaf) return assert(JOURNALS[leaf], leaf) end
 local tint = module.new(runtime, probe.access, "recovery")
 
 -- Display handoff: stock preview proxy container, data proxy and display.
@@ -340,7 +344,7 @@ do
         blue_vm.AssetId=asset(case[4]); clone8=false; proxy_mesh=false -- not Clone 8
         messages={}; local g=module.new(runtime,probe.access,"recovery")
         duplicate=true -- attached live palette beats unparented stale palette
-        local s=assert(assert(loadfile(scripts .. "/default_selection.lua"))().wrap(runtime,probe.access,"selection",g,g).begin_live(),table.concat(messages,"\n"))
+        local s=assert(zone_module.new(runtime,probe.access,journal,{preview=g}).begin_live(),table.concat(messages,"\n"))
         assert(files["rgb.txt"]==nil and s.test_color.R==original.R and s.test_color.G==original.G and s.test_color.B==original.B,
             "Armor, horn and appearance pickers must start from the selected color without a developer input file")
         if case[2]~="Color 04" then assert(has("COLOR SLOT | RESOLVED DISPLAYED")) end
@@ -466,7 +470,6 @@ aux.CurrentCustomizationSlotVM=slot; aux.RootCustomizationSlotVM=nil
 -- v0.2.18 integration: temporary editor selection -> REAL regular tint engine
 -- -> blue handoff -> RGB -> regular restore -> Default. No auxiliary roots.
 do
-    local selection_module=assert(loadfile(scripts .. "/default_selection.lua"))()
     local saved={slot_fragments=slot.GetFragments,source_fragments=source_slot.GetFragmentInstances,
         source_name=source_slot.GetFullName,display_fragments=display_slot.GetFragmentInstances,
         find=FindAllOf,asset=part.AssetId,equipped=slot.EquippedCustomizationPartViewModel}
@@ -492,7 +495,7 @@ do
     local regular,adapted
     local function boot()
         regular=module.new(runtime,probe.access,"recovery")
-        adapted=selection_module.wrap(runtime,probe.access,"selection",regular,regular)
+        adapted=zone_module.new(runtime,probe.access,journal,{preview=regular})
     end
     slot.EquipCustomizationPart=function(_,vm)
         assert(files.selection:match("^selection%-v2\n"))
