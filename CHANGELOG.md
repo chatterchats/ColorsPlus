@@ -51,6 +51,16 @@ the player-only package.
 - The widget library lookup uses a plain validity check: `a.live` rejects
   class default objects by design (caught by the launcher test).
 
+### Docs cleanup
+
+- `docs/` keeps only current material: `architecture.md` (how a color edit
+  works; formerly `flatten-plan.md`), `status-history.md`,
+  `practical-ue4ss-ui-modding-notes.md`, `implementation-strategy-review.md`
+  and `skin-persistence-findings.md`. 40 superseded per-version test
+  procedures, experiment logs and the review's evidence index were removed;
+  older entries below still name them, and they remain in git history at
+  commit 39c0233.
+
 ### Flattening, steps 3-5: one zone instead of four wrapper layers — v0.3.0
 
 - New `color_zone.lua` owns each zone and sequences its steps explicitly:
@@ -66,7 +76,7 @@ the player-only package.
   skins with material swaps at opening, and its drafts are dispatched to it.
 - No change to journals, formats or recovery order. One journal per zone was
   planned and not done: the Apply journal's atomic replacement would either
-  be lost or added to every drag tick (see `docs/flatten-plan.md`).
+  be lost or added to every drag tick (see `docs/architecture.md`).
 - Tests run the production zone. Cases that combined layers in ways players
   never run (Default without the Apply layer; a Zabrak swap skin on the
   regular backend) were changed to the production behaviour or removed where
@@ -75,7 +85,7 @@ the player-only package.
 ### Flattening, steps 1-2: one code path — v0.3.0
 
 What players run is now the only path in the code and the tests (plan:
-`docs/flatten-plan.md`). About 1,000 production and 1,100 test lines removed.
+`docs/architecture.md`). About 1,000 production and 1,100 test lines removed.
 
 - Removed `default_tint`/`default_owner`, an unreachable Clone 8 "Default"
   backend (`default_selection` always handled Default first).

@@ -18,7 +18,7 @@ The strongest counterargument is that continuous mouse interaction is a poor fit
 
 ### Examined state and identities
 
-The companion [evidence manifest](implementation-strategy-review-evidence.json) records file hashes, selected timing rows, package checks, test-output hashes, and SDK audit checks. The source fingerprint covers 108 code/asset/tool/test files; documentation hashes are separate.
+The companion evidence manifest (`implementation-strategy-review-evidence.json`, removed in the v0.3.0 docs cleanup; in git history at commit 39c0233) records file hashes, selected timing rows, package checks, test-output hashes, and SDK audit checks. The source fingerprint covers 108 code/asset/tool/test files; documentation hashes are separate.
 
 | Item | Verified baseline and limitation |
 | --- | --- |

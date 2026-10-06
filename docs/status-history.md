@@ -1,7 +1,9 @@
 # Colors+Probe status history
 
 The README's former running status notes, kept verbatim for reference
-(v0.2.x development). Current changes are recorded in `CHANGELOG.md`.
+(v0.2.x development). Current changes are recorded in `CHANGELOG.md`. The
+per-version test and research notes these entries cite were removed from
+`docs/` in the v0.3.0 cleanup; they remain in git history (commit 39c0233).
 
 
 **Current build: Colors+Probe v0.2.119 (swatches ignore the mouse while the picker launches).**
@@ -225,7 +227,7 @@ events invalidate reuse even during writes. Cancel/Restore, reopening and failed
 consumers retire the route. Opening, idle/display checks and recovery retain
 full discovery. Native HSV values remain unconverted, and Zabrak's existing
 source-backed path is unchanged. This does not expand slot compatibility or
-change save behavior. See the [all-slot retest](docs/picker-drag-performance-testing.md).
+change save behavior. See the all-slot retest.
 
 The picker title uses the game's `WBP_Customization_SlotSubItemName` heading
 widget, including its branch marker, font and spacing. The hex input and color
@@ -255,7 +257,7 @@ recovery record handles interrupted visibility changes and same-process Lua
 cleanup, without replaying native object names after a game restart. All 42
 regression programs pass, including indefinite live drafts and the remaining
 Cancel/context/recovery paths. Check the layout and leave a draft open for
-more than two minutes in the [picker retest](docs/rainbow-switch-testing.md).
+more than two minutes in the picker retest.
 
 **Vitiligo Tint** and **Scar Look** now get the normal **Custom Color** button,
 including from None; the Dev Panel action also works. The 10-01 scar palettes
@@ -265,7 +267,7 @@ above 1: clone, Cancel, Restore and recovery retain those values exactly, while
 picker inputs keep their normal RGB range. Earlier two-fragment RGB scars and
 native HSV Looks remain supported. Choose a visible pattern before testing.
 All 41 regression programs pass; native rendering needs the
-[vitiligo/scar retest](docs/appearance-palette-testing.md).
+vitiligo/scar retest.
 
 The 10-01 Character Suite eye shader exposes RGB iris colors through the normal
 Custom Color picker: **Iris Colour** for matching eyes, **Left Iris Colour**,
@@ -276,7 +278,7 @@ existing reversible stock-swatch fallback, with the launcher available while
 empty. This support requires Character Suite's rebuilt eye shader and captured
 color/amount pairs; native material-swap eye presets keep their existing behavior.
 All 41 regression programs pass; native eye rendering needs the
-[iris retest](docs/appearance-palette-testing.md).
+iris retest.
 
 v0.2.87 optimized armor and Zabrak preview updates.
 
@@ -288,7 +290,7 @@ discards the route on every context event, including events during source writes
 No UObject is cached. Save, recovery journals, source/mesh guards and native
 refresh ordering are unchanged. Other appearance controls retain their cadence.
 All 41 regression programs pass; native performance still needs the
-[armor/Zabrak retest](docs/picker-drag-performance-testing.md).
+armor/Zabrak retest.
 
 Stage profiling identified repeated discovery/validation as the dominant skin
 update cost, not refresh or recovery-file writes. v0.2.86 verifies the known
@@ -309,7 +311,7 @@ selected Look stays equipped, and opening starts at its exact current values.
 Cancel/Restore recover the original adjustments. RGB scar tints retain the
 color wheel and unchanged `MM Scar Tint Strength`; None uses the existing
 reversible RGB stock-swatch fallback. Select a visible vitiligo/scar pattern
-first to judge the result. See the [Dev Panel controls](docs/dev-panel-controls.md).
+first to judge the result. See the Dev Panel controls.
 The regression suite covers HSV preview, Apply, Cancel, timeout and recovery;
 native HSV rendering remains pending verification.
 
@@ -322,7 +324,7 @@ even when the preview donor uses another mode. Native None palette entries use
 the existing reversible stock-swatch fallback. Scars' HSV behavior is a game
 convention; v0.2.85 edits those native adjustments directly.
 All 40 regression programs pass; in-game rendering is pending verification.
-See the [Character Suite retest](docs/appearance-palette-testing.md).
+See the Character Suite retest.
 
 The v0.2.81 native test confirmed smoother Zabrak dragging, but Human remained
 choppy. Apply, radial round trip, Cancel and Restore passed for both. v0.2.82
@@ -333,7 +335,7 @@ checks remain fresh. Native context notifications force full rediscovery. No
 native wrappers or bindings are cached across updates. Non-skin zones and the
 separate source-backed Zabrak path are unchanged. The face tint-enabling helper
 still performs its own discovery. All 40 regression programs pass; native speedup
-is not yet verified. See the [skin performance retest](docs/picker-drag-performance-testing.md).
+is not yet verified. See the skin performance retest.
 
 The user verified improved opening/closing, radial retention and Restore in
 v0.2.80. v0.2.81 opts SkinTone sessions (including Zabrak) into an immediate
@@ -346,7 +348,7 @@ intact. v0.2.93 removes the two-minute draft deadline. Other slots keep their
 existing cadence.
 All 40 regression programs pass; Human backend cost remains a tuning target.
 This is not a 10 FPS guarantee: update work and game-thread delays add to cooldown.
-See [skin preview retest](docs/picker-drag-performance-testing.md).
+See skin preview retest.
 
 The user verified much more responsive SV clicks and opening/closing in v0.2.79,
 plus Apply/radial/Restore. Character updates still happen in chunks. Native logs
@@ -372,7 +374,7 @@ yet measured. Short presses entirely between polls can still be missed. Separate
 `colors_click start|stop` observes existing CommonUI/game button handlers while
 stock swatches are shown, to test a future event-latching route without changing
 input, widgets or tint state. See the current
-[performance and click-event test steps](docs/picker-drag-performance-testing.md).
+performance and click-event test steps.
 
 The user verified the v0.2.77 drag probe: desktop coordinates move while viewport
 coordinates freeze under capture; dragging, rapid clicks and focus return worked.
@@ -386,7 +388,7 @@ Use `colors_perf start` before opening Custom Color, then `colors_perf stop`
 after testing. Bounded five-second summaries separate construction, input, UI,
 tint/backend and scheduled work; captures expire after 120 seconds. The clock is
 platform-dependent `os.clock`, not a GPU/frame-time measurement. See
-[integrated SV and performance tests](docs/picker-drag-performance-testing.md).
+integrated SV and performance tests.
 
 v0.2.76 opened and rapid clicking worked, but held movement usually froze.
 The native log counted 65 fallback presses and zero event presses; the quick
@@ -409,7 +411,7 @@ selector. It uses one native capture button, a scoped press-event hook and
 change character colors or replace the existing picker. `colors_sv stop`,
 Close, leaving the color page or 90 seconds ends it. Native event delivery
 remains unverified; see
-[SV input probe testing](docs/sv-input-probe-testing.md).
+SV input probe testing.
 
 The user verified v0.2.73 SV rendering/hue changes, smooth hue strip, readable
 hex text and Back/Cancel restoration. Opening improved but still hitches.
@@ -420,7 +422,7 @@ The Zabrak source path's separate per-call logging now also requires an active
 source writes are unchanged. Native launcher appearance and further lag
 improvement still need testing.
 
-Next native test: [rainbow launcher and pane switching](docs/rainbow-switch-testing.md).
+Next native test: rainbow launcher and pane switching.
 The color-wheel redesign appends a rainbow **Custom Color** launcher
 to the active native color selector. Its own fill-sized, bottom-aligned footer
 uses available selector space without modifying stock list sizing. It opens
@@ -463,7 +465,7 @@ borrowing another screen's container. The existing console/DP open routes use
 the same lower-pane path. No native list rebuilding, swatch replacement,
 visibility/focus writes, new save calls or changes to the Dev Panel app.
 
-Previous build: [Zabrak CP lifecycle and persistence](docs/zabrak-picker-testing.md).
+Previous build: Zabrak CP lifecycle and persistence.
 The user verified v0.2.66 renders orange on hands, face and horn-base skin;
 manual Stop and 60-second timeout restore, radial navigation retains orange,
 and native swatch hover returns to orange when the mouse leaves.
@@ -514,7 +516,7 @@ native restoration of a rebuilt array still require the next in-game test.
 Fully restart without saving to retire v0.2.65's held inspection before testing.
 The normal picker's v0.2.61 workaround remains unchanged.
 
-Previous rendering test: [Zabrak face RGB handoff](docs/zabrak-skin-testing.md).
+Previous rendering test: Zabrak face RGB handoff.
 v0.2.60 opened CP and enabled the uniquely visible face MID, but the native
 trace showed Violet RGB on the bare arm while face and horn-base skin retained
 stock RGB. Face Enable Tinting reached 1; Cancel restored it to 0. The bundle's
@@ -558,7 +560,7 @@ without a visible change, which led to the enable/target probes above.
 The material trace reads `Skin Coloration` and `Enable Tinting`
 on assigned MI_Head/MI_Body/MI_Neck materials and their bounded parent overrides.
 Use `colors_materials start/sample/stop` without DP; zero/default getter values
-alone do not prove a parameter exists. See [the comparison test](docs/skin-material-dispatch-testing.md).
+alone do not prove a parameter exists. See the comparison test.
 
 DP dispatch failure is not yet reproduced locally. `colors_panel status` reports
 poll/delivery counters without consuming clicks. Client/bridge stage logs expose
@@ -571,7 +573,7 @@ and preserved through cloning, preview, Apply and Restore. Color targets still
 require all five meshes and the same three material names. Unexpected layout
 changes are refused; clothing-change guards are unchanged.
 Parent-layout recovery uses proxy-v10/editor-v5; existing five-mesh records remain
-proxy-v9/editor-v4. See [the Skin Tone 5 test](docs/human-skin-testing.md).
+proxy-v9/editor-v4. See the Skin Tone 5 test.
 
 Human Skin Tone now accepts the observed three-fragment bundle, preserving the
 race tag and `Enable Tinting=1` while changing only its color. Source, preview
@@ -592,7 +594,7 @@ first (the game-thread timer can run late under load). Existing snapshot payload
 still deduplicate. Normal button/DP/console openings keep lightweight stage logs
 but no longer start this heavy trace. Logging may cause hitches; this is diagnostic,
 not a crash fix.
-See [the focused crash-capture test](docs/picker-crash-tracing.md).
+See the focused crash-capture test.
 
 Tattoo and Twi'lek marking colors passed the user's visual tests. A subsequent
 UE4SS native crash during an active Twi'lek picker remains unproven at the
@@ -601,7 +603,7 @@ all picker read/write entry points, re-entrant session guards and fresh preview/
 source verification between native setters and refreshes. Repeated palette
 success logs are deduplicated; the first eight RGB updates have bounded stage
 markers. This is hardening, **not a confirmed crash fix**. See
-[the lifetime/guide review and focused retest](docs/lifetime-guide-review-2026-09-17.md).
+the lifetime/guide review and focused retest.
 
 The user confirmed all v0.2.36 hair-root/lipstick regression checks passed.
 This build enables the observed Tattoo Color fragment targeting face and horns.
@@ -613,7 +615,7 @@ Tattoo rendering passed v0.2.37 live verification from an existing swatch.
 Non-human skin and mixed-fragment horn colors remain **read-only** at this
 checkpoint. `colors_compat` records companion tags/scalars and reports a human
 skin candidate only after bundle, mesh and same-family donor checks. See
-[the earlier tattoo/skin evidence](docs/skin-tattoo-testing.md).
+the earlier tattoo/skin evidence.
 
 After a panel reinstall, the local Colors+ helper can recreate a missing
 `registry.txt` after confirming the panel's `Scripts/main.lua` exists. It appends
@@ -624,7 +626,7 @@ F6 now groups picker Open/Apply/Cancel/Restore separately from read-only
 diagnostics. Compatibility capture and screen-trace Start/Stop are available
 there alongside target inspection, material tracing and stock-hover tracing.
 Obsolete cyan/handoff/RGB-cycle experiments are no longer menu options.
-See [current Dev Panel controls and checks](docs/dev-panel-controls.md).
+See current Dev Panel controls and checks.
 
 Character Suite iris color slots use the main picker in v0.2.88. Other eye
 material-swap experiments remain available as development
@@ -634,7 +636,7 @@ and **Rodian Star Blue** only. It does not provide arbitrary RGB or replace any
 textures: the original iris pattern, masks and shader switches are untouched.
 Four 5-second stages test saturation=0, baseline, brightness=25% of baseline,
 baseline; a 20-second timeout ends the test. Use `colors_eyes stop` to restore
-early. See [the current focused test](docs/eyebrow-eye-testing.md).
+early. See the current focused test.
 `colors_compat` now captures recorded runtime static switch names, values and
 override flags, separately bounded from the existing vector/scalar/texture
 survey. Missing data is logged as a gap, not false. **Fully restart;
@@ -649,7 +651,7 @@ Default fallback remains outfit-only.
 Eyes now have a separate **display-only**, reversible `colors_eyes [start|texture|stop]`
 experiment, not picker Apply/save support.
 Only one applied zone is supported at a time: use `colors_picker restore`
-between zones. See [the current focused test](docs/eyebrow-eye-testing.md).
+between zones. See the current focused test.
 `colors_compat` remains read-only and now inspects nested slots (including their
 UI visibility). v0.2.27's outfit Apply/Restore tests and Eye Shadow Apply worked,
 but appearance reopening found duplicate global palettes. v0.2.28 follows the
@@ -693,7 +695,7 @@ The user confirmed Apply, radial navigation, Cancel and exit restoration from a
 clean Saturated Red 1 baseline. A separately saved custom color also survived a
 full game restart with no mod reapplication. These results cover the tested
 accent, not other slots. **Do not save during the compatibility survey.** See
-[the session-Apply test](docs/editor-session-testing.md).
+the session-Apply test.
 
 Colors+ remains a scaffold. A separate development mod, **Colors+Probe**, now
 successfully reads customization tint fragments. v0.2.8 traced cyan to the hidden
@@ -729,9 +731,9 @@ This does not establish that the native reload hang is fixed. Start with the
 closed-window reload procedure in `docs/reload-hang-testing.md`.
 There is no saved-swatch library or mod-driven save operation; native character
 saving retained the tested custom accent. See
-[the live-picker test](docs/live-picker-testing.md),
-[the next Dev Panel test](docs/dev-panel-tint-test.md) and
-[the read-probe results](docs/probe-results-2026-09-15.md).
+the live-picker test,
+the next Dev Panel test and
+the read-probe results.
 
 v0.2.20 adds a standalone in-game console entry point: `colors_picker`
 (or `colors_picker open`), and `colors_picker close` to cancel the current edit.
@@ -746,6 +748,6 @@ Close the game console after entering the command to use the picker. Both-open
 CP/DP reload crashed during live testing; close both windows before Reload All
 Mods. The console entry point does not fix that native reload issue.
 
-See [the research notes](docs/research.md) for the current reference findings
+See the research notes for the current reference findings
 and implementation boundaries.
 

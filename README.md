@@ -21,9 +21,10 @@ game's eye choices are not supported.
   summaries, environment line, lookup timings). Detailed events go to
   `colors_plus_probe.log`.
 
-Recent work is in [CHANGELOG.md](CHANGELOG.md). Earlier status notes are in
-[docs/status-history.md](docs/status-history.md); research and per-version
-testing notes are in [docs/](docs/).
+Recent work is in [CHANGELOG.md](CHANGELOG.md). How a color edit works is in
+[docs/architecture.md](docs/architecture.md); earlier status notes are in
+[docs/status-history.md](docs/status-history.md). General UE4SS UI lessons
+are in [docs/practical-ue4ss-ui-modding-notes.md](docs/practical-ue4ss-ui-modding-notes.md).
 
 `src/Colors+` is the original bootstrap placeholder for the eventual release
 mod.
