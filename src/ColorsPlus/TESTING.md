@@ -1,10 +1,24 @@
-# Welcome to Colors+ — tester build v0.4.0
+# Welcome to Colors+ — tester build v0.4.1
 
 Colors+ lets you choose your own colors when customizing a character, instead
 of being limited to the game's existing choices. Thanks for trying it out!
 This is an early test version, so please back up your saves first.
 
 ## What's new in this update
+
+**v0.4.1: fewer hitches.** Colors+ was searching through every object in the
+game far more often than it needed to, which some computers feel as a
+stutter. This update cuts that by about five times:
+
+- **Smoother browsing between color slots,** even before you open the
+  picker.
+- **Quicker opening and applying** in the picker.
+- **No more stutter from hovering swatches in the base editor.**
+
+Nothing should look or behave differently otherwise. If you sent us a
+performance log for 0.4.0, we'd love one from this build to compare.
+
+**From v0.4.0:**
 
 - **Custom colors in the in-game character editor.** The Custom Color button
   now also appears in the character customization you reach in the base

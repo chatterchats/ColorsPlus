@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tester release: fewer object scans — v0.4.1
+
+- The hub hook-retry fix and the known-instances lookups below. Local lookup
+  traces (main menu + hub): 4.4 s over 4 picker sessions -> 1.1 s over 5
+  (~1.1 s -> ~0.2 s per session); `FindAllOf` scans 115 -> 11. No behaviour
+  change intended. The Dev build adds `colors_lookups`.
+
 ### Fewer object scans: known instances instead of FindAllOf
 
 - Dev tools: `colors_lookups [start|stop|summary|reset]` traces every
