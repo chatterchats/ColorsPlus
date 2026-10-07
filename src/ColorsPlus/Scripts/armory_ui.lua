@@ -190,7 +190,15 @@ function M.new(runtime,a)
         runtime:after("armory-ui:poll",delay or 500,function()
             if generation~=epoch or self.binding~=b then return end
             local ok,err=pcall(validate,b)
-            if ok then poll(b,generation); return end
+            if ok then
+                -- The button finishes building after it is placed and resets
+                -- its label to the designer text: set it again a few times.
+                if self.caption_checks and self.caption_checks>0 and self.button_name then
+                    self.caption_checks=self.caption_checks-1
+                    pcall(function() fresh(self.button_name,"Custom Color button"):UpdateText(FText("CUSTOM COLOR")) end)
+                end
+                poll(b,generation); return
+            end
             log("RETIRED | " .. tostring(err))
             if self.picker_owner and runtime.picker.active then runtime.picker.close("armory row changed") end
             local removed,why=pcall(retire)
@@ -226,6 +234,7 @@ function M.new(runtime,a)
         local slot=fresh(b.stack,"row column"):AddChild(root)
         slot:SetPadding({Left=0,Top=6,Right=0,Bottom=2})
         fresh(self.button_name,"Custom Color button"):UpdateText(FText("CUSTOM COLOR"))
+        self.caption_checks=4
         local generation=epoch
         button_clicks.get(runtime).bind(self.button_name,self.root_name,"launch",function()
             if runtime.picker.active then return end
@@ -271,7 +280,10 @@ function M.new(runtime,a)
         self.picker_owner=root_name
         log("PALETTE HIDDEN | " .. #hidden .. " widgets")
     end
-    function self.release_picker()
+    -- picker_view also calls release_picker(nil) during its pre-open cleanup:
+    -- only a real release of an armory picker hands control back.
+    function self.release_picker(b)
+        if b==nil and not self.picker_owner then return end
         for _,h in ipairs(hidden) do
             local ok,w=pcall(fresh,h.widget,"row widget")
             if ok then w:SetVisibility(h.original) end

@@ -109,6 +109,10 @@ assert(ui.binding and ui.binding.row==paint_row.full and ui.binding.entry==paint
 assert(ui.binding.overlay==paint_overlay.full and ui.binding.stack==paint_column.full)
 assert(ui.root_name and objects[ui.root_name:match("^[^ ]+ (.+)$")].parent==paint_column,"Launcher sits in the row's column")
 assert(has("FOUND | row=") and has("ATTACHED | row="))
+-- The label is set again by the first polls (the button resets it after building).
+local launch_button=objects[ui.button_name:match("^[^ ]+ (.+)$")]
+launch_button.caption="%TEXT"; run("armory-ui:poll")
+assert(launch_button.caption=="CUSTOM COLOR","Caption reapplied")
 assert(ui.bound_row()==paint_row.full)
 -- A click launches the picker on the armory backend and host.
 local click=assert(hooks["/Script/CommonUI.CommonButtonBase:HandleButtonClicked"])
@@ -116,6 +120,9 @@ local button=objects[ui.button_name:match("^[^ ]+ (.+)$")]
 click({get=function() return button end})
 run("armory-ui:launch"); run("armory-ui:open")
 assert(opened==1 and runtime.color_host==ui and runtime.color_backend==runtime.armory_paint)
+-- picker_view's pre-open cleanup calls release_picker(nil): the launch keeps its host.
+ui.release_picker(nil)
+assert(runtime.color_host==ui and runtime.color_backend==runtime.armory_paint,"Cleanup release keeps the armory launch")
 -- Host calls: prepare, hide (grid and launcher collapsed), release restores.
 local b=ui.prepare_picker()
 assert(b==ui.binding and ui.validate_picker(b))
