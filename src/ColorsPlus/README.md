@@ -55,16 +55,6 @@ Only one copy of Colors+ can be installed at a time. If you tried an early
 test version, delete its old **Colors_Probe** folder.
 
 
-## Where you'll find it
-
-**Character creator (main menu) and the barracks:** clothing and armor,
-hair, skin (including species skin tones, such as Zabrak), makeup, tattoos,
-horns and scars. Eye colors aren't supported (but eye-color options added by
-another mod may be).
-
-**Armory → Customize Weapon:** the Paint Color of your blasters.
-
-
 ## How to use it
 
 Click **CUSTOM COLOR** under a color choice. Drag in the color box and along
@@ -99,7 +89,7 @@ weapons, and your saves load fine without the mod.
   mostly compatible. Custom colors don't work for its Blaster Bolt or
   Lightsaber colors.
 - [Coppershore's Ship Paint and Hangar Lift](https://www.nexusmods.com/starwarszerocompany/mods/134):
-  not tested yet.
+  TODO: Waiting on their next big upgrade they're working on. 
 
 
 ## Known issues
