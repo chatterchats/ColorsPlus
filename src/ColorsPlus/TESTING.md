@@ -1,22 +1,35 @@
-# Welcome to Colors+ — tester build v0.4.1
+# Welcome to Colors+ — tester build v0.5.0
 
-Colors+ lets you choose your own colors when customizing a character, instead
-of being limited to the game's existing choices. Thanks for trying it out!
-This is an early test version, so please back up your saves first.
+Colors+ lets you choose your own colors when customizing a character or a
+weapon, instead of being limited to the game's existing choices. Thanks for
+trying it out! This is an early test version, so please back up your saves
+first.
 
 ## What's new in this update
 
-**v0.4.1: fewer hitches.** Colors+ was searching through every object in the
-game far more often than it needed to, which some computers feel as a
-stutter. This update cuts that by about five times:
+**v0.5.0: custom weapon paint.** In the base's armory, open **Customize
+Weapon** and go to the **COLOR** section. The **Paint Color** row now has a
+**Custom Color** button under its swatches.
 
-- **Smoother browsing between color slots,** even before you open the
-  picker.
-- **Quicker opening and applying** in the picker.
-- **No more stutter from hovering swatches in the base editor.**
+- **Preview first, then apply.** While the picker is open, only the weapon
+  preview changes. **Apply Color** paints your weapon (the game saves it
+  right away, like picking a swatch). **Cancel** leaves it as it was.
+- **Try patterns and finishes with your color.** You can change **Location**
+  and **Paint Finish** while the picker is open; the preview keeps your
+  custom color on each one.
+- **To go back to a stock color,** just pick a swatch as usual.
+- **Blasters only.** Lightsabers don't get the button. With the ZCUnlocked
+  mod, its **Bolt Color** and blade rows don't get it either: those colors
+  live in ZCUnlocked's own settings, so a custom color there would have no
+  effect. We've asked its author about supporting them.
 
-Nothing should look or behave differently otherwise. If you sent us a
-performance log for 0.4.0, we'd love one from this build to compare.
+Please try a few different weapons and characters, then save, go back to the
+main menu and load your game. Tell us if a weapon's color ever changes back,
+or shows on the wrong weapon.
+
+**From v0.4.1:** Colors+ searches through the game's objects about five
+times less often, so browsing color slots, opening and applying the picker,
+and hovering swatches in the base editor should all stutter less.
 
 **From v0.4.0:**
 
@@ -70,11 +83,13 @@ Customize a character as you normally would. When choosing a color, click
 - Try different clothing, hair, skin, and other available colors. Feel free
   to switch between custom colors and the game's existing choices.
 - In the main-menu creator, save your character normally to keep your
-  changes. In the base editor, leaving the editor keeps them. We'd love to
+  changes. In the base editor, leaving the editor keeps them. In the armory,
+  Apply Color saves the weapon's paint straight away. We'd love to
   hear whether they still look right the next time you play.
 
 There's no timed checklist to follow: use it at your own pace. The button
-belongs on color choices, not the lists where you choose a helmet or outfit.
+belongs on color choices, not the lists where you choose a helmet or outfit;
+in the armory it appears only on a blaster's Paint Color row.
 The base game's eye choices aren't supported; extra eye-color controls added
 by another mod may be available.
 
@@ -82,8 +97,8 @@ by another mod may be available.
 
 Did anything feel slow, confusing, or fail to work? Did a color disappear or
 change unexpectedly? Tell us what you were customizing and what happened.
-Mention your character's race and any other character-customization mods you
-use. Screenshots or a short video are welcome. If everything worked, that's
+Mention your character's race (or the weapon) and any other customization
+mods you use, such as ZCUnlocked. Screenshots or a short video are welcome. If everything worked, that's
 useful feedback too!
 
 Performance logging runs automatically while you use the picker. There's

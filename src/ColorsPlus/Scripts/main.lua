@@ -1,6 +1,6 @@
--- Colors+ v0.4.1
+-- Colors+ v0.5.0
 -- RGB preview; Default temporarily changes the editor swatch and restores it.
-local VERSION = "0.4.1"
+local VERSION = "0.5.0"
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local directory = assert(source:match("^(.*[/\\])"), "Scripts directory unavailable")
 

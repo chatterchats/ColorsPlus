@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "id": "community.colors-plus",
   "name": "Colors+ — Custom Color Picker",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "author": "Chats",
-  "description": "Adds continuous color selection to compatible character-customizations.",
+  "description": "Adds continuous color selection to compatible character and weapon customizations.",
   "game": {
     "appId": 2075800,
     "testedBuilds": [
