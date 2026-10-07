@@ -16,6 +16,9 @@ function M.new(runtime)
     local next_root_id
     local trace_window
     local frame
+    -- The launcher that hosts the picker: the character editors' color_ui, or
+    -- armory_ui for weapon paint (runtime.color_host while it owns a launch).
+    local function host() return runtime.color_host or runtime.color_ui end
     local function log(s)
         if runtime.log then runtime.log("PICKER VIEW | " .. s) end
         if runtime.perf then runtime.perf.event("PICKER VIEW | " .. s) end
@@ -97,12 +100,12 @@ function M.new(runtime)
     local function fresh(name,label) return timed("ui.object_lookup",fresh_impl,name,label) end
     local function attached()
         if self.pane_binding then call("attachment.binding",function()
-            assert(runtime.color_ui.binding==self.pane_binding,"Color pane ownership ended")
+            assert(self.pane_host and self.pane_host.binding==self.pane_binding,"Color pane ownership ended")
         end) end
         if frame and frame.attached==self.root_name then return required(frame.root,"root") end
         local root=fresh(self.root_name,"root")
         if self.pane_binding then
-            call("attachment.validate_picker",function() runtime.color_ui.validate_picker(self.pane_binding) end)
+            call("attachment.validate_picker",function() self.pane_host.validate_picker(self.pane_binding) end)
             local parent=required(call("root.GetParent",function() return root:GetParent() end),"picker parent")
             assert(call("parent.GetFullName",function() return parent:GetFullName() end)==self.pane_binding.overlay,"Picker pane was detached")
         else
@@ -185,7 +188,7 @@ function M.new(runtime)
         -- RemoveFromParent covers viewport and native-panel children alike.
         call("close.RemoveFromParent",function() root:RemoveFromParent() end)
         assert(call("close.IsInViewport readback",function() return root:IsInViewport() end) == false, "Picker viewport removal did not complete")
-        if runtime.color_ui then
+        if host() then
             assert(not valid(call("close.GetParent",function() return root:GetParent() end)),"Picker panel removal did not complete")
         end
     end
@@ -213,8 +216,9 @@ function M.new(runtime)
             end
         end
         self.root_name=nil
-        if runtime.color_ui and runtime.color_ui.release_picker then runtime.color_ui.release_picker(self.pane_binding) end
-        self.pane_binding=nil
+        local owner=self.pane_host or host()
+        if owner and owner.release_picker then owner.release_picker(self.pane_binding) end
+        self.pane_binding=nil; self.pane_host=nil
         log("REMOVED | picker detached; palette restored")
         if runtime.call_trace then runtime.call_trace.stop(trace_window,"picker closed") end
         trace_window=nil
@@ -224,7 +228,7 @@ function M.new(runtime)
         -- root class/name prefix; never touch stock or another mod's widgets.
         assert(not self.root_name, "Close the current picker before cleanup")
         if next_root_id then
-            if runtime.color_ui then runtime.color_ui.release_picker(nil) end
+            if host() then host().release_picker(nil) end
             return next_root_id
         end
         log("CLEANUP BEGIN")
@@ -239,7 +243,7 @@ function M.new(runtime)
                 end
             end
         end
-        if runtime.color_ui then runtime.color_ui.release_picker(nil) end
+        if host() then host().release_picker(nil) end
         next_root_id=max_id+1
         log("CLEANUP COMPLETE")
         return next_root_id
@@ -262,7 +266,8 @@ function M.new(runtime)
         if runtime.objects then runtime.objects.remember(pc) end -- SV drag reacquires it by name
         assert(pc.bShowMouseCursor == true, "Open cursor-driven character customization first")
         local pane
-        if runtime.color_ui then pane=timed("ui.prepare_pane",runtime.color_ui.prepare_picker) end
+        local pane_host=host()
+        if pane_host then pane=timed("ui.prepare_pane",pane_host.prepare_picker) end
         local root=construct("/Script/UMG.UserWidget",pc,"ColorsPlusPicker_Root_" .. next_id)
         self.root_name=identity(root)
         assert(self.root_name:match(ROOT),"Unexpected picker root identity")
@@ -350,9 +355,9 @@ function M.new(runtime)
                 local host=fresh(pane.overlay,"swatch overlay")
                 local host_slot=call("overlay.AddChild",function() return host:AddChild(root) end)
                 host_slot:SetHorizontalAlignment(0); host_slot:SetVerticalAlignment(0)
-                self.pane_binding=pane
+                self.pane_binding=pane; self.pane_host=pane_host
                 attached()
-                runtime.color_ui.hide_palette(pane,self.root_name)
+                pane_host.hide_palette(pane,self.root_name)
                 attached()
             else
                 call("root.AddToViewport",function() root:AddToViewport(30010) end)

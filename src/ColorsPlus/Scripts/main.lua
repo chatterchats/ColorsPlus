@@ -106,10 +106,16 @@ if #missing == 0 then
     runtime.log("STARTUP | RECOVERY LOAD BEGIN")
     tint.start()
     runtime.log("STARTUP | RECOVERY LOAD RETURN")
-    runtime.picker = module("live_picker").new(runtime, tint, module("picker_view").new(runtime), module("rgb_input"))
+    -- Weapon Paint Color in the armory has its own backend and host; the
+    -- picker talks to whichever one the launcher that opened it selected.
+    runtime.armory_paint = module("armory_paint").new(runtime, probe.access)
+    local backend = setmetatable({}, {__index=function(_,k) return (runtime.color_backend or tint)[k] end})
+    runtime.picker = module("live_picker").new(runtime, backend, module("picker_view").new(runtime), module("rgb_input"))
     runtime.picker.start()
     runtime.color_ui = module("color_ui").new(runtime,probe.access,tint)
     runtime.color_ui.start()
+    runtime.armory_ui = module("armory_ui").new(runtime,probe.access)
+    runtime.armory_ui.start()
     runtime.skin_enable = module("skin_enable_probe").new(runtime, probe.access)
     runtime.skin_enable.attach()
     module("context_events").attach(runtime, probe, tint)

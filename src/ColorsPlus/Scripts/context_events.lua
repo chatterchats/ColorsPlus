@@ -15,6 +15,10 @@ function M.attach(runtime,probe,tint)
         dev("before",reason,identity)
         if runtime.skin_enable then runtime.skin_enable.stop(reason) end
         tint.context_changed(reason,identity)
+        if runtime.armory_ui then
+            local ok,err=pcall(runtime.armory_ui.context_changed,reason,identity)
+            if not ok then runtime.log("ARMORY UI | context failed | " .. tostring(err)) end
+        end
         dev("after",reason,identity)
     end
 end

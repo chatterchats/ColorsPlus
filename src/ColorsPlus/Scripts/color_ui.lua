@@ -298,7 +298,9 @@ function M.new(runtime,a,tint)
         runtime:after("color-ui:open",100,function()
             if generation~=epoch or self.binding~=b then thaw(); return end
             local valid,why=pcall(self.validate_picker,b)
-            if valid then log("LAUNCH | " .. b.tag); runtime.picker.open()
+            if valid then
+                runtime.color_host=nil; runtime.color_backend=nil -- the character editor's own
+                log("LAUNCH | " .. b.tag); runtime.picker.open()
             else
                 log("LAUNCH REFUSED | " .. tostring(why))
                 if runtime.perf then runtime.perf.cancel_launch("launch refused: " .. tostring(why)) end

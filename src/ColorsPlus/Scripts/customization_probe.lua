@@ -339,13 +339,38 @@ function M.new(runtime)
         end }
     end
 
+    -- Armory > Customize Weapon (weapon Paint Color, armory_ui). These classes
+    -- load only in the armory, and a failed RegisterHook costs a full lookup,
+    -- so they are retried at most every ARMORY_RETRY seconds from swatch
+    -- events, plus at startup and page activation. A late install starts a
+    -- discovery, since the screen's own activation has already passed.
+    local ARMORY = "/Game/Game/UI/Strategy/Armory/WBP_Menu_Armory_CustomizeWeapon.WBP_Menu_Armory_CustomizeWeapon_C:"
+    local ARMORY_RETRY = 10
+    local function armory(reason, context)
+        if not runtime.armory_ui then return end
+        local screen = unwrap(context)
+        local ok, err = pcall(runtime.armory_ui.context_changed, reason, live(screen) and name(screen) or nil)
+        if not ok then log("Armory event failed | " .. tostring(err)) end
+    end
+    for _, spec in ipairs({ {"BP_OnActivated","armory activated"}, {"BP_OnDeactivated","armory deactivated"},
+        {"UpdateStyleSection","armory section"} }) do
+        local event, reason = spec[1], spec[2]
+        specs[#specs + 1] = { ARMORY .. event, throttle=ARMORY_RETRY,
+            on_installed=event=="BP_OnActivated" and function() armory("armory hooks ready", nil) end or nil,
+            function(context) armory(reason, context) end }
+    end
+
     local missing_reported = {}
     -- page_event: startup or an item page activation; only then are
     -- page_only hooks retried.
     function self.install(page_event)
+        local now = os.clock()
         for _, spec in ipairs(specs) do
-            if not runtime.hooks[spec[1]] and (page_event or not spec.page_only) then
+            local due = page_event or not spec.throttle or not spec.tried or now - spec.tried >= spec.throttle
+            if not runtime.hooks[spec[1]] and (page_event or not spec.page_only) and due then
+                spec.tried = now
                 local ok, err = runtime:hook(spec[1], spec[2])
+                if ok and spec.on_installed then spec.on_installed() end
                 if not ok and not missing_reported[spec[1]] then
                     missing_reported[spec[1]] = true
                     log("Hook pending (function may not be loaded): " .. spec[1] .. " | " .. tostring(err))

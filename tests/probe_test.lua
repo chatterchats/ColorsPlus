@@ -260,7 +260,7 @@ assert(not first.alive and second.alive and second.generation == 2)
 assert(console_count == 8,"probe, picker, performance, screen, compatibility, lookup trace, armory trace and skin enable reuse registrations")
 assert(commands.colors_lookups,"Lookup trace console dispatcher must survive same-state reload")
 assert(commands.colors_perf,"Performance console dispatcher must survive same-state reload")
-assert(native_unhooks == 13)
+assert(native_unhooks == 16, "13 customization hooks plus 3 armory screen hooks")
 for _, handle in ipairs(pending_handles) do assert(cancelled[handle]) end
 before_reads = reads; drain()
 assert(reads == before_reads, "retired callbacks must remain inert")
