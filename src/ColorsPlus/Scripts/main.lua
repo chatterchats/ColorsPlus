@@ -33,16 +33,20 @@ local function module(name)
     return assert(loadfile(directory .. name .. ".lua"))()
 end
 
-local bootstrap_log = module("logging").new(directory .. "../colors_plus_probe.log",0)
+-- Logs are capped (one .previous copy each). The Dev package also mirrors
+-- the detailed log to UE4SS; players' UE4SS.log stays free of it.
+local dev_build = loadfile(directory .. "dev_tools.lua") ~= nil
+local LOG = {limit = 4 * 1024 * 1024, mirror = dev_build}
+local bootstrap_log = module("logging").new(directory .. "../colors_plus_probe.log",0,LOG)
 bootstrap_log.write("STARTUP | BOOTSTRAP ENTER | v" .. VERSION)
 local started,runtime = pcall(function() return module("hook_registry").start("ColorsPlusProbeRuntime") end)
 bootstrap_log.write("STARTUP | RUNTIME START RETURN | ok=" .. tostring(started))
 bootstrap_log.close()
 assert(started,runtime)
 runtime.version = VERSION
-local log = module("logging").new(directory .. "../colors_plus_probe.log", runtime.generation)
+local log = module("logging").new(directory .. "../colors_plus_probe.log", runtime.generation, LOG)
 runtime.log = log.write
-local perf_log = module("logging").new(directory .. "../colors_plus_performance.log", runtime.generation,{mirror=false})
+local perf_log = module("logging").new(directory .. "../colors_plus_performance.log", runtime.generation,{mirror=false,limit=1024*1024})
 runtime.on_close = function() perf_log.close(); log.close() end
 -- Time every real lookup (cache misses and unheld calls) for tester captures.
 runtime.objects = module("object_cache").new(function(path)

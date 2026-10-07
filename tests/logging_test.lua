@@ -8,7 +8,7 @@ print=function() error("output unavailable") end
 os.date=function() error("bad argument #2 to date") end
 local log=factory.new("mock",7)
 log.write("callback still completes\nnext line")
-assert(lines[1]:find("[timestamp unavailable] [Colors+Probe] [generation=7] callback still completes next line",1,true))
+assert(lines[1]:find("[timestamp unavailable] [Colors+] [generation=7] callback still completes next line",1,true))
 os.date=function() return "2026-09-17T00:00:00Z" end
 log.write("time recovered"); assert(lines[2]:find("2026-09-17T00:00:00Z",1,true))
 log.close(); assert(closed==1)
@@ -37,5 +37,27 @@ assert(printed[#printed]:find("write failure",1,true))
 io.open=function() return nil,"permission denied" end
 dedicated=factory.new("perf",11,{mirror=false}); dedicated.write("open failure")
 assert(printed[#printed]:find("open failure",1,true))
+-- Size cap: an oversized log moves to .previous at startup, and a session
+-- that crosses the cap rotates too, so the file never grows without bound.
+local files,removed,renamed={},{},{}
+local old_remove,old_rename=os.remove,os.rename
+local function fake(name)
+    local f=files[name] or {text=""}; files[name]=f
+    return {write=function(self,t) f.text=f.text .. t; return self end,flush=function() return true end,
+        seek=function() return #f.text end,close=function() end}
+end
+io.open=function(name,mode) assert(mode=="a"); return fake(name) end
+os.remove=function(name) removed[#removed+1]=name; files[name]=nil; return true end
+os.rename=function(a,b) renamed[#renamed+1]=a .. ">" .. b; files[b]=files[a]; files[a]=nil; return true end
+files["x/colors_plus_probe.log"]={text=string.rep("z",200)}
+local capped=factory.new("x/colors_plus_probe.log",12,{limit=150,mirror=false})
+assert(renamed[1]=="x/colors_plus_probe.log>x/colors_plus_probe.previous.log" and removed[1]=="x/colors_plus_probe.previous.log")
+assert(#files["x/colors_plus_probe.previous.log"].text==200 and files["x/colors_plus_probe.log"].text=="")
+capped.write("small")
+assert(files["x/colors_plus_probe.log"].text:find("small",1,true) and #renamed==1)
+capped.write(string.rep("y",120))
+assert(#renamed==2 and files["x/colors_plus_probe.previous.log"].text:find("small",1,true)
+    and files["x/colors_plus_probe.log"].text:find("yyy",1,true) and not files["x/colors_plus_probe.log"].text:find("small",1,true))
+os.remove,os.rename=old_remove,old_rename
 os.date,io.open,print=old_date,old_open,old_print
-print("Logging: timestamp and output failures do not abort callers; timestamp recovery passed")
+print("Logging: timestamp and output failures do not abort callers; timestamp recovery; size cap rotates to .previous")

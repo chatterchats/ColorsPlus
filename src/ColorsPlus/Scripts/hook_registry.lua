@@ -7,7 +7,7 @@ function M.start(key)
     local self = {
         alive = true, generation = old and old.generation + 1 or 1,
         hooks = {}, actions = {}, bindings = old and old.bindings or {},
-        log = function(message) print("[Colors+Probe] " .. tostring(message) .. "\n") end,
+        log = function(message) print("[Colors+] " .. tostring(message) .. "\n") end,
     }
 
     function self:guard(callback)
