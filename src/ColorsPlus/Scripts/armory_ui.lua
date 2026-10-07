@@ -130,8 +130,11 @@ function M.new(runtime,a)
         log("FOUND | row=" .. name(p.r.row) .. " | entry=" .. entry_name .. " | grid=" .. name(p.grid)
             .. " | ancestry=" .. table.concat((function() local t={} for _,c in ipairs(chain) do t[#t+1]=c:match("^([^ ]+) ") end return t end)()," < "))
         assert(overlay and stack,"Paint Color row needs an Overlay and VerticalBox around its swatches")
+        -- The column's entry that holds the swatches (the grid or an ancestor).
+        local holder=name(p.grid)
+        for i,full in ipairs(chain) do if full==stack then holder=chain[i-1] or holder; break end end
         return {screen=screen_name,section=name(section),entry=entry_name,grid=name(p.grid),row=name(p.r.row),
-            fragment=p.r.fragment,overlay=overlay,stack=stack,chain=chain,tag=paint.TAG}
+            fragment=p.r.fragment,overlay=overlay,stack=stack,holder=holder,chain=chain,tag=paint.TAG}
     end
     -- Changing Location or Finish can recreate the row VMs while the row
     -- widget stays: follow the weapon's paint fragment to its new row VM.
@@ -175,6 +178,54 @@ function M.new(runtime,a)
             assert(name(obj(root:GetParent(),"button parent"))==b.stack,"Custom Color button detached")
         end
         return true
+    end
+
+    -- The row column (label, swatches, launcher) ---------------------------------
+    local function column_children(stack)
+        local count=stack:GetChildrenCount()
+        assert(type(count)=="number" and count>=0 and count<=16,"Unexpected row column")
+        local out={}
+        for i=0,count-1 do out[#out+1]=obj(stack:GetChildAt(i),"row column child") end
+        return out
+    end
+    local function slot_layout(w)
+        local s=obj(w.Slot,"row column slot")
+        local p,z=s.Padding,s.Size
+        return {padding={Left=p.Left,Top=p.Top,Right=p.Right,Bottom=p.Bottom},
+            size={SizeRule=z.SizeRule,Value=z.Value},h=s.HorizontalAlignment,v=s.VerticalAlignment}
+    end
+    local function add_with(stack,w,layout)
+        local s=obj(stack:AddChild(w),"row column slot")
+        s:SetPadding(layout.padding); s:SetSize(layout.size)
+        s:SetHorizontalAlignment(layout.h); s:SetVerticalAlignment(layout.v)
+    end
+    -- Put the launcher above the swatches (a long palette otherwise hides it
+    -- below the fold). UMG's insert-at-index is not callable from Lua, so the
+    -- swatch area and anything after it are re-added below the launcher with
+    -- their slot layout copied over.
+    local function place_above_swatches(b)
+        local stack=fresh(b.stack,"row column")
+        local children=column_children(stack)
+        local start
+        for i,c in ipairs(children) do if name(c)==b.holder then start=i; break end end
+        assert(start,"Swatch area is not in the row column")
+        local moved={}
+        for i=start,#children do
+            local c=children[i]
+            if name(c)~=self.root_name then moved[#moved+1]={widget=c,layout=slot_layout(c)} end
+        end
+        for _,m in ipairs(moved) do
+            assert(stack:RemoveChild(m.widget)~=false,"Could not move the swatch area")
+            local ok,err=pcall(add_with,stack,m.widget,m.layout)
+            if not ok then
+                -- Never leave the swatches detached.
+                if not stack:HasChild(m.widget) then pcall(function() stack:AddChild(m.widget) end) end
+                error(err,0)
+            end
+        end
+        local order={}
+        for _,c in ipairs(column_children(stack)) do order[#order+1]=kind(c) end
+        return table.concat(order," > ")
     end
 
     -- Launcher ------------------------------------------------------------------
@@ -254,7 +305,8 @@ function M.new(runtime,a)
         self.button_name=name(button); remember(button)
         local button_slot=row:AddChild(button); button_slot:SetSize({SizeRule=1,Value=1}); button_slot:SetVerticalAlignment(2)
         local slot=fresh(b.stack,"row column"):AddChild(root)
-        slot:SetPadding({Left=0,Top=6,Right=0,Bottom=2})
+        slot:SetPadding({Left=0,Top=2,Right=0,Bottom=6})
+        local order=place_above_swatches(b)
         fresh(self.button_name,"Custom Color button"):UpdateText(FText("CUSTOM COLOR"))
         local generation=epoch
         button_clicks.get(runtime).bind(self.button_name,self.root_name,"launch",function()
@@ -263,7 +315,7 @@ function M.new(runtime,a)
         end)
         self.binding=b
         validate(b)
-        log("ATTACHED | row=" .. b.row .. " | entry=" .. b.entry)
+        log("ATTACHED | row=" .. b.row .. " | entry=" .. b.entry .. " | column=" .. order)
         poll(b,epoch,100)
     end
     function self.reconcile()
@@ -293,10 +345,11 @@ function M.new(runtime,a)
     function self.hide_palette(b,root_name)
         validate(b)
         hidden={}
-        for _,full in ipairs({b.grid,self.root_name}) do
-            local w=fresh(full,"row widget")
-            hidden[#hidden+1]={widget=full,original=w:GetVisibility()}
-            w:SetVisibility(1) -- collapsed: the picker takes the row's place
+        -- Collapse the whole column (the row's label, the launcher and the
+        -- swatches): the picker, with its own heading, takes the row's place.
+        for _,w in ipairs(column_children(fresh(b.stack,"row column"))) do
+            hidden[#hidden+1]={widget=name(w),original=w:GetVisibility()}
+            w:SetVisibility(1)
         end
         self.picker_owner=root_name
         log("PALETTE HIDDEN | " .. #hidden .. " widgets")

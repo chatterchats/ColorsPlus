@@ -14,7 +14,19 @@ local function widget(class,path,fields)
     function o:RemoveFromParent() if self.parent then for i,c in ipairs(self.parent.children) do if c==self then table.remove(self.parent.children,i) end end end; self.parent=nil end
     function o:AddChild(child)
         child.parent=self; table.insert(self.children,child)
-        return {SetPadding=function() end,SetVerticalAlignment=function() end,SetHorizontalAlignment=function() end,SetSize=function() end}
+        local slot={Padding={Left=0,Top=0,Right=0,Bottom=0},Size={SizeRule=0,Value=1},HorizontalAlignment=0,VerticalAlignment=0}
+        function slot:IsValid() return true end
+        function slot:SetPadding(v) self.Padding=v end; function slot:SetSize(v) self.Size=v end
+        function slot:SetHorizontalAlignment(v) self.HorizontalAlignment=v end; function slot:SetVerticalAlignment(v) self.VerticalAlignment=v end
+        child.Slot=slot
+        return slot
+    end
+    function o:GetChildrenCount() return #self.children end
+    function o:GetChildAt(i) return self.children[i+1] end
+    function o:HasChild(c) for _,x in ipairs(self.children) do if x==c then return true end end; return false end
+    function o:RemoveChild(c)
+        for i,x in ipairs(self.children) do if x==c then table.remove(self.children,i); c.parent=nil; c.Slot=nil; return true end end
+        return false
     end
     function o:SetHeightOverride() end; function o:SetWidthOverride() end
     function o:SetBrushFromTexture() end; function o:SetColorAndOpacity() end
@@ -64,13 +76,16 @@ local function row_widget(n)
     local entry=widget("WBP_Customization_PartTiles_C",E)
     local overlay=widget("Overlay",E .. ".WidgetTree_11.Overlay_0")
     local column=widget("VerticalBox",E .. ".WidgetTree_11.VerticalBox_0"); column.parent=overlay
-    local size=widget("SizeBox",E .. ".WidgetTree_11.SizeBox_0"); size.parent=column
+    -- The column: the row's label (in a Border), then the swatches' SizeBox.
+    local label=widget("Border",E .. ".WidgetTree_11.Border_0"); column:AddChild(label)
+    local size=widget("SizeBox",E .. ".WidgetTree_11.SizeBox_0"); column:AddChild(size)
+    size.Slot.Padding={Left=1,Top=2,Right=3,Bottom=4}; size.Slot.Size={SizeRule=1,Value=1}; size.Slot.VerticalAlignment=2
     local grid=widget("BitReactorTileView",E .. ".WidgetTree_11.PartsGrid"); grid.parent=size
     grid.items={}
     function grid:GetIndexForItem(item) for i,v in ipairs(self.items) do if v==item then return i-1 end end; return -1 end
     overlay.parent=entry -- the row widget itself (outside its tree)
     entry.PartsGrid=grid
-    return entry,grid,column,overlay
+    return entry,grid,column,overlay,size,label
 end
 local white={}
 local paint_row=register({full="BitReactorCustomizationSlotViewModel /Engine/Transient.X.VM_644",IsValid=function(self) return not self.dead end,GetFullName=function(self) return self.full end,
@@ -79,7 +94,7 @@ local bolt_row=register({full="BitReactorCustomizationSlotViewModel /Engine/Tran
     EquippedCustomizationPartViewModel=white})
 local vm=register({full="VM_WeaponCustomization_C /Engine/Transient.X.VM_WeaponCustomization_C_0",IsValid=function() return true end,GetFullName=function(self) return self.full end,
     ColorSlotVMs={paint_row,bolt_row}})
-local paint_entry,paint_grid,paint_column,paint_overlay=row_widget(12)
+local paint_entry,paint_grid,paint_column,paint_overlay,paint_size,paint_label=row_widget(12)
 local bolt_entry,bolt_grid=row_widget(13)
 -- Both grids hold the shared White swatch: entry order picks the paint row.
 paint_grid.items={white}; bolt_grid.items={white}
@@ -112,6 +127,13 @@ assert(ui.binding and ui.binding.row==paint_row.full and ui.binding.entry==paint
 assert(ui.binding.overlay==paint_overlay.full and ui.binding.stack==paint_column.full)
 assert(ui.root_name and objects[ui.root_name:match("^[^ ]+ (.+)$")].parent==paint_column,"Launcher sits in the row's column")
 assert(has("FOUND | row=") and has("ATTACHED | row="))
+-- The launcher sits above the swatches; the swatch box keeps its slot layout.
+local root_widget=objects[ui.root_name:match("^[^ ]+ (.+)$")]
+assert(paint_column.children[1]==paint_label and paint_column.children[2]==root_widget and paint_column.children[3]==paint_size,"Label, launcher, swatches")
+local moved=paint_size.Slot
+assert(moved.Padding.Left==1 and moved.Padding.Top==2 and moved.Padding.Right==3 and moved.Padding.Bottom==4
+    and moved.Size.SizeRule==1 and moved.VerticalAlignment==2,"Swatch slot layout kept")
+assert(has("column=Border > UserWidget > SizeBox"))
 -- The label is set again by the first polls (the button resets it after building).
 local launch_button=objects[ui.button_name:match("^[^ ]+ (.+)$")]
 launch_button.caption="%TEXT"; run("armory-ui:poll")
@@ -145,11 +167,12 @@ assert(runtime.color_host==ui and runtime.color_backend==runtime.armory_paint,"C
 local b=ui.prepare_picker()
 assert(b==ui.binding and ui.validate_picker(b))
 ui.hide_palette(b,"UserWidget picker")
-assert(paint_grid.visibility==1 and objects[ui.root_name:match("^[^ ]+ (.+)$")].visibility==1 and ui.picker_owner)
+assert(paint_label.visibility==1 and paint_size.visibility==1 and objects[ui.root_name:match("^[^ ]+ (.+)$")].visibility==1 and ui.picker_owner,
+    "The whole column (label included) gives way to the picker")
 ui.context_changed("armory section",screen.full)
 assert(not jobs["armory-ui:install"],"Never rebind under an open picker")
 ui.release_picker(b)
-assert(paint_grid.visibility==0 and objects[ui.root_name:match("^[^ ]+ (.+)$")].visibility==4 and not ui.picker_owner)
+assert(paint_label.visibility==0 and paint_size.visibility==0 and objects[ui.root_name:match("^[^ ]+ (.+)$")].visibility==4 and not ui.picker_owner)
 assert(runtime.color_host==nil and runtime.color_backend==nil)
 -- The poll retires the launcher when the row is no longer the paint row.
 runtime.picker.active=false
