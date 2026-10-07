@@ -213,6 +213,52 @@ function M.new(runtime,a)
                     end
                 end
             end
+            if not page then
+                -- Armory: every weapon colour row, read through the screen's
+                -- weapon customization VM. Read-only, like the rest.
+                local ok_armory,why=pcall(function()
+                    local function try(fn) local ok,v=pcall(fn); return ok and v or nil end
+                    for _,wvm in pairs(candidates("VM_WeaponCustomization_C",16)) do
+                        if a.live(wvm) then
+                            local instance_vm=try(function() return a.unwrap(a.prop(wvm,"CustomizationInstanceVM")) end)
+                            local section=try(function() return a.unwrap(a.prop(wvm,"ColorSectionVM")) end)
+                            local rows=try(function() return a.values(a.prop(wvm,"ColorSlotVMs")) end) or {}
+                            log("ARMORY VM | " .. name(wvm) .. " | instance_vm=" .. (a.live(instance_vm) and name(instance_vm) or "<none>")
+                                .. " | color_section=" .. (a.live(section) and name(section) or "<none>") .. " | color_rows=" .. #rows)
+                            for i,row in ipairs(rows) do
+                                if i>16 then log("ARMORY ROW | limit 16"); break end
+                                local r=a.unwrap(row)
+                                if a.live(r) then
+                                    local tag=try(function() return a.text(r.SlotTag.TagName) end) or "?"
+                                    local label=try(function() return a.text(r.DisplayName) end) or "?"
+                                    local part=try(function() return id(object(r.EquippedCustomizationPartViewModel).AssetId) end) or "<none>"
+                                    local frags=try(function() return a.values(r:GetFragments()) end) or {}
+                                    local first=frags[1] and a.unwrap(frags[1])
+                                    local detail="fragments=" .. #frags
+                                    if a.live(first) then
+                                        detail=detail .. " | first=" .. scalar(name(object(first):GetClass()):match("[%w_]+$"))
+                                            .. " | owner=" .. scalar(try(function() return name(first:GetOwningCustomizationInstance()) end) or "?")
+                                        local c=try(function() return first:GetColor() end)
+                                        if c then detail=detail .. " | rgba=" .. scalar(tostring(c.R) .. "," .. tostring(c.G) .. "," .. tostring(c.B) .. "," .. tostring(c.A)) end
+                                        local t=try(function() return first.MaterialTarget end)
+                                        if t then detail=detail .. " | parameter=" .. scalar(try(function() return a.text(t.MaterialParameterName) end) or "?") end
+                                    end
+                                    log("ARMORY ROW | " .. i .. " | " .. name(r) .. " | label=" .. scalar(label) .. " | tag=" .. scalar(tag)
+                                        .. " | swatch=" .. scalar(part) .. " | " .. detail)
+                                end
+                            end
+                        end
+                    end
+                    for _,render in pairs(candidates("BP_ArmoryWeaponRender_C",8)) do
+                        if a.live(render) then
+                            local ci=try(function() return a.unwrap(a.prop(render,"CustomizationInstance")) end)
+                            log("ARMORY PREVIEW | " .. name(render) .. " | instance=" .. (a.live(ci) and name(ci) or "<none>")
+                                .. " | showing_weapon=" .. scalar(try(function() return a.prop(render,"isShowingWeapon") end)))
+                        end
+                    end
+                end)
+                if not ok_armory then log("ARMORY GAP | " .. scalar(why)) end
+            end
             if not a.live(a.unwrap(vm)) then
                 -- The armory may not drive the aux VM's current slot; report
                 -- what it does hold instead of failing.
