@@ -17,7 +17,7 @@ in `tests/` (`tools/run-tests.sh`).
   `context_changed`, plus `pending`/`applied`/`blocked`/`busy`.
 - `dev_tools.lua` (Dev package only, from `src/Colors+Probe`) attaches traces,
   the compatibility survey and the picker console. The
-  Testers package is exactly `src/ColorsPlus`.
+  player package is exactly `src/ColorsPlus`.
 
 ## A zone (`color_zone.lua`)
 

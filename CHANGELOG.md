@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Player package: README.txt, plain ZIP name
+
+- `README.txt` (player guide: install, where it works, use, uninstall,
+  compatibility, known issues, reporting) replaces the tester guide
+  `TESTING.md` in the package. `tools/package-testers.py` is now
+  `tools/package.py` and builds `ColorsPlus-<version>.zip` (was
+  `ColorsPlus-Testers-<version>.zip`) plus `ColorsPlus-Dev-<version>.zip`.
+- `Recovery/README.txt` no longer claims recovery after the game closes:
+  journals from a previous game process are archived, never replayed.
+
+### Logs: capped, and kept out of UE4SS.log
+
+- `colors_plus_probe.log` reached 6 MB in a day of testing. It now rotates at
+  4 MB and `colors_plus_performance.log` at 1 MB (at startup or mid-session)
+  into `<name>.previous.log`, replacing the older copy.
+- Only the Dev package mirrors the detailed log to UE4SS; the player build
+  writes to UE4SS only when its own file is unavailable. Lines start with
+  `[Colors+]` (was `[Colors+Probe]`).
+
+### Armory: the Paint Color row by slot tag, not its label
+
+- Row labels are localized; the English label check would have hidden the
+  button in other game languages. On a blaster only the vanilla Paint Color
+  row carries the PaintColor tag (ZCUnlocked's Bolt Color reuses
+  PaintFinish); a weapon VM with more than one PaintColor row gets no
+  button. Confirmed in game with the game in French.
+
+### Tester release: weapon paint in the armory — v0.5.0
+
+- The Custom Color picker on the vanilla Paint Color row of blasters in
+  Armory > Customize Weapon > COLOR (`armory_ui` launcher and host,
+  `armory_paint` backend). Drafts write only the armory preview copy; Apply
+  writes the real weapon's paint fragment, which the game saves at once like
+  a swatch pick. Cancel restores the preview.
+- The draft follows the weapon, not the preview copy: changing Location or
+  Paint Finish rebuilds the preview, and the draft is reapplied to each new
+  copy. The launcher follows row VMs the game recreates under the same row
+  widget, and keeps its caption set.
+- Left alone: lightsabers and ZCUnlocked's Bolt Color and blade rows (their
+  colours come from ZCUnlocked's own store; see the compatibility proposal).
+  Confirmed in game across blasters; hub editor and main-menu creator
+  unaffected.
+
 ### Tester release: fewer object scans — v0.4.1
 
 - The hub hook-retry fix and the known-instances lookups below. Local lookup

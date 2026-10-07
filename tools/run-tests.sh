@@ -1,7 +1,7 @@
 #!/bin/sh
 # Run every Lua test against the Dev package layout: src/ColorsPlus with the
 # developer scripts from src/Colors+Probe/Scripts linked into its Scripts
-# folder (as tools/package-testers.py builds it). The packager separately
+# folder (as tools/package.py builds it). The packager separately
 # checks that src/ColorsPlus alone needs no developer script.
 # Usage: tools/run-tests.sh [test_name ...]   (default: every tests/*_test.lua)
 # Exits non-zero if any test fails; prints each failure's output.

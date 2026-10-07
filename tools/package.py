@@ -1,6 +1,6 @@
 """Build clean player and dev ZIPs from source, never the live mod directory.
 
-src/ColorsPlus is the mod: the Testers package is exactly its files.
+src/ColorsPlus is the mod: the player package is exactly its files.
 src/Colors+Probe/Scripts holds developer tools (traces, the compatibility
 survey, console commands). The Dev package overlays them into the same Scripts folder:
 UE4SS gives every mod its own Lua state, so the tools must run inside the mod.
@@ -21,12 +21,12 @@ version = json.loads((SOURCE / "modinfo.json").read_text())["version"]
 assert re.fullmatch(r"\d+\.\d+\.\d+", version), "Invalid package version"
 assert json.loads((SOURCE / "zcom-mod.json").read_text())["version"] == version
 assert f'local VERSION = "{version}"' in (SCRIPTS / "main.lua").read_text()
-assert f"v{version}" in (SOURCE / "TESTING.md").read_text()
+assert f"Colors+ v{version} " in (SOURCE / "README.txt").read_text()
 
 # Recovery/README.txt keeps the Recovery folder present after extraction:
 # journals and session metadata are written there, and Lua cannot create it.
 COMMON = [SOURCE / leaf for leaf in (
-    "enabled.txt", "modinfo.json", "zcom-mod.json", "TESTING.md", "Recovery/README.txt",
+    "enabled.txt", "modinfo.json", "zcom-mod.json", "README.txt", "Recovery/README.txt",
     "Assets/hue.png", "Assets/saturation.png", "Assets/value.png",
 )]
 DEV_ENTRY = "dev_tools"
@@ -72,7 +72,7 @@ def build(label, scripts):
     # Journals and session metadata (recovery_session.txt,
     # process_session_counter.txt), not scripts such as editor_session.lua.
     assert not any(re.search(r"_recovery\.txt|\.previous|\.archive-|session[^/]*\.txt$", name) for name in entries)
-    output = ROOT / "dist" / f"ColorsPlus-{label}-{version}.zip"
+    output = ROOT / "dist" / ("-".join(["ColorsPlus"] + ([label] if label else []) + [version]) + ".zip")
     output.parent.mkdir(exist_ok=True)
     if output.exists():
         # A released version is immutable: same version, same bytes, or bump it.
@@ -95,6 +95,6 @@ def build(label, scripts):
 
 
 player = player_scripts()
-build("Testers", player)
+build(None, player)  # ColorsPlus-<version>.zip (was -Testers- through 0.5.0)
 build("Dev", player + dev_scripts())
 print("Dev-only scripts: " + ", ".join(p.stem for p in dev_scripts()))
