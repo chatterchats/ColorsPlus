@@ -257,7 +257,8 @@ local pending_handles = {}
 for handle in pairs(queue) do pending_handles[#pending_handles + 1] = handle end
 local second = boot()
 assert(not first.alive and second.alive and second.generation == 2)
-assert(console_count == 6,"probe, picker, performance, screen, compatibility and skin enable reuse registrations")
+assert(console_count == 7,"probe, picker, performance, screen, compatibility, lookup trace and skin enable reuse registrations")
+assert(commands.colors_lookups,"Lookup trace console dispatcher must survive same-state reload")
 assert(commands.colors_perf,"Performance console dispatcher must survive same-state reload")
 assert(native_unhooks == 13)
 for _, handle in ipairs(pending_handles) do assert(cancelled[handle]) end
