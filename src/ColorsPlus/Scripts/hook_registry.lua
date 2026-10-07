@@ -31,11 +31,15 @@ function M.start(key)
         callback = boundary(callback)
         if before then before = boundary(before) end
         self.log("STARTUP | REGISTER HOOK BEGIN | " .. path)
-        local ok, pre, post = pcall(function()
+        local function register()
             if path:sub(1, 8) == "/Script/" then
                 return RegisterHook(path, before and self:guard(before) or function() end, self:guard(callback))
             end
             return RegisterHook(path, self:guard(callback))
+        end
+        local ok, pre, post = pcall(function()
+            if self.perf then return self.perf.measure("hook.register", register) end
+            return register()
         end)
         if not ok then self.log("STARTUP | REGISTER HOOK FAILED | " .. path .. " | " .. tostring(pre)); return false, tostring(pre) end
         self.log("STARTUP | REGISTER HOOK RETURN | " .. path)

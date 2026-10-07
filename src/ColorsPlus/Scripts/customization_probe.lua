@@ -313,13 +313,17 @@ function M.new(runtime)
             local page = unwrap(context)
             if not live(page) then return end
             if runtime.color_ui then runtime.color_ui.context_changed(event) end
-            runtime:after("install", 1, self.install)
+            runtime:after("install:page", 1, function() self.install(true) end)
         end }
     end
     for _, spec in ipairs({ {PAGE .. "BP_OnDeactivated","page closed"},
         {AUX .. "ClearCustomizationAuxData","creator closed"}, {MASTER .. "CloseMenu","creator closed",true} }) do
         local path,reason,master=spec[1],spec[2],spec[3]
-        specs[#specs + 1] = { path, function(context)
+        -- The main-menu creator's class never loads in the hub editor, and a
+        -- tester's hub log showed its retries bursting to 26/s on swatch
+        -- events (each asks UE4SS for a missing UFunction; timed as
+        -- hook.register). Retry it only at startup and page activation.
+        specs[#specs + 1] = { path, page_only=master, function(context)
             -- End UI ownership at the screen boundary, not the next 33ms poll.
             if runtime.picker and runtime.picker.active then runtime.picker.close(reason) end
             if runtime.color_ui then runtime.color_ui.context_changed(reason) end
@@ -331,9 +335,11 @@ function M.new(runtime)
     end
 
     local missing_reported = {}
-    function self.install()
+    -- page_event: startup or an item page activation; only then are
+    -- page_only hooks retried.
+    function self.install(page_event)
         for _, spec in ipairs(specs) do
-            if not runtime.hooks[spec[1]] then
+            if not runtime.hooks[spec[1]] and (page_event or not spec.page_only) then
                 local ok, err = runtime:hook(spec[1], spec[2])
                 if not ok and not missing_reported[spec[1]] then
                     missing_reported[spec[1]] = true
@@ -359,7 +365,7 @@ function M.new(runtime)
         end
         -- Finite startup retries. Native events/console retry later-loaded UI.
         for index, delay in ipairs({ 0, 500, 2000, 5000 }) do
-            runtime:after("startup:" .. index, delay, self.install)
+            runtime:after("startup:" .. index, delay, function() self.install(true) end)
         end
         log("Probe ready | diagnostics=fragment-read-v4 | command=colors_probe | detailed snapshots manual only; context hooks active")
     end

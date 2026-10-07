@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Hub editor: stop retrying the main-menu creator hook on swatch events
+
+- A tester's 0.4.0 hub log (Windows) showed 89 failed retries of the
+  main-menu `WBP_CustomCharacter_Master_C:CloseMenu` hook, up to 26 in one
+  second: every swatch hover/equip/reset event retried every missing hook,
+  and that class never loads in the hub. Each retry asks UE4SS for a
+  missing UFunction; on the same machine an object lookup costs ~38 ms
+  (`lookup.static_find`, against ~1.4 ms on the dev machine). The creator
+  hook is now retried only at startup and on item-page activation; other
+  missing hooks keep the old retry. Hook registration is timed as
+  `hook.register` in the performance log.
+- Same log, compared with this tester's 0.2.112-113 logs: idle picker tick
+  ~250 ms -> 2.2 ms, editing tick ~410-480 ms -> 48 ms, picker opening
+  ~1.9 s -> 1.1 s. Idle intervals made no object lookups; the remaining
+  cost is 30-56 cache misses per opening and 17-43 per Apply/close.
+
 ### Tester release: the in-game character editor — v0.4.0
 
 - Custom colors work in the in-game (hub/barracks) character editor as well

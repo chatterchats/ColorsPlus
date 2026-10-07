@@ -91,8 +91,12 @@ local fname_constructor = newproxy(true)
 getmetatable(fname_constructor).__call = function() error("bootstrap invoked FName") end
 getmetatable(fname_constructor).__metatable = false
 FName = fname_constructor
+local master_path="/Game/Game/UI/Strategy/Customization/Widgets/CustomCharacter/WBP_CustomCharacter_Master.WBP_CustomCharacter_Master_C:CloseMenu"
+local master_missing,master_attempts=false,0 -- hub editor: the creator class never loads
 function RegisterHook(path, first, second)
+    if path==master_path then master_attempts=master_attempts+1 end
     if path:sub(1, 6) == "/Game/" and not blueprint_ready then error("function not loaded") end
+    if path==master_path and master_missing then error("function not loaded") end
     assert(not hooks[path], "duplicate hook")
     next_id = next_id + 2
     hooks[path] = { first = first, second = second, pre = next_id - 1, post = next_id }
@@ -140,7 +144,8 @@ assert(has("STARTUP | REGISTER HOOK BEGIN") and has("STARTUP | REGISTER HOOK RET
 assert(has("STARTUP | RUN BEGIN | startup:") and has("STARTUP | RUN END | startup:"))
 assert(hooks[native .. "EquipCustomizationPart"])
 assert(not hooks[aux_path .. "UpdateCurrentCustomizationSlotVM"])
-blueprint_ready = true
+blueprint_ready = true; master_missing = true
+local attempts_before_events = master_attempts
 local equip = hooks[native .. "EquipCustomizationPart"]
 equip.first(wrap(slot))
 assert(reads == 0, "native pre-hook must not inspect pre-equip state")
@@ -169,9 +174,11 @@ drain()
 for _,event in ipairs({"PreviewCustomizationPart","ResetPreviewedPart","ResetToDefault"}) do
     hooks[native .. event].second(wrap(slot)); drain()
 end
+assert(master_attempts==attempts_before_events,"Swatch events never retry the missing creator hook")
 for _,event in ipairs({"BP_OnActivated","DisplayCustomizationList"}) do
     hooks[page_path .. event].first(wrap(page)); drain()
 end
+assert(master_attempts==attempts_before_events+2 and not hooks[master_path],"Page activation retries it once each")
 assert(reads==event_reads,"Stock events and page activation must not collect snapshots")
 assert(context_events==4 and launcher_events==6,"Removing snapshots must preserve context/launcher notifications")
 first.probe.on_context_event,first.color_ui.context_changed=original_context,original_launcher
@@ -226,7 +233,8 @@ end
 commands.colors_picker("colors_picker",{})
 hooks[aux_path .. "ClearCustomizationAuxData"].first(wrap(aux))
 assert(boundary=="creator closed" and not identity and not first.actions["console:picker"])
-local master_path="/Game/Game/UI/Strategy/Customization/Widgets/CustomCharacter/WBP_CustomCharacter_Master.WBP_CustomCharacter_Master_C:CloseMenu"
+-- The main-menu creator loads: the next page activation installs its hook.
+master_missing=false; hooks[page_path .. "BP_OnActivated"].first(wrap(page)); drain()
 local creator=object("WBP_CustomCharacter_Master_C /Game/Test.Creator")
 hooks[master_path].first(wrap(creator))
 assert(boundary=="creator closed" and identity==creator:GetFullName())
