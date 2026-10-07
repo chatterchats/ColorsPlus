@@ -1,7 +1,7 @@
 # Architecture
 
 How Colors+ edits a color, and why it is shaped this way. The mod lives in
-`src/ColorsPlus/Scripts`, developer tools in `src/Colors+Probe/Scripts`; tests
+`src/ColorsPlus/Scripts`; tests
 in `tests/` (`tools/run-tests.sh`).
 
 ## Overview
@@ -15,9 +15,9 @@ in `tests/` (`tools/run-tests.sh`).
   the active zone only through its public surface: `begin_live`,
   `update_live`, `check_live`, `apply_live`, `cancel_live`, `restore`,
   `context_changed`, plus `pending`/`applied`/`blocked`/`busy`.
-- `dev_tools.lua` (Dev package only, from `src/Colors+Probe`) attaches traces,
-  the compatibility survey and the picker console. The
-  player package is exactly `src/ColorsPlus`.
+- The package is exactly `src/ColorsPlus`. (Developer tools in
+  `src/Colors+Probe`, shipped only in a Dev package, were removed before
+  1.0; see git history.)
 
 ## A zone (`color_zone.lua`)
 

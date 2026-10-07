@@ -7,13 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Player package: README.txt, plain ZIP name
+### One release package; developer tools removed
 
-- `README.txt` (player guide: install, where it works, use, uninstall,
-  compatibility, known issues, reporting) replaces the tester guide
-  `TESTING.md` in the package. `tools/package-testers.py` is now
-  `tools/package.py` and builds `ColorsPlus-<version>.zip` (was
-  `ColorsPlus-Testers-<version>.zip`) plus `ColorsPlus-Dev-<version>.zip`.
+- The Dev package and its developer tools (`src/Colors+Probe`: call, screen,
+  lookup and armory traces, the compatibility survey, the `colors_picker`
+  console) are gone, along with the mod's hooks for them and their tests.
+  `tools/package-testers.py` is now `tools/package.py` and builds one
+  `ColorsPlus-<version>.zip` (was `-Testers-` plus `-Dev-`).
+- The player guide `README.md` replaces the tester guide `TESTING.md`:
+  install with Zero Company Mod Command, Zero Mod Manager or by hand; where
+  it works; use; uninstall; compatibility; known issues; reporting.
 - `Recovery/README.txt` no longer claims recovery after the game closes:
   journals from a previous game process are archived, never replayed.
 
@@ -22,9 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `colors_plus_probe.log` reached 6 MB in a day of testing. It now rotates at
   4 MB and `colors_plus_performance.log` at 1 MB (at startup or mid-session)
   into `<name>.previous.log`, replacing the older copy.
-- Only the Dev package mirrors the detailed log to UE4SS; the player build
-  writes to UE4SS only when its own file is unavailable. Lines start with
-  `[Colors+]` (was `[Colors+Probe]`).
+- The detailed log is no longer mirrored to UE4SS (only when its own file
+  is unavailable). Lines start with `[Colors+]` (was `[Colors+Probe]`).
 
 ### Armory: the Paint Color row by slot tag, not its label
 

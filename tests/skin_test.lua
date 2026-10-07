@@ -300,12 +300,6 @@ do
     assert(target.decode_targets(q,encoded)); q.skin_race="br.Customization.Part.Character.Race.0A"
     assert(not target.same(p,q))
 end
--- Read-only compatibility uses the same bundle gate, with no preview writes.
-do
-    local before=writes
-    assert_ok(load("color_compatibility").new(runtime,access).capture())
-    assert(table.concat(logs,"\n"):find("CANDIDATE: human skin bundle",1,true) and writes==before)
-end
 local s=start()
 assert(#arrays[preview][3].MaterialTarget.SlotNameTagsToApply.GameplayTags==5,"Installed custom bundle must retain source scalar targets")
 assert(#arrays[displayed][3].MaterialTarget.SlotNameTagsToApply.GameplayTags==5)
@@ -754,8 +748,6 @@ do
         mid.SetScalarParameterValue=setter
         runtime.skin_enable=nil; runtime.tint=nil
     end
-    local before=writes
-    assert_ok(load("color_compatibility").new(runtime,access).capture()); assert(writes==before)
     s=start(); assert(s.profile.skin_scalar=="outfit")
     assert(#arrays[preview][3].MaterialTarget.SlotNameTagsToApply.GameplayTags==1)
     assert(#arrays[displayed][3].MaterialTarget.SlotNameTagsToApply.GameplayTags==1)

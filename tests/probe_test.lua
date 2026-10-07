@@ -134,7 +134,6 @@ local aux_path = base .. "CustomizationAuxVM.CustomizationAuxVM_C:"
 local page_path = base .. "WBP_Customization_ItemPage.WBP_Customization_ItemPage_C:"
 
 local first = boot()
-assert(commands.colors_picker, "standalone picker command must register at bootstrap")
 assert(first.tint, "callable userdata FName must not disable tint actions")
 assert(getmetatable(FName) == false, "match UE4SS's protected metatable")
 assert(has("TINT | API presence checks passed | FName=userdata"))
@@ -191,22 +190,6 @@ assert(#messages == before, "Stock selection must not emit automatic diagnostics
 first.probe.capture_aux(aux,"explicit duplicate")
 assert(#messages==before,"Explicit non-forced snapshots remain deduplicated")
 
--- Trace before collecting fields, including duplicate snapshots and failures.
-do
-    local window=first.call_trace.start("snapshot regression")
-    first.probe.capture_slot(slot,"trace regression")
-    assert(has("BEGIN | SNAPSHOT READ capture_slot"))
-    assert(has("BEGIN | SNAPSHOT READ GetFragments"))
-    assert(has("RETURN | SNAPSHOT READ fragment[0].GetColor"))
-    local original=fragment.GetColor
-    fragment.GetColor=function() error("injected snapshot color failure",0) end
-    first.probe.capture_slot(slot,"trace regression")
-    assert(has("ERROR | SNAPSHOT READ fragment[0].GetColor | injected snapshot color failure"))
-    assert(has("RETURN | SNAPSHOT READ capture_slot"),"diagnostic read errors remain recoverable")
-    fragment.GetColor=original
-    first.call_trace.stop(window,"test complete")
-end
-
 -- Invalidated captured UObjects must not be accessed when delayed work runs.
 commands.colors_probe(); slot.invalid = true
 local before_reads = reads
@@ -215,24 +198,17 @@ assert(reads == before_reads)
 slot.invalid = nil
 commands.colors_probe()
 first.picker.active={session={}}
-local lateAction=false
-first:after("console:picker",1,function() lateAction=true end)
-commands.colors_picker("colors_picker",{})
-assert(first.actions["console:picker"],"console open is a queued runtime action")
 hooks[page_path .. "BP_OnDeactivated"].first(wrap(page))
-assert(not first.actions["console:picker"],"page exit cancels queued console opening")
 assert(not first.picker.active,"page exit must end picker ownership synchronously")
 before_reads = reads; drain()
 assert(reads == before_reads, "closing the page must cancel pending snapshots")
-assert(not lateAction,"closing the page must cancel a queued picker-open action")
 local original_boundary=first.probe.on_context_event
 local boundary,identity
 first.probe.on_context_event=function(reason,who)
     boundary,identity=reason,who; original_boundary(reason,who)
 end
-commands.colors_picker("colors_picker",{})
 hooks[aux_path .. "ClearCustomizationAuxData"].first(wrap(aux))
-assert(boundary=="creator closed" and not identity and not first.actions["console:picker"])
+assert(boundary=="creator closed" and not identity)
 -- The main-menu creator loads: the next page activation installs its hook.
 master_missing=false; hooks[page_path .. "BP_OnActivated"].first(wrap(page)); drain()
 local creator=object("WBP_CustomCharacter_Master_C /Game/Test.Creator")
@@ -250,15 +226,11 @@ assert(has("page association unverified"))
 
 -- Pending work and console registrations across same-state reload.
 selected.first(wrap(aux))
-commands.colors_screens("colors_screens",{})
-commands.colors_compat("colors_compat",{})
-assert(first.actions["screen-trace:command"],"read-only trace command is runtime-owned")
 local pending_handles = {}
 for handle in pairs(queue) do pending_handles[#pending_handles + 1] = handle end
 local second = boot()
 assert(not first.alive and second.alive and second.generation == 2)
-assert(console_count == 8,"probe, picker, performance, screen, compatibility, lookup trace, armory trace and skin enable reuse registrations")
-assert(commands.colors_lookups,"Lookup trace console dispatcher must survive same-state reload")
+assert(console_count == 3,"probe, performance and skin enable reuse registrations")
 assert(commands.colors_perf,"Performance console dispatcher must survive same-state reload")
 assert(native_unhooks == 16, "13 customization hooks plus 3 armory screen hooks")
 for _, handle in ipairs(pending_handles) do assert(cancelled[handle]) end
@@ -432,4 +404,4 @@ assert(has("STARTUP | BOOTSTRAP COMPLETE"))
 assert(has("SESSION | CLASSIFIED | same-process-reload"))
 io.open, print = original_open, original_print
 os.rename,os.remove,ModRef=original_rename,original_remove,original_mod
-print("Colors+Probe: hooks, snapshots, no mutation, invalidation, reload, cleanup and fragment-read diagnostics tests passed")
+print("Customization probe: hooks, snapshots, no mutation, invalidation, reload, cleanup and fragment-read diagnostics tests passed")

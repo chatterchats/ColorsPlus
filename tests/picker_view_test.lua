@@ -197,30 +197,16 @@ view.frame(function()
 end)
 view.close()
 pc.bShowMouseCursor=false; assert(not pcall(view.open) and not view.root_name and not pc.bShowMouseCursor)
--- Normal openings avoid synchronous per-call log flushing. Explicit one-shot
--- tracing still covers the actual UI boundary without changing values.
+-- Values read back as set; a failing slider read surfaces as an error.
 pc.bShowMouseCursor=true
-local traces={}
-local runtime=runtime_with_clicks({log=function(s) traces[#traces+1]=s end,after=function() end,cancel=function() end})
-runtime.call_trace=assert(loadfile(scripts .. "/call_trace.lua"))().new(runtime)
+local runtime=runtime_with_clicks({log=function() end,after=function() end,cancel=function() end})
 view=assert(loadfile(scripts .. "/picker_view.lua"))().new(runtime)
-view.open(); assert(not runtime.call_trace.window); view.close()
-assert(not table.concat(traces,"\n"):find("CALL TRACE",1,true))
-runtime.picker_trace_next=true
 view.open(); view.set_rgb({R=10,G=20,B=30})
-assert(runtime.call_trace.window and runtime.picker_trace_next==nil)
 values=view.read(); assert(values.R==10 and values.G==20 and values.B==30)
 view.show(values,{R=.1,G=.2,B=.3,A=1})
 widget(view.sliders.R).GetValue=function() error("injected slider failure",0) end
 assert(not pcall(view.read))
-view.close(); assert(not runtime.call_trace.window)
-local joined=table.concat(traces,"\n")
-for _,marker in ipairs({"BEGIN | UI R.GetValue","RETURN | UI R.GetValue",
-    "RETURN | UI readout.SetText",
-    "RETURN | UI swatch.SetBrushColor","ERROR | UI R.GetValue | injected slider failure",
-    "RETURN | UI close.RemoveFromParent","picker closed"}) do
-    assert(joined:find(marker,1,true),marker)
-end
+view.close()
 assert(scoped==0,"No picker path may attempt the native scoped overload")
 -- A held object cache reuses verified identities across polls; boundaries,
 -- invalid wrappers and release all force fresh full-path lookups.

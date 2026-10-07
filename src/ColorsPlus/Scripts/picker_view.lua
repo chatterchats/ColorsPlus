@@ -14,7 +14,6 @@ function M.new(runtime)
     runtime.gradient_assets=runtime.gradient_assets or assert(loadfile(directory .. "gradient_assets.lua"))()
     local count = 0
     local next_root_id
-    local trace_window
     local frame
     -- The launcher that hosts the picker: the character editors' color_ui, or
     -- armory_ui for weapon paint (runtime.color_host while it owns a launch).
@@ -28,7 +27,6 @@ function M.new(runtime)
         return fn(...)
     end
     local function call(label,fn)
-        if runtime.call_trace then return runtime.call_trace.call("UI " .. label,fn) end
         return fn()
     end
     -- Session-held reuse (object_cache); identity is still verified below.
@@ -220,8 +218,6 @@ function M.new(runtime)
         if owner and owner.release_picker then owner.release_picker(self.pane_binding) end
         self.pane_binding=nil; self.pane_host=nil
         log("REMOVED | picker detached; palette restored")
-        if runtime.call_trace then runtime.call_trace.stop(trace_window,"picker closed") end
-        trace_window=nil
     end
     function self.cleanup()
         -- A Lua reload can leave a viewport alive. Remove only our exact native
@@ -253,9 +249,6 @@ function M.new(runtime)
         assert(type(StaticConstructObject) == "function","StaticConstructObject unavailable")
         assert(input_mode==nil or input_mode=="hsv_shift","Unsupported picker input mode")
         self.input_mode=input_mode
-        local trace=runtime.picker_trace_next
-        runtime.picker_trace_next=nil
-        if trace and runtime.call_trace then trace_window=runtime.call_trace.start("picker opening (opt-in)") end
         local next_id=timed("ui.cleanup",self.cleanup)
         next_root_id=next_id+1
         log("OPEN CONTROLLER | root=" .. next_id)

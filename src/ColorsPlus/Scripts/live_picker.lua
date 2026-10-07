@@ -37,7 +37,6 @@ function M.new(runtime,tint,view,rgb_input)
         return ui_frame(fn)
     end
     local function opening_step(label,fn,...)
-        if runtime.call_trace then return runtime.call_trace.call("OPEN STEP " .. label,fn,...) end
         return fn(...)
     end
     local function close_current(active,reason)
@@ -193,7 +192,6 @@ function M.new(runtime,tint,view,rgb_input)
         log("OPEN BEGIN")
         -- Released by close(), including every failed or refused opening.
         if runtime.objects then runtime.objects.hold("picker") end
-        local opening_trace
         local ok,err=pcall(function()
             local mode,initial,initialized
             if tint.read_context then
@@ -221,11 +219,6 @@ function M.new(runtime,tint,view,rgb_input)
                 end
             end) end)
             log("VIEW READY | starting verified tint preview")
-            -- Preserve explicit traces. Automatic diagnostics start after the
-            -- large widget build so the call budget covers the suspect region.
-            if runtime.trace_picker_initialization and runtime.call_trace and not runtime.call_trace.window then
-                opening_trace=runtime.call_trace.start("automatic post-build picker initialization")
-            end
             local session=assert(opening_step("tint.begin",timed,"tint.begin",tint.begin_live),"Could not start verified live preview")
             local poll_ms=view.poll_ms or 33
             local active={session=session,mode=mode,ticks=0,poll_ms=poll_ms,
@@ -268,10 +261,8 @@ function M.new(runtime,tint,view,rgb_input)
             log("OPEN FAILED | " .. tostring(err))
             -- Retain diagnostics through rollback, then retire only our window.
             local closed,why=pcall(self.close,"picker open failed")
-            if opening_trace then runtime.call_trace.stop(opening_trace,"opening failed") end
             if not closed then error(why,0) end
         end
-        if opening_trace then runtime.call_trace.stop(opening_trace,ok and "opening complete" or "opening failed") end
         return ok
     end
     function self.open()

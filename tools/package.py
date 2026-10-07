@@ -1,9 +1,7 @@
-"""Build clean player and dev ZIPs from source, never the live mod directory.
+"""Build the release ZIP from source, never the live mod directory.
 
-src/ColorsPlus is the mod: the player package is exactly its files.
-src/Colors+Probe/Scripts holds developer tools (traces, the compatibility
-survey, console commands). The Dev package overlays them into the same Scripts folder:
-UE4SS gives every mod its own Lua state, so the tools must run inside the mod.
+src/ColorsPlus is the mod: the package is exactly its files. (A Dev package
+with developer tools from src/Colors+Probe existed through 0.5.0.)
 """
 from pathlib import Path
 import hashlib
@@ -14,22 +12,20 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src" / "ColorsPlus"
 SCRIPTS = SOURCE / "Scripts"
-DEV_SCRIPTS = ROOT / "src" / "Colors+Probe" / "Scripts"
 # Installed folder name (Colors_Probe through v0.3.0).
 PACKAGE_ROOT = "ColorsPlus"
 version = json.loads((SOURCE / "modinfo.json").read_text())["version"]
 assert re.fullmatch(r"\d+\.\d+\.\d+", version), "Invalid package version"
 assert json.loads((SOURCE / "zcom-mod.json").read_text())["version"] == version
 assert f'local VERSION = "{version}"' in (SCRIPTS / "main.lua").read_text()
-assert f"Colors+ v{version} " in (SOURCE / "README.txt").read_text()
+assert f"Colors+ v{version} " in (SOURCE / "README.md").read_text()
 
 # Recovery/README.txt keeps the Recovery folder present after extraction:
 # journals and session metadata are written there, and Lua cannot create it.
 COMMON = [SOURCE / leaf for leaf in (
-    "enabled.txt", "modinfo.json", "zcom-mod.json", "README.txt", "Recovery/README.txt",
+    "enabled.txt", "modinfo.json", "zcom-mod.json", "README.md", "Recovery/README.txt",
     "Assets/hue.png", "Assets/saturation.png", "Assets/value.png",
 )]
-DEV_ENTRY = "dev_tools"
 REFERENCE = re.compile(r'module\("(\w+)"\)|"(\w+)\.lua"')
 
 
@@ -38,12 +34,8 @@ def references(path):
 
 
 def player_scripts():
-    """Every mod script, checked to be reachable from main.lua and to need no
-    developer script (main.lua loads dev_tools.lua only when present)."""
+    """Every mod script, checked to be reachable from main.lua."""
     mod = {p.stem: p for p in SCRIPTS.glob("*.lua")}
-    dev = {p.stem for p in DEV_SCRIPTS.glob("*.lua")}
-    assert not mod.keys() & dev, f"Script in both trees: {sorted(mod.keys() & dev)}"
-    assert DEV_ENTRY in dev
     seen, pending = set(), ["main"]
     while pending:
         name = pending.pop()
@@ -51,23 +43,16 @@ def player_scripts():
             continue
         seen.add(name)
         for ref in references(mod[name]):
-            if ref == DEV_ENTRY or ref not in mod and ref not in dev:
-                continue
-            assert ref in mod, f"{name}.lua needs developer script {ref}.lua"
+            assert ref in mod, f"{name}.lua needs missing script {ref}.lua"
             pending.append(ref)
     assert seen == mod.keys(), f"Unreachable mod scripts: {sorted(mod.keys() - seen)}"
     return sorted(mod.values())
 
 
-def dev_scripts():
-    return sorted(DEV_SCRIPTS.glob("*.lua"))
-
-
 def build(label, scripts):
     files = COMMON + scripts
     assert all(p.is_file() and not p.is_symlink() for p in files)
-    entries = {f"{PACKAGE_ROOT}/" + (p.relative_to(SOURCE).as_posix() if p.is_relative_to(SOURCE)
-               else "Scripts/" + p.name): p for p in files}
+    entries = {f"{PACKAGE_ROOT}/" + p.relative_to(SOURCE).as_posix(): p for p in files}
     assert len(entries) == len(files)
     # Journals and session metadata (recovery_session.txt,
     # process_session_counter.txt), not scripts such as editor_session.lua.
@@ -94,7 +79,4 @@ def build(label, scripts):
     print(f"SHA256: {digest}")
 
 
-player = player_scripts()
-build(None, player)  # ColorsPlus-<version>.zip (was -Testers- through 0.5.0)
-build("Dev", player + dev_scripts())
-print("Dev-only scripts: " + ", ".join(p.stem for p in dev_scripts()))
+build(None, player_scripts())  # ColorsPlus-<version>.zip (was -Testers- through 0.5.0)

@@ -461,11 +461,6 @@ assert(not pcall(tint.read_context),"Any reentrant event refuses the source look
 page.IsActivated=activated
 for _,case in ipairs(cases) do
     reset(case); local before=originals(); local writes_before=writes
-    assert_ok(load("color_compatibility").new(runtime,access).capture())
-    assert(writes==writes_before and table.concat(logs,"\n"):find(selected_tag==blush_tag
-        and "CANDIDATE: blush color/blend-mode pair" or selected_tag==scar_tag
-        and "CANDIDATE: scar tint/strength pair" or iris_rules.iris(selected_tag)
-        and "CANDIDATE: iris color/amount pair" or "CANDIDATE: race tint bundle",1,true))
     local s=start()
     local p=s.profile
     if cross_target then
@@ -609,8 +604,6 @@ do
                 if case[1]=="Vitiligo" then values[lekku[1]]=nil end
             end
         end
-        local n=writes; assert_ok(load("color_compatibility").new(runtime,access).capture())
-        assert(writes==n and table.concat(logs,"\n"):find("RESULT | CANDIDATE",1,true))
         local s=start(); assert(s.test_color.A==original.A and s.blue.part~="None:None")
         if case[1]=="ScarTint" then assert(s.blue.part=="CustomizationPartDefinition:CPD_COS_ScarTint_Pink") end
         assert_ok(editor.update_live(s,violet)); assert(s.test_color.A==original.A)
@@ -677,8 +670,6 @@ do
         palette={rgb_part,stock,shade}; proxy_part=stock.AssetId
         for _,m in pairs(meshes) do m[horns[1]]=nil end
         local before=originals(); local n=writes
-        assert_ok(load("color_compatibility").new(runtime,access).capture())
-        assert(writes==n and table.concat(logs,"\n"):find("CANDIDATE: scar HSV adjustments",1,true))
         local s=start()
         assert(load("color_rules").hsv(s.profile) and equal(s.test_color,value) and equal(s.blue.original,other))
         assert(vm.EquippedCustomizationPartViewModel==stock and vm.EquippedCustomizationPartViewModel.AssetId.PrimaryAssetName=="CPD_COS_ScarLook_" .. value.name)

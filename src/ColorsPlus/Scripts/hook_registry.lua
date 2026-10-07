@@ -88,9 +88,6 @@ function M.start(key)
                     if profile then return profile.measure("job." .. key_name,callback) end
                     return callback()
                 end
-                if self.call_trace and key_name~="call-trace:expiry" then
-                    return self.call_trace.call("JOB " .. key_name,invoke)
-                end
                 return invoke()
             end)
             if traced then self.log("STARTUP | RUN " .. (ok and "END" or "FAILED") .. " | " .. key_name) end

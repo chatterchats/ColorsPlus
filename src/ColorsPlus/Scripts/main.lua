@@ -33,10 +33,8 @@ local function module(name)
     return assert(loadfile(directory .. name .. ".lua"))()
 end
 
--- Logs are capped (one .previous copy each). The Dev package also mirrors
--- the detailed log to UE4SS; players' UE4SS.log stays free of it.
-local dev_build = loadfile(directory .. "dev_tools.lua") ~= nil
-local LOG = {limit = 4 * 1024 * 1024, mirror = dev_build}
+-- Logs are capped (one .previous copy each) and kept out of UE4SS.log.
+local LOG = {limit = 4 * 1024 * 1024, mirror = false}
 local bootstrap_log = module("logging").new(directory .. "../colors_plus_probe.log",0,LOG)
 bootstrap_log.write("STARTUP | BOOTSTRAP ENTER | v" .. VERSION)
 local started,runtime = pcall(function() return module("hook_registry").start("ColorsPlusProbeRuntime") end)
@@ -53,7 +51,6 @@ runtime.objects = module("object_cache").new(function(path)
     if runtime.perf then return runtime.perf.measure("lookup.static_find", StaticFindObject, path) end
     return StaticFindObject(path)
 end)
-runtime.trace_picker_initialization = false -- manual colors_picker trace remains available
 runtime.perf = module("performance_log").new(runtime,{sink=perf_log.write_batch})
 if type(RegisterConsoleCommandHandler)=="function" then runtime.perf.attach() end
 local probe = module("customization_probe").new(runtime)
@@ -132,12 +129,6 @@ if #missing == 0 then
 else
     runtime.tint_disabled_reason = "required UE4SS API unavailable: " .. table.concat(missing, ", ")
     runtime.log("TINT | Disabled: " .. runtime.tint_disabled_reason)
-end
--- Developer diagnostics ship only in the dev package (see dev_tools.lua).
-local dev_tools = loadfile(directory .. "dev_tools.lua")
-if dev_tools then
-    dev_tools().attach(runtime, probe, tint, module, directory)
-    runtime.log("STARTUP | DEV TOOLS ATTACHED")
 end
 runtime.log("STARTUP | BOOTSTRAP COMPLETE | waiting for deferred game-thread jobs")
 return runtime

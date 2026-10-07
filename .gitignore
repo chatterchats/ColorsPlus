@@ -11,5 +11,3 @@ Thumbs.db
 /src/ColorsPlus/Recovery/*
 # Ships in every package so the journal folder exists after extraction.
 !/src/ColorsPlus/Recovery/README.txt
-# Local journals from running the mod out of the old combined source folder.
-/src/Colors+Probe/DevPanel/

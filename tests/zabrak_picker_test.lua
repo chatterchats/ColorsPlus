@@ -92,7 +92,6 @@ local function reset()
     local _,_,description=codec.new(a).read(values,{slot=SKIN})
     profile={slot=SKIN,bundle=description}
     runtime.picker=nil; runtime.skin_enable=nil
-    runtime.call_trace=nil
     runtime.tint={read_context=function() return {owner=owner,source_slot=slot,part={AssetId=part},profile=profile} end}
 end
 function owner:GetSlotInstance(t) if t.TagName==SKIN then return slot end; return mesh_slots[t.TagName] end
@@ -232,10 +231,8 @@ local draft=assert(opened,errors()); assert(draft.live and worker.pending==draft
 assert(draft.perf_target.backend=="source-swap"
     and draft.perf_target.part=="CustomizationPartDefinition:CPD_H_SkinTone_Hum_Zabrak_1A1")
 assert(not contains("CALL TRACE |"),"Normal opening must not emit per-call diagnostics")
-runtime.call_trace={window={}}
 assert(worker.update_live(draft,orange)); assert(equal(current("MaterialColor").color,orange))
-assert(contains("BEGIN | color SetColor") or contains("RETURN | source unwrap"),"Explicit trace must preserve call pairs")
-runtime.call_trace=nil; logs={}
+logs={}
 runtime.perf=load("performance_log").new(runtime); runtime.perf.start()
 local before_context,before_bound=context_reads,bound_reads
 local updated,validated=worker.update_live(draft,violet)

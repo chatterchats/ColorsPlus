@@ -126,7 +126,6 @@ function M.new(runtime)
     -- Only observational snapshots use these wrappers. Tint validation keeps
     -- the original access helpers above. Labels never inspect native objects.
     local function call(label, fn, ...)
-        if runtime.call_trace then return runtime.call_trace.call("SNAPSHOT READ " .. label, fn, ...) end
         return fn(...)
     end
     local function traced(label, fn)

@@ -9,14 +9,14 @@ preview on the character.
 
 ## Status
 
-The mod lives in `src/ColorsPlus`; developer tools live in `src/Colors+Probe`
-(see [Packages](#packages)). It supports clothing
+The mod lives in `src/ColorsPlus` (see [Packages](#packages)). It supports clothing
 and armor colors, hair, skin (including race-specific skin bundles such as
 Zabrak tones), makeup, tattoos, horns and scar HSV adjustments, and the
 Paint Color of blasters in Armory > Customize Weapon. The base game's eye
 choices and lightsabers are not supported; ZCUnlocked's bolt and blade rows
 are left to ZCUnlocked. The mod is mouse only. Players' guide:
-[`src/ColorsPlus/README.txt`](src/ColorsPlus/README.txt).
+[`src/ColorsPlus/README.md`](src/ColorsPlus/README.md) (also the mod page
+text: install with Zero Company Mod Command, Zero Mod Manager or by hand).
 
 - **Apply Color** keeps the choice for the current editor visit. In the
   main-menu creator, save the character normally to keep it; leaving without
@@ -45,27 +45,23 @@ are in [docs/practical-ue4ss-ui-modding-notes.md](docs/practical-ue4ss-ui-moddin
 
 ## Packages
 
-`python3 tools/package.py` builds two verified ZIPs (with SHA-256
-files) in `dist/`, both with a `ColorsPlus/` root (the install folder; it
-was `Colors_Probe/` through v0.3.0):
+`python3 tools/package.py` builds one verified ZIP (with a SHA-256 file) in
+`dist/`: **`ColorsPlus-<version>.zip`**, with a `ColorsPlus/` root (the
+install folder; it was `Colors_Probe/` through v0.3.0). It is exactly
+`src/ColorsPlus`: picker, editing backend, recovery, performance log,
+assets, manifests, the player guide `README.md` and `Recovery/README.txt`
+(which keeps the journal folder present after extraction). The packager
+checks that every script is reachable from `main.lua`.
 
-- **`ColorsPlus-<version>.zip`** (`-Testers-` through 0.5.0): the player
-  build, exactly `src/ColorsPlus`: picker, editing backend, recovery,
-  performance log, assets, manifests, the player guide `README.txt` and
-  `Recovery/README.txt` (which keeps
-  the journal folder present after extraction). The packager checks that every mod
-  script is reachable from `main.lua` and that none needs a developer script.
-- **`ColorsPlus-Dev-<version>.zip`**: the mod plus `src/Colors+Probe/Scripts`
-  overlaid into the same `Scripts/` folder: traces, the compatibility survey
-  and console commands (`colors_picker`, `colors_compat`, `colors_screens`).
-  `main.lua` attaches
-  them when `dev_tools.lua` is present. They can't be a separate UE4SS mod:
-  each mod runs in its own Lua state, and the tools read the picker's runtime.
+Through 0.5.0 there were also `-Testers-` (now the plain ZIP) and `-Dev-`
+packages; the Dev package overlaid developer tools from `src/Colors+Probe`
+(traces, the compatibility survey, console commands), removed before 1.0.
+They remain in git history.
 
-Both exclude logs, recovery journals and panel state. A released version is
+The ZIP excludes logs and recovery journals. A released version is
 immutable: the packager refuses to overwrite an existing ZIP with different
 contents, so bump the version in `src/ColorsPlus` (`Scripts/main.lua`,
-`modinfo.json`, `zcom-mod.json`, `README.txt`) first.
+`modinfo.json`, `zcom-mod.json`, `README.md`) first.
 
 To install, extract `ColorsPlus/` into
 `SWZeroCompany/Binaries/Win64/ue4ss/Mods/` and restart the game. Copy over an
@@ -82,8 +78,8 @@ tools/run-tests.sh tint skin  # selected tests
 ```
 
 Tests are plain LuaJIT scripts with in-memory fakes of the UE4SS API. The
-runner lays out the Dev package (mod plus developer scripts) in a temporary
-folder and runs each test against it. Runtime behavior
+runner lays out the package (`src/ColorsPlus`) in a temporary folder and
+runs each test against it. Runtime behavior
 still needs in-game verification: the reference corpus does not contain the
 cooked implementation of the customization preview and save lifecycle.
 
@@ -92,10 +88,9 @@ cooked implementation of the customization preview and save lifecycle.
 ├── CHANGELOG.md
 ├── docs/                    # architecture, status history, UE4SS notes
 ├── src/
-│   ├── ColorsPlus/          # the mod (Scripts/, Assets/, Recovery/, manifests)
-│   └── Colors+Probe/        # developer tools (Scripts/ only; Dev package)
+│   └── ColorsPlus/          # the mod (Scripts/, Assets/, Recovery/, manifests, README.md)
 ├── tests/                   # LuaJIT test scripts
 └── tools/
-    ├── package.py           # player + dev ZIPs
+    ├── package.py           # release ZIP
     └── run-tests.sh
 ```

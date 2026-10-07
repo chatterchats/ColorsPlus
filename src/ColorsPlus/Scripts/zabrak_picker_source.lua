@@ -40,16 +40,11 @@ function M.new(runtime,a,path)
     local function call(label,fn)
         calls=calls+1; assert(calls<=4096,"Dispatch trace call bound")
         local prefix="CALL TRACE | call=" .. calls .. " | "
-        -- Normal CP operations keep milestones/errors, not thousands of flushed
-        -- diagnostic lines. Explicit colors_picker trace enables these pairs.
-        local traced=not quiet and runtime.call_trace and runtime.call_trace.window
-        if traced then log(prefix .. "BEGIN | " .. label) end
         local result=pack(pcall(fn))
         if not result[1] then
             log(prefix .. "ERROR | " .. label .. " | " .. tostring(result[2]))
             error(result[2],0)
         end
-        if traced then log(prefix .. "RETURN | " .. label) end
         return unpack_values(result,2,result.n)
     end
     local inspector=assert(loadfile(directory .. "zabrak_rebuild_inspector.lua"))().new(a,log,call,directory)

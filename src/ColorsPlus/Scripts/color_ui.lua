@@ -22,7 +22,6 @@ function M.new(runtime,a,tint)
         return fn()
     end
     local function call(label,fn)
-        if runtime.call_trace then return runtime.call_trace.call("COLOR UI " .. label,fn) end
         return fn()
     end
     local function find(path) if a.find then return a.find(path) end; return StaticFindObject(path) end

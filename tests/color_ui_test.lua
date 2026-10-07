@@ -455,21 +455,11 @@ function fake_tint.apply_live(session) applied=updated; fake_tint.pending=nil; s
 function fake_tint.cancel_live() cancelled=true; fake_tint.pending=nil; return true end
 function fake_tint.check_live() return true end
 local input=assert(loadfile(scripts .. "/rgb_input.lua"))()
-runtime.call_trace=assert(loadfile(scripts .. "/call_trace.lua"))().new(runtime)
-runtime.trace_picker_initialization=true
 runtime.picker=assert(loadfile(scripts .. "/live_picker.lua"))().new(runtime,fake_tint,live_view,input)
 assert(runtime.picker.open())
 assert(find(live_view.hsv.hue_name).value_writes==1
     and find(live_view.hsv.hex_name).text=="#FF0000",
     "Coordinator initializes the selected RGB exactly once before polling")
-assert(not runtime.call_trace.window and not jobs["call-trace:expiry"])
-local opening_logs=table.concat(logs,"\n")
-for _,boundary in ipairs({"OPEN STEP view.set_rgb","UI set_rgb.attached","UI attachment.validate_picker",
-    "UI HSV initial RGB to HSV","UI HSV hue.SetValue","UI HSV hex.SetText",
-    "UI HSV marker.SetAnchors","UI HSV marker.SetAlignment","UI HSV marker.SetOffsets","OPEN STEP view.show"}) do
-    assert(opening_logs:find("BEGIN | " .. boundary,1,true),boundary)
-    assert(opening_logs:find("RETURN | " .. boundary,1,true),boundary)
-end
 find(live_view.hsv.hex_name).text="#FF8020"
 click(live_view,2)
 run("picker:tick")
@@ -486,7 +476,6 @@ run("picker:tick"); assert(cancelled and not runtime.picker.active and not jobs[
 assert(zone_label.visibility==0 and recolour_label.visibility==3 and slider_box.visibility==4
     and launcher.visibility==4,"Cancel restores the complete native selector")
 runtime.picker=old_picker
-runtime.call_trace=nil; runtime.trace_picker_initialization=nil
 -- Retired native wrappers are never retained. The path is reacquired each use.
 local retired_grid=grid
 grid=object("BitReactorTileView",retired_grid.path)

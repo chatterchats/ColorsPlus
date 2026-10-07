@@ -299,40 +299,14 @@ do
     view.frame,view.set_rgb=old_frame,old_set
     tint.begin_live,tint.read_context=old_begin,old_read_context
 end
--- Automatic opening-only tracing is bounded and does not spill into polling.
-runtime.call_trace=assert(loadfile(scripts .. "/call_trace.lua"))().new(runtime)
-runtime.trace_picker_initialization=true
-logs={}
-assert(picker.open() and not runtime.call_trace.window and not jobs["call-trace:expiry"])
-local trace_text=table.concat(logs,"\n")
-for _,step in ipairs({"tint.begin","performance ready","input mode validation","initial color conversion",
-    "initial color keys","UI initialization frame","view.set_rgb","view.show","schedule input polling"}) do
-    assert(trace_text:find("BEGIN | OPEN STEP " .. step,1,true),step)
-    assert(trace_text:find("RETURN | OPEN STEP " .. step,1,true),step)
-end
-assert(trace_text:find("opening complete",1,true))
-logs={}; run(); assert(not table.concat(logs,"\n"):find("CALL TRACE",1,true))
-picker.close("trace test")
--- Lua initialization failures still restore and pair ERROR before stopping.
+-- Lua initialization failures restore and leave nothing pending.
 local set_rgb=view.set_rgb
 view.set_rgb=function() error("initialization fault",0) end
 logs={}; assert(not picker.open() and not picker.active and not tint.pending)
-assert(not runtime.call_trace.window and not jobs["call-trace:expiry"])
-assert(table.concat(logs,"\n"):find("ERROR | OPEN STEP view.set_rgb | initialization fault",1,true))
 view.set_rgb=set_rgb
--- An explicit user's trace is neither replaced nor stopped by automatic mode.
-local explicit=runtime.call_trace.start("explicit diagnostic")
-assert(picker.open() and runtime.call_trace.window==explicit)
-picker.close("explicit test"); runtime.call_trace.stop(explicit,"test complete")
--- Release defaults: no automatic per-call flushing, but performance capture
--- and explicit diagnostic requests remain available.
-runtime.trace_picker_initialization=false
+-- Normal openings: performance capture, no per-call diagnostics.
 logs={}; assert(picker.open())
-assert(not runtime.call_trace.window and not jobs["call-trace:expiry"])
 assert(runtime.perf.window and runtime.perf.window.mode=="picker")
 assert(not table.concat(logs,"\n"):find("CALL TRACE",1,true))
 picker.close("normal logging"); assert(not runtime.perf.window)
-explicit=runtime.call_trace.start("manual with automatic tracing off")
-assert(picker.open() and runtime.call_trace.window==explicit)
-picker.close("manual test"); runtime.call_trace.stop(explicit,"test complete")
 print("Live picker: coalescing, skin cooldown/validation receipts, idle health, Apply flush, cancellation and stale/reentrant timers passed")
