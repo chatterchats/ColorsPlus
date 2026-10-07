@@ -237,6 +237,7 @@ function M.new(runtime,a)
                                     local detail="fragments=" .. #frags
                                     if a.live(first) then
                                         detail=detail .. " | first=" .. scalar(name(object(first):GetClass()):match("[%w_]+$"))
+                                            .. " | fragment=" .. scalar(name(first))
                                             .. " | owner=" .. scalar(try(function() return name(first:GetOwningCustomizationInstance()) end) or "?")
                                         local c=try(function() return first:GetColor() end)
                                         if c then detail=detail .. " | rgba=" .. scalar(tostring(c.R) .. "," .. tostring(c.G) .. "," .. tostring(c.B) .. "," .. tostring(c.A)) end

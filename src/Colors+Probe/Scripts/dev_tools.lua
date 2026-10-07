@@ -12,5 +12,7 @@ function M.attach(runtime,probe,tint,module,directory)
     runtime.screen_trace.attach()
     runtime.color_compatibility = module("color_compatibility").new(runtime, probe.access)
     runtime.color_compatibility.attach()
+    runtime.armory_trace = module("armory_trace").new(runtime, probe.access)
+    runtime.armory_trace.attach()
 end
 return M
