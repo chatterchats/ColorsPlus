@@ -57,4 +57,23 @@ pc.dead=true
 local pc2=obj("BP_BrunoPlayerController_C","/Game/Maps/Main.Main:PersistentLevel.BP_BrunoPlayerController_C_0")
 package.loaded.UEHelpers.GetPlayerController=function() helper_calls=helper_calls+1; return pc2 end
 assert(known.player_controller()==pc2 and helper_calls==2,"dead controller rediscovered")
+-- Known live instance that does not qualify: one scan per epoch, not per poll.
+local generation=1
+local gated=known_module.new(a,function() return generation end)
+local AUX="CustomizationAuxVM_C"
+local aux=obj(AUX,"/Engine/Transient.GameEngine_0:BP_BrunoGameInstance_C_0.CustomizationAuxVM_C_0",{current=false})
+local function current(x) return a.live(x) and x.current end
+local before=scans
+assert(#gated.select(AUX,128,current)==0 and scans==before+1,"first: scan (nothing known)")
+assert(#gated.select(AUX,128,current)==0 and scans==before+1,"known but unqualified in the same epoch: no rescan")
+for _=1,20 do gated.select(AUX,128,current) end
+assert(scans==before+1,"polls in the same epoch never rescan")
+aux.current=true
+assert(#gated.select(AUX,128,current)==1 and scans==before+1,"known instance qualifies again without a scan")
+aux.current=false; generation=2
+gated.select(AUX,128,current); assert(scans==before+2,"a new epoch allows one rescan")
+gated.select(AUX,128,current); assert(scans==before+2)
+-- Without an epoch source the old behaviour (scan when none qualifies) remains.
+local plain=known_module.new(a); plain.note(aux); local s0=scans
+plain.select(AUX,128,current); plain.select(AUX,128,current); assert(scans==s0+2)
 print("Known instances: scan once then by-name, newest first, dead pruning, no adoption, ambiguity kept, limits and player controller passed")

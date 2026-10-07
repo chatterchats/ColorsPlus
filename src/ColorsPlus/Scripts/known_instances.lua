@@ -6,9 +6,15 @@
 -- a name that no longer exists also costs a full scan. Callers try known names
 -- first and scan only when no known instance qualifies; dead names are dropped
 -- after one miss. Ambiguity checks then apply to the qualifying instances.
+-- epoch() changes on every native hook callback (the lookup cache's
+-- generation). A known live instance that does not qualify (the aux VM off a
+-- color slot) is rescanned at most once per epoch: capture 2 showed polls
+-- rescanning it 68 times while the player sat on radial menus.
 local M={LIMIT=8}
-function M.new(a)
+function M.new(a,epoch)
+    epoch=epoch or function() return nil end
     local self={scans=0}
+    local unqualified={} -- class -> epoch of the last scan that found none
     local names={} -- class -> full names, most recently noted first
     local controller -- player controller full name
     local function lookup(full)
@@ -41,8 +47,13 @@ function M.new(a)
     -- qualifying list and whether a scan ran.
     function self.select(class,limit,accept)
         local found={}
-        for _,v in ipairs(self.known(class)) do if accept(v) then found[#found+1]=v end end
+        local alive=self.known(class)
+        for _,v in ipairs(alive) do if accept(v) then found[#found+1]=v end end
         if #found>0 then return found,false end
+        -- Known instances exist but none qualifies, and nothing has happened
+        -- since a scan last found none: the answer is still none.
+        local now=epoch()
+        if #alive>0 and now~=nil and unqualified[class]==now then return found,false end
         self.scans=self.scans+1
         local values=FindAllOf(class) or {}
         assert(type(values)=="table","Unsupported object list: " .. class)
@@ -54,6 +65,7 @@ function M.new(a)
                 if accept(v) then found[#found+1]=v end
             end
         end
+        unqualified[class]=#found==0 and now or nil
         return found,true
     end
     -- UEHelpers.GetPlayerController scans every PlayerController; reuse the

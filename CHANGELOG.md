@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (no first-lookup scan per slot visited).
 - Gradient textures are imported per bind instead of reacquired by name: 9
   of 13 reacquisitions were full scans (collected or never-seen textures).
+- Capture 2: item-page scans 32 -> 4, container scans 22 -> 2, controller
+  8 -> 2, no texture or slot-VM scans. But the aux VM was rescanned 68 times
+  (2.16 s): off a color slot (radial menus) the known aux VM has no current
+  slot, so it never qualified and every launcher poll scanned. A known live
+  instance that does not qualify is now rescanned at most once per native
+  event (the lookup cache's generation).
 
 ### Hub editor: stop retrying the main-menu creator hook on swatch events
 
