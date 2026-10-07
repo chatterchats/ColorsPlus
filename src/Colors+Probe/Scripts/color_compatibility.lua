@@ -250,6 +250,63 @@ function M.new(runtime,a)
                             end
                         end
                     end
+                    -- COLOR row widgets: label, grid, which slot's equipped swatch each
+                    -- grid holds, and the grid's ancestry (launcher/picker placement).
+                    local all_rows={}
+                    for _,wvm in pairs(candidates("VM_WeaponCustomization_C",16)) do
+                        if a.live(wvm) then
+                            for i,row in ipairs(try(function() return a.values(a.prop(wvm,"ColorSlotVMs")) end) or {}) do
+                                local r=a.unwrap(row)
+                                if a.live(r) then all_rows[#all_rows+1]={vm=r,label=(name(wvm):match("_(%d+)$") or "?") .. "." .. i} end
+                            end
+                        end
+                    end
+                    for _,section in pairs(candidates("WBP_CustomizationSection_Tiles_C",8)) do
+                        if a.live(section) then
+                            local entries=try(function() return a.values(a.unwrap(section.TileEntries):GetAllEntries()) end) or {}
+                            log("ARMORY SECTION | " .. name(section) .. " | visible=" .. scalar(try(function() return section:IsVisible() end))
+                                .. " | entries=" .. #entries)
+                            for e,entry in ipairs(entries) do
+                                local w=a.unwrap(entry)
+                                if a.live(w) and e<=8 then
+                                    local caption=try(function() return a.text(w.WBP_Customization_SlotSubItemName.Caption) end) or "?"
+                                    local grid=a.unwrap(try(function() return w.PartsGrid end))
+                                    local count=a.live(grid) and try(function() return grid:GetNumItems() end) or "?"
+                                    local matches={}
+                                    for _,rr in ipairs(all_rows) do
+                                        local index=try(function() return grid:GetIndexForItem(rr.vm.EquippedCustomizationPartViewModel) end)
+                                        if type(index)=="number" and index>=0 then matches[#matches+1]=rr.label .. "@" .. index end
+                                    end
+                                    local chain={}
+                                    local current=grid
+                                    for _=1,8 do
+                                        current=a.unwrap(try(function() return current:GetParent() end))
+                                        if not a.live(current) then break end
+                                        chain[#chain+1]=(name(current):match("^([^ ]+) ") or "?") .. ":" .. (name(current):match("([^.]+)$") or "?")
+                                        if name(current):match("^WBP_Customization_PartTiles_C ") then break end
+                                    end
+                                    log("ARMORY ENTRY | " .. e .. " | " .. name(w) .. " | caption=" .. scalar(caption) .. " | visible=" .. scalar(try(function() return w:IsVisible() end))
+                                        .. " | grid_items=" .. scalar(count) .. " | equipped_of=" .. (#matches>0 and table.concat(matches,",") or "none")
+                                        .. " | grid_ancestry=" .. table.concat(chain," < "))
+                                end
+                            end
+                        end
+                    end
+                    -- The weapon's holder and SpudGuid, in the form ZCUnlocked's store keys it.
+                    for _,rr in ipairs(all_rows) do
+                        local f=a.unwrap(((try(function() return a.values(rr.vm:GetFragments()) end) or {})[1]))
+                        local weapon=a.live(f) and a.unwrap(try(function() return f:GetOwningCustomizationInstance():GetOwner() end))
+                        if a.live(weapon) then
+                            local holder=a.unwrap(try(function() return weapon:GetOwner() end))
+                            local guid=a.live(holder) and try(function() return a.prop(holder,"SpudGuid") end)
+                            local key=guid and try(function()
+                                local function u(v) v=tonumber(v) or 0; if v<0 then v=v+4294967296 end; return v end
+                                return string.format("%08X%08X%08X%08X",u(guid.A),u(guid.B),u(guid.C),u(guid.D))
+                            end)
+                            log("ARMORY HOLDER | row " .. rr.label .. " | weapon=" .. name(weapon) .. " | holder=" .. (a.live(holder) and name(holder) or "<none>")
+                                .. " | spud=" .. scalar(key or "<unreadable>"))
+                        end
+                    end
                     for _,render in pairs(candidates("BP_ArmoryWeaponRender_C",8)) do
                         if a.live(render) then
                             local ci=try(function() return a.unwrap(a.prop(render,"CustomizationInstance")) end)
