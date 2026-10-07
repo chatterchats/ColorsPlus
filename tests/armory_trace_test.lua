@@ -63,4 +63,41 @@ assert(has("ROW | VM_WeaponCustomization_C VM_1 | 1 |") and has("fragment=<none>
 -- Stop: hooks stay registered but are silent.
 commands.colors_armory(nil,{"stop"}); run("armory-trace:command")
 logs={}; hooks[path](row); assert(#logs==0 and not jobs["armory-trace:snapshot"])
+-- Experiment: paint writes the real weapon's row fragment, restore puts it back.
+local objects={}
+function StaticFindObject(path) return objects[path] end
+local refreshes=0
+local weapon_ci=obj("CustomizationInstance /Game/Game/Maps/Hub/HUB_Root.HUB_Root:PersistentLevel.BP_Rifle_Relby-v10_C_3.CustomizationInstance",
+    {RefreshCustomization=function() refreshes=refreshes+1 end})
+local colorclass=obj("Class /Script/BitReactorCore.CustomizationFragmentInstanceMaterialColor")
+local current={R=.7,G=.7,B=.7,A=1}
+local bolt=obj("CustomizationFragmentInstanceMaterialColor " .. weapon_ci.full:match(" (.+)$") .. ".Slot_19.MaterialColor_262",{
+    GetClass=function() return colorclass end,GetOwningCustomizationInstance=function() return weapon_ci end,
+    GetColor=function() return {R=current.R,G=current.G,B=current.B,A=current.A} end,
+    SetColor=function(_,c) current={R=c.R,G=c.G,B=c.B,A=c.A} end})
+objects[bolt.full:match(" (.+)$")]=bolt
+local bolt_row=obj("BitReactorCustomizationSlotViewModel VM_637",{DisplayName="Bolt Color",GetFragments=function() return {bolt} end})
+local preview_owner=obj("CustomizationInstance /Game/Game/Maps/Hub/Sublevels/Facilities/HUB_Armory_Gameplay.HUB_Armory_Gameplay:PersistentLevel.BP_ArmoryWeaponRender_C_0.CustomizationInstance")
+local preview_frag=obj("CustomizationFragmentInstanceMaterialColor X",{GetClass=function() return colorclass end,GetOwningCustomizationInstance=function() return preview_owner end})
+local preview_row=obj("BitReactorCustomizationSlotViewModel VM_9",{GetFragments=function() return {preview_frag} end})
+lists.VM_WeaponCustomization_C={obj("VM_WeaponCustomization_C VM_WeaponCustomization_C_0",{ColorSlotVMs={row,bolt_row,preview_row}})}
+logs={}
+assert(not pcall(trace.paint,0,2,"GG0000"),"bad hex refused")
+assert(not pcall(trace.paint,1,2,"00FF00"),"unknown VM refused")
+assert(not pcall(trace.paint,0,3,"00FF00"),"preview-owned fragment refused")
+trace.paint(0,2,"00FF00")
+assert(current.R==0 and current.G==1 and current.B==0 and current.A==1 and refreshes==1)
+assert(has("PAINT | " .. bolt.full) and has("from=0.7000,0.7000,0.7000,1.0000") and has("PAINT READBACK | 0.0000,1.0000,0.0000,1.0000"))
+trace.paint(0,2,"808080")
+assert(math.abs(current.R-0.2158605)<1e-6,"sRGB 0x80 -> linear 0.2159")
+trace.restore()
+assert(current.R==.7 and current.G==.7 and current.B==.7 and has("RESTORED | " .. bolt.full) and has("restored=1"),"restore keeps the first original")
+-- A fragment replaced by a later swatch pick is left alone.
+trace.paint(0,2,"FF0000"); objects[bolt.full:match(" (.+)$")]=nil
+trace.restore(); assert(current.R==1 and has("RESTORE SKIPPED"),"replaced fragment untouched")
+-- Console routes paint and restore.
+logs={}
+commands.colors_armory(nil,{"paint","0","2","0000FF"}); run("armory-trace:command")
+assert(current.B==1 and current.R==0)
+commands.colors_armory(nil,{"paint","0","2"}); assert(has("Usage: colors_armory"))
 print("Armory trace: opt-in hooks, chained slot events, coalesced read-only snapshots, failures logged and stop passed")

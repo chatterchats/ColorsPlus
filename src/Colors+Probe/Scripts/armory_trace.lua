@@ -4,6 +4,11 @@
 -- hold afterwards. Hooks only log and schedule one coalesced snapshot; no
 -- setters, equips or saves. Register only while the armory is open (the
 -- classes must be loaded): colors_armory [start|stop].
+-- Experiment (writes!): colors_armory paint <vm#> <row#> <RRGGBB> writes a
+-- colour straight into that colour row's fragment on the REAL weapon (as a
+-- swatch pick would) and refreshes it; colors_armory restore puts every
+-- recorded original back. Dev-only, to learn whether ZCUnlocked's bolt
+-- colour follows the fragment and whether a custom weapon colour persists.
 local M={}
 local BASE="/Game/Game/UI/Strategy/Armory/"
 local VM=BASE .. "BP/VM_WeaponCustomization.VM_WeaponCustomization_C:"
@@ -77,6 +82,58 @@ function M.new(runtime,a)
             end
         end)
     end
+    -- Experiment writes ------------------------------------------------------
+    local WEAPON="^CustomizationInstance /Game/Game/Maps/Hub/HUB_Root%.HUB_Root:PersistentLevel%.BP_[%w_%-]+_C_%d+%.CustomizationInstance$"
+    local written={} -- fragment full name -> {owner=, original=}
+    local function linear(byte)
+        local c=byte/255
+        return c<=0.04045 and c/12.92 or ((c+0.055)/1.055)^2.4
+    end
+    local function find(full)
+        local v=live(StaticFindObject(full:match("^[^ ]+ (.+)$")))
+        if v and a.name(v)==full then return v end
+    end
+    function self.paint(vm_index,row_index,hex)
+        local r8,g8,b8=hex:match("^#?(%x%x)(%x%x)(%x%x)$")
+        assert(r8,"Colour must be RRGGBB")
+        local wvm
+        for _,v in ipairs(list("VM_WeaponCustomization_C",8)) do
+            if name(v):match("_(%d+)$")==tostring(vm_index) then wvm=v end
+        end
+        assert(wvm,"No VM_WeaponCustomization_C_" .. tostring(vm_index))
+        local rows=a.values(a.prop(wvm,"ColorSlotVMs"))
+        local row=assert(live(rows[row_index]),"No colour row " .. tostring(row_index))
+        local frags=a.values(row:GetFragments())
+        assert(#frags==1,"Row must have exactly one fragment (has " .. #frags .. ")")
+        local f=assert(live(frags[1]),"Fragment unavailable")
+        assert(name(f:GetClass())=="Class /Script/BitReactorCore.CustomizationFragmentInstanceMaterialColor","Not a colour fragment")
+        local owner=assert(live(f:GetOwningCustomizationInstance()),"No owner")
+        assert(name(owner):match(WEAPON),"Owner is not a hub weapon: " .. name(owner))
+        local now=f:GetColor()
+        local record=written[name(f)] or {owner=name(owner),original={R=now.R,G=now.G,B=now.B,A=now.A}}
+        written[name(f)]=record
+        local c={R=linear(tonumber(r8,16)),G=linear(tonumber(g8,16)),B=linear(tonumber(b8,16)),A=record.original.A}
+        log("PAINT | " .. name(f) .. " | label=" .. scalar(try(function() return a.text(row.DisplayName) end) or "?")
+            .. " | from=" .. color(f) .. " | to=" .. string.format("%.4f,%.4f,%.4f,%.4f",c.R,c.G,c.B,c.A))
+        f:SetColor(c)
+        owner:RefreshCustomization()
+        log("PAINT READBACK | " .. color(f) .. " | owner=" .. name(owner) .. " | restore with colors_armory restore")
+    end
+    function self.restore()
+        local n=0
+        for full,record in pairs(written) do
+            local f=find(full)
+            if f and name(f:GetOwningCustomizationInstance())==record.owner then
+                f:SetColor(record.original)
+                live(f:GetOwningCustomizationInstance()):RefreshCustomization()
+                log("RESTORED | " .. full .. " | rgba=" .. color(f)); n=n+1
+            else
+                log("RESTORE SKIPPED | " .. full .. " | fragment replaced (a swatch was picked since) or gone")
+            end
+            written[full]=nil
+        end
+        log("RESTORE DONE | restored=" .. n)
+    end
     function self.start()
         self.active=true
         local installed,missing=0,0
@@ -103,12 +160,26 @@ function M.new(runtime,a)
         }
         if type(RegisterConsoleCommandHandler)~="function" then log("Console unavailable"); return end
         runtime:console("colors_armory",function(_,parameters,output)
-            local action=string.lower(tostring((parameters or {})[1] or "start"))
+            parameters=parameters or {}
+            local action=string.lower(tostring(parameters[1] or "start"))
             local message
             if action=="start" or action=="stop" then
                 runtime:after("armory-trace:command",1,function() if action=="stop" then self.stop() else self.start() end end)
                 message="Queued armory trace " .. action .. "."
-            else message="Usage: colors_armory [start|stop]" end
+            elseif action=="paint" and #parameters==4 then
+                local vm_index,row_index,hex=tonumber(parameters[2]),tonumber(parameters[3]),tostring(parameters[4])
+                runtime:after("armory-trace:command",1,function()
+                    local ok,err=pcall(self.paint,vm_index,row_index,hex)
+                    if not ok then log("PAINT REFUSED | " .. scalar(err)) end
+                end)
+                message="Queued paint of VM " .. tostring(vm_index) .. " row " .. tostring(row_index) .. " -> " .. hex .. "."
+            elseif action=="restore" then
+                runtime:after("armory-trace:command",1,function()
+                    local ok,err=pcall(self.restore)
+                    if not ok then log("RESTORE FAILED | " .. scalar(err)) end
+                end)
+                message="Queued restore of painted rows."
+            else message="Usage: colors_armory [start|stop|paint <vm#> <row#> <RRGGBB>|restore]" end
             log(message)
             if output then pcall(function() output:Log(message) end) end
         end)
