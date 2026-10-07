@@ -134,6 +134,25 @@ function M.new(runtime,a)
         return {screen=screen_name,section=name(section),entry=entry_name,grid=name(p.grid),row=name(p.r.row),
             fragment=p.r.fragment,overlay=overlay,stack=stack,chain=chain,tag=paint.TAG}
     end
+    -- Changing Location or Finish can recreate the row VMs while the row
+    -- widget stays: follow the weapon's paint fragment to its new row VM.
+    local function rebind_row(b)
+        local found={}
+        select("VM_WeaponCustomization_C",16,function(vm)
+            if not a.live(vm) then return false end
+            local any=false
+            for i,row in ipairs(a.values(a.prop(vm,"ColorSlotVMs") or {})) do
+                if i<=16 and paint.qualifies(row) then
+                    local r=obj(row,"paint row")
+                    if name(obj(a.values(r:GetFragments())[1],"paint fragment"))==b.fragment then found[#found+1]=name(r); any=true end
+                end
+            end
+            return any
+        end)
+        assert(#found==1,"Paint Color row changed (" .. #found .. " rows hold the weapon's paint)")
+        log("ROW REBOUND | " .. b.row .. " -> " .. found[1])
+        b.row=found[1]
+    end
     local function validate(b)
         assert(b and self.binding==b,"Armory pane ownership ended")
         local screen=fresh(b.screen,"Customize Weapon screen")
@@ -141,8 +160,8 @@ function M.new(runtime,a)
         local section=fresh(b.section,"COLOR section")
         assert(section:IsVisible()==true,"COLOR section hidden")
         local entry=fresh(b.entry,"Paint Color row widget")
-        local row=fresh(b.row,"Paint Color row")
-        assert(paint.qualifies(row),"Paint Color row changed")
+        local ok,row=pcall(fresh,b.row,"Paint Color row")
+        if not (ok and paint.qualifies(row)) then rebind_row(b) end
         local grid=obj(entry.PartsGrid,"swatch grid")
         assert(name(grid)==b.grid,"Swatch grid replaced")
         local current=grid

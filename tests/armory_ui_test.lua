@@ -73,7 +73,7 @@ local function row_widget(n)
     return entry,grid,column,overlay
 end
 local white={}
-local paint_row=register({full="BitReactorCustomizationSlotViewModel /Engine/Transient.X.VM_644",IsValid=function() return true end,GetFullName=function(self) return self.full end,
+local paint_row=register({full="BitReactorCustomizationSlotViewModel /Engine/Transient.X.VM_644",IsValid=function(self) return not self.dead end,GetFullName=function(self) return self.full end,
     EquippedCustomizationPartViewModel=white,GetFragments=function() return {{IsValid=function() return true end,GetFullName=function() return "CustomizationFragmentInstanceMaterialColor @Rifle.Frag" end}} end})
 local bolt_row=register({full="BitReactorCustomizationSlotViewModel /Engine/Transient.X.VM_637",IsValid=function() return true end,GetFullName=function(self) return self.full end,
     EquippedCustomizationPartViewModel=white})
@@ -120,6 +120,12 @@ local button=objects[ui.button_name:match("^[^ ]+ (.+)$")]
 click({get=function() return button end})
 run("armory-ui:launch"); run("armory-ui:open")
 assert(opened==1 and runtime.color_host==ui and runtime.color_backend==runtime.armory_paint)
+-- Location/Finish changes recreate the row VM under the same row widget.
+local renewed_row=register({full="BitReactorCustomizationSlotViewModel /Engine/Transient.X.VM_660",IsValid=function() return true end,GetFullName=function(self) return self.full end,
+    EquippedCustomizationPartViewModel=white,GetFragments=paint_row.GetFragments})
+runtime.armory_paint.qualifies=function(row) return row==paint_row or row==renewed_row end
+paint_row.dead=true; vm.ColorSlotVMs={renewed_row,bolt_row}
+assert(ui.validate_picker(ui.binding) and ui.bound_row()==renewed_row.full and has("ROW REBOUND |"),"Row VM followed")
 -- picker_view's pre-open cleanup calls release_picker(nil): the launch keeps its host.
 ui.release_picker(nil)
 assert(runtime.color_host==ui and runtime.color_backend==runtime.armory_paint,"Cleanup release keeps the armory launch")
@@ -153,4 +159,4 @@ runtime.armory_paint.qualifies=function() return false end
 ui.context_changed("armory activated",screen.full)
 for _=1,3 do run("armory-ui:install") end
 assert(not ui.binding and has("NOT ATTACHED |") and has("No vanilla Paint Color row"))
-print("Armory UI: quiet outside the armory, row discovery and placement, launch on the armory backend, host hide/release, retire and leave")
+print("Armory UI: quiet outside the armory, row discovery and placement, launch on the armory backend, row VM renewal, host hide/release, retire and leave")

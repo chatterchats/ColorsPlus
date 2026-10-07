@@ -61,16 +61,9 @@ function M.new(runtime,a)
         return ok
     end
     self.qualifies=qualifies
-    -- Resolve everything from the bound row (scalar identity) afresh.
-    local function resolve(row_name)
-        assert(type(row_name)=="string","No armory paint row bound")
-        local row=find(row_name,"Paint row")
-        assert(qualifies(row),"Row is no longer the vanilla Paint Color row")
-        local f=paint_fragment(row:GetFragments(),"Row")
-        local owner=object(f:GetOwningCustomizationInstance(),"weapon customization")
-        local slot=object(f:GetOwningCustomizationSlot(),"weapon paint slot")
-        assert(a.text(slot:GetSlotNameTag().TagName)==M.TAG,"Weapon paint slot tag changed")
-        -- The armory preview mirrors the weapon being customized: same part.
+    -- The armory preview showing the weapon: its customization and paint
+    -- fragment, which must show the given swatch.
+    local function preview_paint(expected)
         local renders={}
         local function shown(r) return a.live(r) and a.prop(r,"isShowingWeapon")==true end
         if runtime.known then renders=runtime.known.select("BP_ArmoryWeaponRender_C",8,shown)
@@ -80,13 +73,63 @@ function M.new(runtime,a)
         assert(name(preview):match(PREVIEW),"Unsupported armory preview")
         local pslot=object(preview:GetSlotInstance({TagName=FName(M.TAG)}),"armory preview paint slot")
         local pf=paint_fragment(pslot:GetFragmentInstances(),"Preview")
-        assert(part(pslot)==part(slot),"Armory preview shows a different paint swatch")
+        assert(part(pslot)==expected,"Armory preview shows a different paint swatch")
+        return preview,pf
+    end
+    -- The weapon's paint slot and fragment, found from the weapon itself.
+    local function weapon_paint(owner)
+        local slot=object(owner:GetSlotInstance({TagName=FName(M.TAG)}),"weapon paint slot")
+        assert(a.text(slot:GetSlotNameTag().TagName)==M.TAG,"Weapon paint slot tag changed")
+        return slot,paint_fragment(slot:GetFragmentInstances(),"Weapon")
+    end
+    -- Resolve everything from the bound row (scalar identity) afresh.
+    local function resolve(row_name)
+        assert(type(row_name)=="string","No armory paint row bound")
+        local row=find(row_name,"Paint row")
+        assert(qualifies(row),"Row is no longer the vanilla Paint Color row")
+        local f=paint_fragment(row:GetFragments(),"Row")
+        local owner=object(f:GetOwningCustomizationInstance(),"weapon customization")
+        local slot,wf=weapon_paint(owner)
+        assert(name(wf)==name(f),"Weapon paint slot does not hold the row's fragment")
+        local preview,pf=preview_paint(part(slot))
         return {row=row,fragment=f,owner=owner,slot=slot,preview=preview,preview_fragment=pf}
     end
+    local function write_preview(c,value)
+        c.preview_fragment:SetColor(value)
+        c.preview:RefreshCustomization()
+        assert(a.live(c.preview_fragment) and same(color(c.preview_fragment),value),"Armory preview readback failed")
+    end
+    -- Changing Location or Finish rebuilds the armory preview (and can
+    -- recreate the row VMs): the session follows the weapon itself. The
+    -- preview may be missing for a moment while it rebuilds; a new copy gets
+    -- the draft again. Only a weapon-side paint change ends the draft.
+    local MISSING_LIMIT=20
     local function check(s)
-        local c=resolve(s.row)
-        assert(name(c.fragment)==s.fragment and name(c.owner)==s.owner,"Weapon paint fragment replaced")
-        assert(name(c.preview_fragment)==s.preview_fragment and name(c.preview)==s.preview,"Armory preview rebuilt")
+        local owner=find(s.owner,"Weapon customization")
+        local slot,f=weapon_paint(owner)
+        assert(part(slot)==s.perf_target.part,"Weapon paint swatch changed")
+        if name(f)~=s.fragment then
+            assert(same(color(f),s.original),"Weapon paint fragment replaced")
+            log("WEAPON FRAGMENT RENEWED | " .. s.fragment .. " -> " .. name(f))
+            s.fragment=name(f)
+        end
+        local c={owner=owner,slot=slot,fragment=f}
+        local ok,preview,pf=pcall(preview_paint,s.perf_target.part)
+        if not ok then
+            s.missing=(s.missing or 0)+1
+            if s.missing==1 then log("PREVIEW UNAVAILABLE | waiting for the armory to rebuild it (" .. tostring(preview) .. ")") end
+            assert(s.missing<MISSING_LIMIT,"Armory preview unavailable: " .. tostring(preview))
+            return c
+        end
+        s.missing=nil
+        c.preview,c.preview_fragment=preview,pf
+        if name(pf)~=s.preview_fragment or name(preview)~=s.preview then
+            -- A fresh copy of the weapon: its colour is the weapon's own.
+            s.preview,s.preview_fragment=name(preview),name(pf)
+            s.preview_original=color(pf)
+            if not same(s.preview_original,s.test_color) then write_preview(c,s.test_color) end
+            log("PREVIEW REBUILT | preview=" .. s.preview_fragment .. " | draft reapplied")
+        end
         return c
     end
     -- The row the armory launcher is bound to (scalar), or nil.
@@ -114,23 +157,20 @@ function M.new(runtime,a)
         if not ok then log("OPEN REFUSED | " .. tostring(result)); return nil end
         return result
     end
-    local function write_preview(s,c,value)
-        c.preview_fragment:SetColor(value)
-        c.preview:RefreshCustomization()
-        local after=check(s)
-        assert(same(color(after.preview_fragment),value),"Armory preview readback failed")
-    end
     function self.update_live(s,chosen)
         if s~=self.pending or not s.live or self.busy then return false end
         self.busy=true
         local ok,err=pcall(function()
             local value={R=chosen.R,G=chosen.G,B=chosen.B,A=s.original.A}
-            write_preview(s,check(s),value)
+            local c=check(s)
             s.test_color=value
+            -- Without a preview the draft waits for the next copy.
+            if c.preview then write_preview(c,value); return true end
+            return false
         end)
         self.busy=false
-        if not ok then log("UPDATE REFUSED | " .. tostring(err)) end
-        return ok,ok
+        if not ok then log("UPDATE REFUSED | " .. tostring(err)); return false end
+        return true,err
     end
     function self.check_live(s)
         if s~=self.pending or not s.live then return false,"Armory paint draft ended" end
@@ -146,10 +186,9 @@ function M.new(runtime,a)
             local value=copy(s.test_color)
             c.fragment:SetColor(value)
             c.owner:RefreshCustomization()
-            local after=check(s)
-            assert(same(color(after.fragment),value),"Weapon paint readback failed")
+            assert(a.live(c.fragment) and same(color(c.fragment),value),"Weapon paint readback failed")
             -- Keep the preview showing the applied colour too.
-            if not same(color(after.preview_fragment),value) then write_preview(s,after,value) end
+            if c.preview and not same(color(c.preview_fragment),value) then write_preview(c,value) end
             log("APPLIED | weapon=" .. s.owner .. " | " .. rgba(s.original) .. " -> " .. rgba(value)
                 .. " | the game saves it like a swatch pick")
         end)
@@ -166,7 +205,8 @@ function M.new(runtime,a)
         self.busy=true
         local ok,err=pcall(function()
             local c=check(s)
-            write_preview(s,c,s.preview_original)
+            assert(c.preview,"Armory preview unavailable")
+            write_preview(c,s.preview_original)
         end)
         self.busy=false
         s.live=false; self.pending=nil

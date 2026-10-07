@@ -36,6 +36,9 @@ local real_ci=obj("CustomizationInstance " .. HUB .. "BP_Rifle_Relby-v10_C_3.Cus
 local real_slot=obj("CustomizationFragmentInstanceSlot " .. HUB .. "BP_Rifle_Relby-v10_C_3.CustomizationInstance.Slot_26",
     {GetSlotNameTag=function() return {TagName=TAG} end,GetCustomizationPartPrimaryAssetId=function() return id("CPD_Wep_PaintColor_White") end})
 local real=fragment("CustomizationFragmentInstanceMaterialColor " .. HUB .. "BP_Rifle_Relby-v10_C_3.CustomizationInstance.Slot_26.Color_0",real_ci,real_slot,{.71,.72,.70,1})
+local real_list={real}
+function real_slot:GetFragmentInstances() return real_list end
+function real_ci:GetSlotInstance(t) assert(t.TagName==TAG); return real_slot end
 local row=obj("BitReactorCustomizationSlotViewModel /Engine/Transient.GameEngine_0:BP_BrunoGameInstance_C_0.VM_644",
     {DisplayName="Paint Color",SlotTag={TagName=TAG},GetFragments=function() return {real} end})
 -- The armory preview copy.
@@ -95,15 +98,32 @@ real.color={R=.2,G=.2,B=.2,A=1}
 assert(not paint.apply_live(s) and has("APPLY FAILED | ") and near(real.color,.2,.2,.2,1))
 assert(paint.cancel_live("cleanup"))
 
--- The game rebuilt the preview: health fails, Cancel leaves it to the game.
-s=assert(paint.begin_live())
-local rebuilt=fragment("CustomizationFragmentInstanceMaterialColor " .. ARM .. "BP_ArmoryWeaponRender_C_0.CustomizationInstance.Slot_3.Color_9",preview_ci,preview_slot,{.2,.2,.2,1})
+-- Location/Finish changes rebuild the preview: the draft follows the new copy.
+s=assert(paint.begin_live()); assert(paint.update_live(s,{R=1,G=0,B=0,A=1}))
+local rebuilt=fragment("CustomizationFragmentInstanceMaterialColor " .. ARM .. "BP_ArmoryWeaponRender_C_0.CustomizationInstance.Slot_9.Color_0",preview_ci,preview_slot,{.2,.2,.2,1})
 preview_list={rebuilt}
+assert(paint.check_live(s) and near(rebuilt.color,1,0,0,1) and has("PREVIEW REBUILT |"),"Draft reapplied to the new copy")
+-- The preview is missing for a moment: drafts wait, then land on the next copy.
+lists.BP_ArmoryWeaponRender_C={}
+assert(paint.check_live(s) and paint.update_live(s,{R=0,G=0,B=1,A=1}) and has("PREVIEW UNAVAILABLE |"))
+local again=fragment("CustomizationFragmentInstanceMaterialColor " .. ARM .. "BP_ArmoryWeaponRender_C_0.CustomizationInstance.Slot_12.Color_0",preview_ci,preview_slot,{.2,.2,.2,1})
+preview_list={again}; lists.BP_ArmoryWeaponRender_C={render}
+assert(paint.check_live(s) and near(again.color,0,0,1,1))
+-- Cancel restores the new copy's own colour; the weapon was never written.
+assert(paint.cancel_live("Cancel") and near(again.color,.2,.2,.2,1) and near(real.color,.2,.2,.2,1) and has("preview restored"))
+-- The weapon's fragment is renewed with the same colour: Apply still works.
+s=assert(paint.begin_live()); assert(paint.update_live(s,{R=0,G=1,B=1,A=1}))
+local renewed=fragment("CustomizationFragmentInstanceMaterialColor " .. HUB .. "BP_Rifle_Relby-v10_C_3.CustomizationInstance.Slot_26.Color_4",real_ci,real_slot,{.2,.2,.2,1})
+real_list={renewed}
+assert(paint.apply_live(s) and near(renewed.color,0,1,1,1) and has("WEAPON FRAGMENT RENEWED |"))
+real_list={real}; preview_list={preview}; row.GetFragments=function() return {real} end
+-- A different swatch on the weapon ends the draft.
+s=assert(paint.begin_live())
+preview_part="CPD_Wep_PaintColor_Red"; real_slot.GetCustomizationPartPrimaryAssetId=function() return id("CPD_Wep_PaintColor_Red") end
 local healthy,why=paint.check_live(s)
-assert(not healthy and tostring(why):find("rebuilt",1,true))
-assert(not paint.update_live(s,{R=1,G=1,B=1,A=1}) and near(rebuilt.color,.2,.2,.2,1))
-assert(paint.cancel_live("rebuilt") and has("preview left to the game"))
-preview_list={preview}
+assert(not healthy and tostring(why):find("swatch changed",1,true))
+assert(paint.cancel_live("swatch"))
+preview_part="CPD_Wep_PaintColor_White"; real_slot.GetCustomizationPartPrimaryAssetId=function() return id("CPD_Wep_PaintColor_White") end
 
 -- Refusals at opening: a preview of another swatch, two previews, no row.
 preview_part="CPD_Wep_PaintColor_Red"; assert(not paint.begin_live() and has("different paint swatch")); preview_part="CPD_Wep_PaintColor_White"
@@ -112,4 +132,4 @@ assert(not paint.begin_live() and has("Expected one armory preview")); lists.BP_
 bound=nil; assert(not paint.begin_live() and has("No armory paint row bound")); bound=row.full
 row.DisplayName="Bolt Color"; assert(not paint.begin_live() and has("no longer the vanilla Paint Color row")); row.DisplayName="Paint Color"
 assert(paint.begin_live() and paint.cancel_live("done"))
-print("Armory paint: vanilla row only, preview-only drafts, Apply to the weapon (alpha kept), Cancel restores, refusals on change")
+print("Armory paint: vanilla row only, preview-only drafts, Apply to the weapon (alpha kept), Cancel restores, follows preview rebuilds, refusals on change")
