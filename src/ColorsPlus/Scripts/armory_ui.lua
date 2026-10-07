@@ -149,9 +149,19 @@ function M.new(runtime,a)
             end
             return any
         end)
-        assert(#found==1,"Paint Color row changed (" .. #found .. " rows hold the weapon's paint)")
-        log("ROW REBOUND | " .. b.row .. " -> " .. found[1])
-        b.row=found[1]
+        if #found==1 then
+            log("ROW REBOUND | " .. b.row .. " -> " .. found[1])
+            b.row=found[1]; return
+        end
+        -- Another weapon (or a new paint fragment) in the same row widget:
+        -- with no picker open, keep the launcher where discovery lands on the
+        -- same widgets (a new button would show its designer text again).
+        assert(not self.picker_owner,"Paint Color row changed (" .. #found .. " rows hold the weapon's paint)")
+        local d=discover()
+        assert(d.section==b.section and d.entry==b.entry and d.grid==b.grid and d.stack==b.stack
+            and table.concat(d.chain,"|")==table.concat(b.chain,"|"),"Paint Color row moved")
+        log("ROW REBOUND | weapon paint changed | " .. b.row .. " -> " .. d.row)
+        b.row=d.row; b.fragment=d.fragment
     end
     local function validate(b)
         assert(b and self.binding==b,"Armory pane ownership ended")
@@ -210,10 +220,9 @@ function M.new(runtime,a)
             if generation~=epoch or self.binding~=b then return end
             local ok,err=pcall(validate,b)
             if ok then
-                -- The button finishes building after it is placed and resets
-                -- its label to the designer text: set it again a few times.
-                if self.caption_checks and self.caption_checks>0 and self.button_name then
-                    self.caption_checks=self.caption_checks-1
+                -- The button can reset its label to the designer text after
+                -- it is placed (seen up to seconds later): keep setting it.
+                if self.button_name and not self.picker_owner then
                     pcall(function() fresh(self.button_name,"Custom Color button"):UpdateText(FText("CUSTOM COLOR")) end)
                 end
                 poll(b,generation); return
@@ -253,7 +262,6 @@ function M.new(runtime,a)
         local slot=fresh(b.stack,"row column"):AddChild(root)
         slot:SetPadding({Left=0,Top=6,Right=0,Bottom=2})
         fresh(self.button_name,"Custom Color button"):UpdateText(FText("CUSTOM COLOR"))
-        self.caption_checks=4
         local generation=epoch
         button_clicks.get(runtime).bind(self.button_name,self.root_name,"launch",function()
             if runtime.picker.active then return end

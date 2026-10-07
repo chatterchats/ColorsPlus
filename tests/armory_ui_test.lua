@@ -126,6 +126,15 @@ local renewed_row=register({full="BitReactorCustomizationSlotViewModel /Engine/T
 runtime.armory_paint.qualifies=function(row) return row==paint_row or row==renewed_row end
 paint_row.dead=true; vm.ColorSlotVMs={renewed_row,bolt_row}
 assert(ui.validate_picker(ui.binding) and ui.bound_row()==renewed_row.full and has("ROW REBOUND |"),"Row VM followed")
+-- Another weapon in the same row widget (new paint fragment), no picker open:
+-- the launcher stays and follows the new row.
+local root_before,button_before=ui.root_name,ui.button_name
+local other_row=register({full="BitReactorCustomizationSlotViewModel /Engine/Transient.X.VM_670",IsValid=function() return true end,GetFullName=function(self) return self.full end,
+    EquippedCustomizationPartViewModel=white,GetFragments=function() return {{IsValid=function() return true end,GetFullName=function() return "CustomizationFragmentInstanceMaterialColor @Pistol.Frag" end}} end})
+runtime.armory_paint.qualifies=function(row) return row==other_row end
+vm.ColorSlotVMs={other_row,bolt_row}
+assert(ui.validate_picker(ui.binding) and ui.bound_row()==other_row.full and ui.binding.fragment:find("@Pistol",1,true))
+assert(ui.root_name==root_before and ui.button_name==button_before and has("weapon paint changed"),"Launcher kept")
 -- picker_view's pre-open cleanup calls release_picker(nil): the launch keeps its host.
 ui.release_picker(nil)
 assert(runtime.color_host==ui and runtime.color_backend==runtime.armory_paint,"Cleanup release keeps the armory launch")
