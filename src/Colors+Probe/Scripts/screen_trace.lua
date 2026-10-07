@@ -10,6 +10,8 @@ local CLASSES={
     {"WBP_CentralUITabs_C","page"},
     {"WBP_Customization_MasterPage_C","page"},
     {"WBP_Customization_Edit_Portrait_C","page"},
+    -- Armory > Customize Weapon (ZCBoltColor's Bolt Color row lives here).
+    {"WBP_Menu_Armory_CustomizeWeapon_C","page"},
     {"BitReactorActivatableWidgetStack","stack"},
     {"BitReactorActivatableWidgetTabStack","stack"},
 }

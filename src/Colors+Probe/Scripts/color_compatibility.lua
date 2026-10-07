@@ -185,11 +185,24 @@ function M.new(runtime,a)
             for _,p in pairs(candidates("WBP_Customization_ItemPage_C",128)) do
                 if a.live(p) and p:IsActivated()==true then assert(not page,"Ambiguous active item page"); page=name(p) end
             end
-            assert(page,"Open a customization color page first")
-            -- The in-game (hub) editor has no creator master; survey it unbound.
-            local bound,binding=pcall(lifetime.bind,page)
-            log("CONTEXT | page=" .. page .. " | creator=" .. (bound and binding.master
-                or ("unbound (" .. scalar(binding) .. ")")))
+            -- The armory's Customize Weapon screen has no item page; survey the
+            -- selected slot through the aux VM alone (no palette mapping).
+            if page then
+                -- The in-game (hub) editor has no creator master; survey it unbound.
+                local bound,binding=pcall(lifetime.bind,page)
+                log("CONTEXT | page=" .. page .. " | creator=" .. (bound and binding.master
+                    or ("unbound (" .. scalar(binding) .. ")")))
+            else
+                log("CONTEXT | no active item page (armory?) | slot from the aux VM; palette not surveyed")
+                for _,class in ipairs({"WBP_Menu_Armory_CustomizeWeapon_C","WBP_TabbedMenu_Armory_C"}) do
+                    for _,w in pairs(candidates(class,32)) do
+                        if a.live(w) then
+                            local active=pcall(function() return w:IsActivated() end) and w:IsActivated()
+                            log("ARMORY SCREEN | " .. name(w) .. " | activated=" .. scalar(active))
+                        end
+                    end
+                end
+            end
             local vm,root
             for _,aux in pairs(candidates("CustomizationAuxVM_C",128)) do
                 if a.live(aux) then
@@ -201,7 +214,8 @@ function M.new(runtime,a)
                 end
             end
             vm=object(vm)
-            vm=targets.selected(vm,page,root)
+            if page then vm=targets.selected(vm,page,root) end
+            log("SLOT VM | " .. name(vm) .. " | root=" .. scalar(a.live(a.unwrap(root)) and name(root) or "<none>"))
             local slot_tag=a.text(vm.SlotTag.TagName)
             local equipped=object(vm.EquippedCustomizationPartViewModel)
             log("SELECTED | name=" .. scalar(a.text(vm.DisplayName)) .. " | tag=" .. scalar(slot_tag)
