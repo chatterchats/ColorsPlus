@@ -93,6 +93,9 @@ local opened=0
 runtime.picker={active=false,open=function() opened=opened+1; runtime.picker.active=true; return true end,
     close=function(reason) runtime.picker.active=false; runtime.picker.closed=reason end}
 runtime.armory_paint={TAG="br.Customization.Slot.Weapon.PaintColor",qualifies=function(row) return row==paint_row end}
+function runtime.armory_paint.paint_row(v)
+    for _,row in ipairs(v.ColorSlotVMs) do if runtime.armory_paint.qualifies(row) then return row end end
+end
 local function run(k) local cb=assert(jobs[k],k); jobs[k]=nil; cb() end
 local function has(s) for _,l in ipairs(logs) do if l:find(s,1,true) then return true end end end
 local ui=factory.new(runtime,a)

@@ -9,8 +9,11 @@
 -- Color row qualifies: ZCUnlocked's bolt/blade rows reuse the same tags and
 -- colour their effects from their own store, so a write there would only
 -- repaint the weapon body. Lightsabers are left alone for the same reason.
+-- Rows are told apart by slot tag, never by their (localized) label: on a
+-- blaster only the vanilla Paint Color row carries the PaintColor tag
+-- (ZCUnlocked's Bolt Color row reuses PaintFinish). A weapon VM with more
+-- than one PaintColor row is not one we understand, so it gets no button.
 local M={}
-M.LABEL="Paint Color"
 M.TAG="br.Customization.Slot.Weapon.PaintColor"
 M.PARAMETER="Paint Color"
 local COLOR="Class /Script/BitReactorCore.CustomizationFragmentInstanceMaterialColor"
@@ -49,11 +52,12 @@ function M.new(runtime,a)
         assert(a.text(f.MaterialTarget.MaterialParameterName)==M.PARAMETER,label .. " fragment does not target " .. M.PARAMETER)
         return f
     end
+    local function tagged(row) return a.text(row.SlotTag.TagName)==M.TAG end
     -- Is this colour row the vanilla Paint Color row of a hub blaster?
     local function qualifies(row)
         local ok=pcall(function()
             row=object(row,"row")
-            assert(a.text(row.DisplayName)==M.LABEL and a.text(row.SlotTag.TagName)==M.TAG)
+            assert(tagged(row))
             local f=paint_fragment(row:GetFragments(),"Row")
             local weapon=name(f:GetOwningCustomizationInstance()):match(WEAPON)
             assert(weapon and not weapon:find("LightSaber",1,true))
@@ -61,6 +65,17 @@ function M.new(runtime,a)
         return ok
     end
     self.qualifies=qualifies
+    -- The weapon VM's one Paint Color row (its ColorSlotVMs), or nil.
+    function self.paint_row(vm)
+        local found,count=nil,0
+        for i,row in ipairs(a.values(a.prop(vm,"ColorSlotVMs") or {})) do
+            if i>16 then break end
+            local ok,is=pcall(function() return tagged(object(row,"row")) end)
+            if ok and is then count=count+1; found=row end
+        end
+        if count==1 and qualifies(found) then return object(found,"row") end
+        return nil
+    end
     -- The armory preview showing the weapon: its customization and paint
     -- fragment, which must show the given swatch.
     local function preview_paint(expected)

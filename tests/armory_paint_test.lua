@@ -63,8 +63,15 @@ local function near(c,r,g,b,al) return math.abs(c.R-r)<1e-6 and math.abs(c.G-g)<
 
 -- Only the vanilla Paint Color row of a hub blaster qualifies.
 assert(paint.qualifies(row))
-local bolt=obj("BitReactorCustomizationSlotViewModel /Engine/Transient.X.VM_637",{DisplayName="Bolt Color",SlotTag={TagName=TAG},GetFragments=function() return {real} end})
+-- ZCUnlocked's Bolt Color row reuses the PaintFinish tag (and targets Paint Color).
+local bolt=obj("BitReactorCustomizationSlotViewModel /Engine/Transient.X.VM_637",{DisplayName="Bolt Color",SlotTag={TagName="br.Customization.Slot.Weapon.PaintFinish"},GetFragments=function() return {real} end})
 assert(not paint.qualifies(bolt),"ZCUnlocked rows are left alone")
+-- Labels are localized: a translated label still qualifies; tags decide.
+row.DisplayName="Couleur de peinture"; assert(paint.qualifies(row)); row.DisplayName="Paint Color"
+-- The weapon VM's one PaintColor row; two PaintColor rows: none.
+assert(paint.paint_row({ColorSlotVMs={row,bolt}})==row and paint.paint_row({ColorSlotVMs={bolt}})==nil)
+local twin=obj("BitReactorCustomizationSlotViewModel /Engine/Transient.X.VM_638",{DisplayName="Paint Color",SlotTag={TagName=TAG},GetFragments=function() return {real} end})
+assert(paint.paint_row({ColorSlotVMs={row,twin}})==nil,"Two PaintColor rows: no button")
 local saber_ci=obj("CustomizationInstance " .. HUB .. "BP_LightSaber_Tel_Padawan_C_2.CustomizationInstance")
 local saber_frag=fragment("CustomizationFragmentInstanceMaterialColor " .. HUB .. "BP_LightSaber_Tel_Padawan_C_2.CustomizationInstance.Slot_0.Color_0",saber_ci,real_slot,{1,1,1,1})
 local saber=obj("BitReactorCustomizationSlotViewModel /Engine/Transient.X.VM_652",{DisplayName="Paint Color",SlotTag={TagName=TAG},GetFragments=function() return {saber_frag} end})
@@ -130,6 +137,6 @@ preview_part="CPD_Wep_PaintColor_Red"; assert(not paint.begin_live() and has("di
 lists.BP_ArmoryWeaponRender_C={render,obj("BP_ArmoryWeaponRender_C " .. ARM .. "BP_ArmoryWeaponRender_C_1",{isShowingWeapon=true,CustomizationInstance=preview_ci})}
 assert(not paint.begin_live() and has("Expected one armory preview")); lists.BP_ArmoryWeaponRender_C={render}
 bound=nil; assert(not paint.begin_live() and has("No armory paint row bound")); bound=row.full
-row.DisplayName="Bolt Color"; assert(not paint.begin_live() and has("no longer the vanilla Paint Color row")); row.DisplayName="Paint Color"
+row.SlotTag={TagName="br.Customization.Slot.Weapon.PaintFinish"}; assert(not paint.begin_live() and has("no longer the vanilla Paint Color row")); row.SlotTag={TagName=TAG}
 assert(paint.begin_live() and paint.cancel_live("done"))
-print("Armory paint: vanilla row only, preview-only drafts, Apply to the weapon (alpha kept), Cancel restores, follows preview rebuilds, refusals on change")
+print("Armory paint: vanilla row only (by tag, any language), preview-only drafts, Apply to the weapon (alpha kept), Cancel restores, follows preview rebuilds, refusals on change")

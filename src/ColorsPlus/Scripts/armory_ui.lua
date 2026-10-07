@@ -20,6 +20,8 @@ function M.new(runtime,a)
     -- Row checks belong to the backend instance (runtime.armory_paint).
     local paint={TAG=paint_module.TAG,qualifies=function(row)
         return runtime.armory_paint~=nil and runtime.armory_paint.qualifies(row)
+    end,row=function(vm)
+        return runtime.armory_paint~=nil and runtime.armory_paint.paint_row(vm) or nil
     end}
     runtime.gradient_assets=runtime.gradient_assets or assert(loadfile(directory .. "gradient_assets.lua"))()
     local gradients=runtime.gradient_assets
@@ -66,16 +68,13 @@ function M.new(runtime,a)
         local rows={}
         select("VM_WeaponCustomization_C",16,function(vm)
             if not a.live(vm) then return false end
-            local list=a.values(a.prop(vm,"ColorSlotVMs") or {})
-            local any=false
-            for i,row in ipairs(list) do
-                if i<=16 and paint.qualifies(row) then
-                    local r=obj(row,"paint row")
-                    local f=obj(a.values(r:GetFragments())[1],"paint fragment")
-                    rows[#rows+1]={row=r,index=i,fragment=name(f)}; any=true
-                end
-            end
-            return any
+            local r=paint.row(vm)
+            if not r then return false end
+            local index
+            for i,row in ipairs(a.values(a.prop(vm,"ColorSlotVMs") or {})) do if a.unwrap(row)==r or name(row)==name(r) then index=i; break end end
+            local f=obj(a.values(r:GetFragments())[1],"paint fragment")
+            rows[#rows+1]={row=r,index=index,fragment=name(f)}
+            return true
         end)
         assert(#rows>0,"No vanilla Paint Color row on this weapon")
         -- The COLOR section shown on this screen.
@@ -140,14 +139,9 @@ function M.new(runtime,a)
         local found={}
         select("VM_WeaponCustomization_C",16,function(vm)
             if not a.live(vm) then return false end
-            local any=false
-            for i,row in ipairs(a.values(a.prop(vm,"ColorSlotVMs") or {})) do
-                if i<=16 and paint.qualifies(row) then
-                    local r=obj(row,"paint row")
-                    if name(obj(a.values(r:GetFragments())[1],"paint fragment"))==b.fragment then found[#found+1]=name(r); any=true end
-                end
-            end
-            return any
+            local r=paint.row(vm)
+            if r and name(obj(a.values(r:GetFragments())[1],"paint fragment"))==b.fragment then found[#found+1]=name(r); return true end
+            return false
         end)
         if #found==1 then
             log("ROW REBOUND | " .. b.row .. " -> " .. found[1])
