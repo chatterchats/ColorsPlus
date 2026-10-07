@@ -9,6 +9,8 @@ Test builds before 1.0 are described in
 
 ## [Unreleased]
 
+## [1.0.0]
+
 ### Added
 
 - First public release.
@@ -21,3 +23,4 @@ Test builds before 1.0 are described in
   and Paint Finish.
 - Armor wearing a color the palette no longer offers (for example from an
   unlocker mod) can be changed.
+
