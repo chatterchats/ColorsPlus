@@ -83,7 +83,9 @@ local preview_row=obj("BitReactorCustomizationSlotViewModel VM_9",{GetFragments=
 lists.VM_WeaponCustomization_C={obj("VM_WeaponCustomization_C VM_WeaponCustomization_C_0",{ColorSlotVMs={row,bolt_row,preview_row}})}
 logs={}
 assert(not pcall(trace.paint,0,2,"GG0000"),"bad hex refused")
-assert(not pcall(trace.paint,1,2,"00FF00"),"unknown VM refused")
+local refused,why=pcall(trace.paint,1,2,"00FF00")
+assert(not refused and tostring(why):find("live: 0 (BP_Rifle_Relby-v10_C_3)",1,true),"unknown VM refused with the live list")
+assert(has("ROWS | vm 0 | weapon=BP_Rifle_Relby-v10_C_3 | rows: 1=Paint Color, 2=Bolt Color"))
 assert(not pcall(trace.paint,0,3,"00FF00"),"preview-owned fragment refused")
 trace.paint(0,2,"00FF00")
 assert(current.R==0 and current.G==1 and current.B==0 and current.A==1 and refreshes==1)
@@ -100,4 +102,5 @@ logs={}
 commands.colors_armory(nil,{"paint","0","2","0000FF"}); run("armory-trace:command")
 assert(current.B==1 and current.R==0)
 commands.colors_armory(nil,{"paint","0","2"}); assert(has("Usage: colors_armory"))
+logs={}; commands.colors_armory(nil,{"rows"}); run("armory-trace:command"); assert(has("ROWS | vm 0"))
 print("Armory trace: opt-in hooks, chained slot events, coalesced read-only snapshots, failures logged and stop passed")

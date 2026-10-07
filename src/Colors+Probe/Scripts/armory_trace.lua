@@ -93,6 +93,28 @@ function M.new(runtime,a)
         local v=live(StaticFindObject(full:match("^[^ ]+ (.+)$")))
         if v and a.name(v)==full then return v end
     end
+    -- The VM numbers change every session: list what is live.
+    function self.rows()
+        local vms=list("VM_WeaponCustomization_C",8)
+        if #vms==0 then log("ROWS | no weapon customization VM (open Customize Weapon)"); return "none" end
+        local summary={}
+        for _,v in ipairs(vms) do
+            local labels,weapon={},"?"
+            for i,row in ipairs(try(function() return a.values(a.prop(v,"ColorSlotVMs")) end) or {}) do
+                local r=live(row)
+                if r then
+                    labels[#labels+1]=i .. "=" .. scalar(try(function() return a.text(r.DisplayName) end) or "?")
+                    local f=live((try(function() return a.values(r:GetFragments()) end) or {})[1])
+                    local o=f and try(function() return name(f:GetOwningCustomizationInstance()) end)
+                    if o and weapon=="?" then weapon=o:match("PersistentLevel%.([%w_%-]+)%.") or o end
+                end
+            end
+            local number=name(v):match("_(%d+)$") or "?"
+            log("ROWS | vm " .. number .. " | weapon=" .. scalar(weapon) .. " | rows: " .. table.concat(labels,", "))
+            summary[#summary+1]=number .. " (" .. weapon .. ")"
+        end
+        return table.concat(summary,"; ")
+    end
     function self.paint(vm_index,row_index,hex)
         local r8,g8,b8=hex:match("^#?(%x%x)(%x%x)(%x%x)$")
         assert(r8,"Colour must be RRGGBB")
@@ -100,7 +122,7 @@ function M.new(runtime,a)
         for _,v in ipairs(list("VM_WeaponCustomization_C",8)) do
             if name(v):match("_(%d+)$")==tostring(vm_index) then wvm=v end
         end
-        assert(wvm,"No VM_WeaponCustomization_C_" .. tostring(vm_index))
+        if not wvm then error("No VM_WeaponCustomization_C_" .. tostring(vm_index) .. "; live: " .. self.rows(),0) end
         local rows=a.values(a.prop(wvm,"ColorSlotVMs"))
         local row=assert(live(rows[row_index]),"No colour row " .. tostring(row_index))
         local frags=a.values(row:GetFragments())
@@ -173,13 +195,19 @@ function M.new(runtime,a)
                     if not ok then log("PAINT REFUSED | " .. scalar(err)) end
                 end)
                 message="Queued paint of VM " .. tostring(vm_index) .. " row " .. tostring(row_index) .. " -> " .. hex .. "."
+            elseif action=="rows" then
+                runtime:after("armory-trace:command",1,function()
+                    local ok,err=pcall(self.rows)
+                    if not ok then log("ROWS FAILED | " .. scalar(err)) end
+                end)
+                message="Queued weapon row listing (see the log/console)."
             elseif action=="restore" then
                 runtime:after("armory-trace:command",1,function()
                     local ok,err=pcall(self.restore)
                     if not ok then log("RESTORE FAILED | " .. scalar(err)) end
                 end)
                 message="Queued restore of painted rows."
-            else message="Usage: colors_armory [start|stop|paint <vm#> <row#> <RRGGBB>|restore]" end
+            else message="Usage: colors_armory [start|stop|rows|paint <vm#> <row#> <RRGGBB>|restore]" end
             log(message)
             if output then pcall(function() output:Log(message) end) end
         end)
