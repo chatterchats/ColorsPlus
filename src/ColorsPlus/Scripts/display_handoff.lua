@@ -15,13 +15,20 @@ function M.new(runtime, a, inspect_display, inspect_meshes)
     end
     local function same(v, other) return a.name(object(v)) == a.name(object(other)) end
     local function discover(data)
+        local function linked_to(container)
+            if not (a.live(container) and worlds.container(a.name(container))) then return false end
+            local storage = a.unwrap(a.prop(container, "ProxyDataStorage"))
+            return a.live(storage) and a.name(storage) == a.name(data)
+        end
         local matches = {}
-        local containers=a.values(FindAllOf("BP_CustomizationPreviewProxyContainer_C") or {})
-        assert(#containers<=4096,"Handoff container scan limit")
-        for _, container in ipairs(containers) do
-            if a.live(container) and worlds.container(a.name(container)) then
-                local storage = a.unwrap(a.prop(container, "ProxyDataStorage"))
-                if a.live(storage) and a.name(storage) == a.name(data) then matches[#matches + 1] = container end
+        if runtime.known then
+            -- Known containers first; a scan only when none links to this preview.
+            matches = runtime.known.select("BP_CustomizationPreviewProxyContainer_C",4096,linked_to)
+        else
+            local containers=a.values(FindAllOf("BP_CustomizationPreviewProxyContainer_C") or {})
+            assert(#containers<=4096,"Handoff container scan limit")
+            for _, container in ipairs(containers) do
+                if linked_to(container) then matches[#matches + 1] = container end
             end
         end
         assert(#matches == 1, "Expected exactly one matched preview container")

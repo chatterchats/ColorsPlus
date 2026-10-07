@@ -22,14 +22,14 @@ end
 local image={SetColorAndOpacity=function(_,color) assert(color.A==1) end,
     SetVisibility=function(_,v) assert(v==3) end}
 function image:SetBrushFromTexture(t,match,...) assert(match==false and select("#",...)==0); self.texture=t end
-assets.bind(image,"hue"); assert(imports==1)
-local old=image.texture
-local replacement=texture(old.path)
-old.IsValid=function() error("Cached wrapper was touched") end
-assets.bind(image,"hue"); assert(imports==1 and image.texture==replacement,"Reacquire texture by exact identity")
-replacement.dead=true; assets.bind(image,"hue"); assert(imports==2,"Reimport after GC")
+assets.bind(image,"hue"); assert(imports==1 and image.texture)
+-- No by-name reacquisition: each bind imports (a lookup cost a full scan).
+local looked=false
+local find=StaticFindObject
+StaticFindObject=function(path) if path~="/Script/Engine.Default__KismetRenderingLibrary" then looked=true end; return find(path) end
+assets.bind(image,"hue"); assert(imports==2 and not looked,"Bind never looks a texture up by name")
 assets.bind(image,"saturation"); assets.bind(image,"value"); assert(imports==4)
 fail=true; image.texture.dead=true
 assert(not pcall(assets.bind,image,"value"),"Failed texture import must not silently present a blank field")
 assert(not pcall(assets.bind,image,"unknown"))
-print("Gradient textures: assets, identity reacquisition, GC recovery and import failure passed")
+print("Gradient textures: assets, fresh import without lookups and import failure passed")

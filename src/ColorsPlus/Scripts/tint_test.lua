@@ -113,18 +113,21 @@ function M.new(runtime, access, recovery_path)
             selected_root=a.prop(aux,"RootCustomizationSlotVM")
             aux_name=binding.aux
         else
-            for _, page in pairs(candidates("WBP_Customization_ItemPage_C")) do
-                if a.live(page) and page:IsActivated() == true then
-                    pages, page_name = pages + 1, a.name(page)
-                end
+            -- Known instances first (known_instances); a scan only when none qualifies.
+            local function each(class,accept)
+                if runtime.known then return runtime.known.select(class,4096,accept) end
+                local out={}
+                for _,v in pairs(candidates(class)) do if accept(v) then out[#out+1]=v end end
+                return out
+            end
+            for _, page in ipairs(each("WBP_Customization_ItemPage_C",function(p) return a.live(p) and p:IsActivated() == true end)) do
+                pages, page_name = pages + 1, a.name(page)
             end
             assert(pages == 1, "Open exactly one customization item page")
-            for _, aux in pairs(candidates("CustomizationAuxVM_C")) do
-                if a.live(aux) and a.live(a.prop(aux, "CurrentCustomizationSlotVM")) then
-                    selected[#selected + 1] = aux.CurrentCustomizationSlotVM
-                    selected_root = a.prop(aux,"RootCustomizationSlotVM")
-                    aux_name=a.name(aux)
-                end
+            for _, aux in ipairs(each("CustomizationAuxVM_C",function(x) return a.live(x) and a.live(a.prop(x, "CurrentCustomizationSlotVM")) end)) do
+                selected[#selected + 1] = aux.CurrentCustomizationSlotVM
+                selected_root = a.prop(aux,"RootCustomizationSlotVM")
+                aux_name=a.name(aux)
             end
             assert(#selected == 1, "Current customization context is missing or ambiguous")
         end

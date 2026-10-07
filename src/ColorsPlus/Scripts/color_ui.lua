@@ -51,13 +51,18 @@ function M.new(runtime,a,tint)
     end
     local function discover()
         local page,page_name
-        for _,v in pairs(scan("WBP_Customization_ItemPage_C",128)) do
-            if a.live(v) and v:IsActivated()==true then assert(not page,"Ambiguous color page"); page=v; page_name=name(v); remember(v) end
-        end
+        local function active(v) return a.live(v) and v:IsActivated()==true end
+        local pages
+        if runtime.known then pages=runtime.known.select("WBP_Customization_ItemPage_C",128,active)
+        else pages={}; for _,v in pairs(scan("WBP_Customization_ItemPage_C",128)) do if active(v) then pages[#pages+1]=v end end end
+        for _,v in ipairs(pages) do assert(not page,"Ambiguous color page"); page=v; page_name=name(v); remember(v) end
         assert(page,"Open a customization color selector")
         local creator=lifetime.bind(page_name) -- creator stack, not merely an inactive visible tree
-        local vm_name=tint.selected_slot_identity()
-        local vm=fresh(vm_name); local tag=a.text(vm.SlotTag.TagName)
+        -- Same-call object when available: no by-name round trip (scan).
+        local vm
+        if tint.selected_slot then vm=obj(tint.selected_slot(),"selected slot")
+        else vm=fresh(tint.selected_slot_identity()) end
+        local vm_name=name(vm); local tag=a.text(vm.SlotTag.TagName)
         assert(rules.launcher_color_slot(tag),"Selected selector is not a color palette")
         local grid=palettes.resolve(page_name,tag)
         local grid_name=name(grid); remember(grid)
@@ -350,7 +355,10 @@ function M.new(runtime,a,tint)
         rainbow_slot:SetPadding({Left=0,Top=0,Right=8,Bottom=0})
         -- CreateWidget initializes the Blueprint button (style, text, click
         -- wiring); a bare StaticConstructObject would not.
-        local pc=obj(call("GetPlayerController",function() return require("UEHelpers").GetPlayerController() end),"player controller")
+        local pc=obj(call("GetPlayerController",function()
+            if runtime.known then return runtime.known.player_controller() end
+            return require("UEHelpers").GetPlayerController()
+        end),"player controller")
         -- A class default object: a.live() rejects Default__ names by design.
         local library=StaticFindObject("/Script/UMG.Default__WidgetBlueprintLibrary")
         assert(library and library:IsValid()==true,"Color UI unavailable: widget library")

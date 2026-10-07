@@ -255,7 +255,10 @@ function M.new(runtime)
         local next_id=timed("ui.cleanup",self.cleanup)
         next_root_id=next_id+1
         log("OPEN CONTROLLER | root=" .. next_id)
-        local pc=required(call("GetPlayerController",function() return require("UEHelpers").GetPlayerController() end),"player controller")
+        local pc=required(call("GetPlayerController",function()
+            if runtime.known then return runtime.known.player_controller() end
+            return require("UEHelpers").GetPlayerController()
+        end),"player controller")
         if runtime.objects then runtime.objects.remember(pc) end -- SV drag reacquires it by name
         assert(pc.bShowMouseCursor == true, "Open cursor-driven character customization first")
         local pane

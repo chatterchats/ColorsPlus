@@ -64,15 +64,15 @@ function M.new(runtime,a,path,preview)
             lookup_route=nil -- failed hint gets full ambiguity-checked discovery
         end
         local found,root,aux_name
-        for _,aux in pairs(candidates("CustomizationAuxVM_C",128)) do
-            if a.live(aux) then
-                local vm=a.unwrap(a.prop(aux,"CurrentCustomizationSlotVM"))
-                if a.live(vm) then
-                    assert(not found,"Ambiguous current customization slot"); found=vm
-                    root=a.prop(aux,"RootCustomizationSlotVM")
-                    aux_name=name(aux)
-                end
-            end
+        local function current(aux) return a.live(aux) and a.live(a.unwrap(a.prop(aux,"CurrentCustomizationSlotVM"))) end
+        local auxes
+        if runtime.known then auxes=runtime.known.select("CustomizationAuxVM_C",128,current)
+        else auxes={}; for _,aux in pairs(candidates("CustomizationAuxVM_C",128)) do if current(aux) then auxes[#auxes+1]=aux end end end
+        for _,aux in ipairs(auxes) do
+            assert(not found,"Ambiguous current customization slot")
+            found=a.unwrap(a.prop(aux,"CurrentCustomizationSlotVM"))
+            root=a.prop(aux,"RootCustomizationSlotVM")
+            aux_name=name(aux)
         end
         found=object(found,"current customization slot")
         local active_page=page()
@@ -85,9 +85,11 @@ function M.new(runtime,a,path,preview)
     end
     page=function()
         local found
-        for _,p in pairs(candidates("WBP_Customization_ItemPage_C",128)) do
-            if a.live(p) and p:IsActivated() then assert(not found,"Ambiguous active page"); found=name(p) end
-        end
+        local function active(p) return a.live(p) and p:IsActivated()==true end
+        local pages
+        if runtime.known then pages=runtime.known.select("WBP_Customization_ItemPage_C",128,active)
+        else pages={}; for _,p in pairs(candidates("WBP_Customization_ItemPage_C",128)) do if active(p) then pages[#pages+1]=p end end end
+        for _,p in ipairs(pages) do assert(not found,"Ambiguous active page"); found=name(p) end
         return assert(found,"Open customization first")
     end
     local function part(v,vm)
@@ -189,6 +191,9 @@ function M.new(runtime,a,path,preview)
         persist(nil); selection=nil; self.held=false
     end
     function self.selected_slot_identity() return name(selected()) end
+    -- The object itself, for same-call use only: a by-name reacquisition of a
+    -- slot VM UE4SS has not seen yet costs a full object scan.
+    function self.selected_slot() return object(selected(),"selected slot") end
     -- Opening step: when the selected slot shows Default, journal the intent,
     -- equip the first previewable stock swatch and bind its owner. Returns
     -- true when a temporary selection now needs the preview; the zone calls

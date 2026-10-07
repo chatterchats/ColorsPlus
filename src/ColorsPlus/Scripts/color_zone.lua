@@ -298,6 +298,7 @@ local function regular_backend(runtime,a,journal,preview_part)
         bind_selected_context=function(c) return preview.bind_selected_context(c) end,
         read_selected_context=function(route) return preview.read_selected_context(route) end,
         selected_slot_identity=function() return timed("context.selected_slot",selection.selected_slot_identity) end,
+        selected_slot=function() return timed("context.selected_slot",selection.selected_slot) end,
         inspect=function()
             if selection.record() or selection.blocked then selection.log("Finish Default selection recovery first"); return false end
             return preview.inspect()
@@ -363,6 +364,7 @@ function M.new(runtime,a,journal,parts)
     function self.bind_selected_context(c) return regular.bind_selected_context(c) end
     function self.read_selected_context(route_hint) return regular.read_selected_context(route_hint) end
     function self.selected_slot_identity() return regular.selected_slot_identity() end
+    function self.selected_slot() return regular.selected_slot() end
     function self.inspect() return regular.inspect() end
     return self
 end

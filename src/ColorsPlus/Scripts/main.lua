@@ -54,6 +54,7 @@ runtime.perf = module("performance_log").new(runtime,{sink=perf_log.write_batch}
 if type(RegisterConsoleCommandHandler)=="function" then runtime.perf.attach() end
 local probe = module("customization_probe").new(runtime)
 runtime.probe = probe
+runtime.known = module("known_instances").new(probe.access)
 runtime.log("Loaded v" .. VERSION .. " | detailed snapshots manual only; lifecycle hooks active | generation=" .. runtime.generation)
 runtime.log("Default fallback temporarily equips a stock swatch. Apply lasts for the editor visit; exit/Restore restores the original. No save calls.")
 runtime.log("Log file: " .. log.path)

@@ -347,8 +347,10 @@ for _,name in pairs(hsv.gradient_names) do
     local image=find(name)
     assert(image.kind=="Image" and image.visibility==3 and image.texture:IsValid())
 end
-assert(imports==3,"Import only three gradient assets, not per-cell textures")
-assert(find(hsv.gradient_names.hue).texture==rainbow.texture,"Launcher and picker share one native hue texture")
+-- Launcher hue + picker hue/saturation/value: one import per gradient image,
+-- never per cell, and no by-name texture reuse (it cost a full object scan).
+assert(imports==4,"One import per gradient image, not per-cell textures")
+assert(find(hsv.gradient_names.hue).texture~=rainbow.texture,"Picker imports its own hue texture")
 assert(find(hsv.swatch_name).brush.R==.1)
 local hex=find(hsv.hex_name)
 local hex_row=hex.parent.parent

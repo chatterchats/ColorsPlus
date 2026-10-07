@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fewer object scans: known instances instead of FindAllOf
+
+- Dev tools: `colors_lookups [start|stop|summary|reset]` traces every
+  `StaticFindObject`/`FindAllOf` the mod makes (path, picker window, call
+  site). A local capture (2026-10-07, main menu + hub, 4 picker sessions):
+  628 lookups, 4.4 s. Every `FindAllOf` scanned the whole object array
+  (~35 ms; 115 calls, 3.07 s, 69%), and 2.84 s happened outside the picker
+  while just browsing color slots (launcher attach, Default checks). A
+  by-name `StaticFindObject` is ~0 ms once UE4SS has seen the name; a first
+  lookup, or a name that no longer exists, also costs a full scan.
+- `known_instances`: hooks note the item pages and aux VM the game hands
+  them, and every scan notes what it finds. The launcher, Default
+  selection, preview context and preview-container discovery now try those
+  names first and scan only when none qualifies; ambiguity checks still
+  apply. The player controller is reused by name instead of
+  `UEHelpers.GetPlayerController` scanning every controller.
+- The launcher receives the selected slot VM object instead of its name
+  (no first-lookup scan per slot visited).
+- Gradient textures are imported per bind instead of reacquired by name: 9
+  of 13 reacquisitions were full scans (collected or never-seen textures).
+
 ### Hub editor: stop retrying the main-menu creator hook on swatch events
 
 - A tester's 0.4.0 hub log (Windows) showed 89 failed retries of the

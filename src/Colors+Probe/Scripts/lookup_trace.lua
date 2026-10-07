@@ -43,7 +43,9 @@ function M.new(runtime,directory)
         return #out>0 and table.concat(out,"<") or "?"
     end
     local function window()
+        -- The performance window is a table; its id matches PERF | window=N.
         local w=runtime.perf and runtime.perf.window
+        if type(w)=="table" then w=w.id end
         return w and ("w" .. tostring(w)) or "none"
     end
     local function record(kind,target,ms,result)

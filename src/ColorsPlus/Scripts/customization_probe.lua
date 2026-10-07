@@ -298,7 +298,11 @@ function M.new(runtime)
     local specs = {}
     for _, event in ipairs({ "UpdateCurrentCustomizationSlotVM", "UpdateCurrentCustomizationPartVM", "UpdateRootCustomizationSlotVM", "TileCustomizationPartWasClickedOn" }) do
         specs[#specs + 1] = { AUX .. event, function(context)
-            context_event(unwrap(context), event)
+            local aux = unwrap(context)
+            -- The game hands us its aux VM and pages: later lookups use these
+            -- names instead of FindAllOf scans (known_instances).
+            if runtime.known then runtime.known.note(aux) end
+            context_event(aux, event)
         end }
     end
     for _, event in ipairs({ "EquipCustomizationPart", "PreviewCustomizationPart", "ResetPreviewedPart", "ResetToDefault" }) do
@@ -312,6 +316,7 @@ function M.new(runtime)
         specs[#specs + 1] = { PAGE .. event, function(context)
             local page = unwrap(context)
             if not live(page) then return end
+            if runtime.known then runtime.known.note(page) end
             if runtime.color_ui then runtime.color_ui.context_changed(event) end
             runtime:after("install:page", 1, function() self.install(true) end)
         end }

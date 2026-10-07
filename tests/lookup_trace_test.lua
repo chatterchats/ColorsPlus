@@ -34,7 +34,7 @@ local value,second=StaticFindObject("/Game/Test.Obj_12")
 assert(value==live and second=="second" and finds==1)
 assert(last():find("StaticFindObject | ms=",1,true) and last():find("window=none | found | path=/Game/Test.Obj_12",1,true))
 assert(last():find("at=lookup_trace_test:",1,true),"caller line recorded")
-runtime.perf.window=3
+runtime.perf.window={id=3}
 assert(StaticFindObject("/Game/Test.Missing")==dead and last():find("window=w3 | missing",1,true))
 local all=FindAllOf("Thing"); assert(#all==2 and last():find("FindAllOf | ms=",1,true) and last():find("count=2",1,true))
 assert(FindAllOf("Empty")==nil and last():find("count=0",1,true))
