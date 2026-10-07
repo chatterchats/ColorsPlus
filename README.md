@@ -94,3 +94,7 @@ cooked implementation of the customization preview and save lifecycle.
     ├── package.py           # release ZIP
     └── run-tests.sh
 ```
+
+## License
+
+[MIT](LICENSE) © 2026 Chatter Chats. The release ZIP includes the license.

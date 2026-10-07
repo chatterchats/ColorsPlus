@@ -53,7 +53,9 @@ def build(label, scripts):
     files = COMMON + scripts
     assert all(p.is_file() and not p.is_symlink() for p in files)
     entries = {f"{PACKAGE_ROOT}/" + p.relative_to(SOURCE).as_posix(): p for p in files}
-    assert len(entries) == len(files)
+    entries[f"{PACKAGE_ROOT}/LICENSE"] = ROOT / "LICENSE"  # MIT: copies keep the notice
+    assert entries[f"{PACKAGE_ROOT}/LICENSE"].is_file()
+    assert len(entries) == len(files) + 1
     # Journals and session metadata (recovery_session.txt,
     # process_session_counter.txt), not scripts such as editor_session.lua.
     assert not any(re.search(r"_recovery\.txt|\.previous|\.archive-|session[^/]*\.txt$", name) for name in entries)
