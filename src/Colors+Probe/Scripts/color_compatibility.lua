@@ -213,6 +213,32 @@ function M.new(runtime,a)
                     end
                 end
             end
+            if not a.live(a.unwrap(vm)) then
+                -- The armory may not drive the aux VM's current slot; report
+                -- what it does hold instead of failing.
+                for _,aux in pairs(candidates("CustomizationAuxVM_C",128)) do
+                    if a.live(aux) then
+                        local function field(k)
+                            local ok,v=pcall(function()
+                                local x=a.prop(aux,k); local u=a.unwrap(x)
+                                if type(u)=="userdata" or type(u)=="table" then
+                                    if a.live(u) then return name(u) end
+                                    local tag=pcall(function() return x.TagName end) and x.TagName
+                                    if tag then return a.text(tag) end
+                                    return "<none>"
+                                end
+                                return a.text(x)
+                            end)
+                            return ok and scalar(v) or ("<error: " .. scalar(v) .. ">")
+                        end
+                        log("AUX STATE | " .. name(aux) .. " | current_slot=" .. field("CurrentCustomizationSlotVM")
+                            .. " | current_part=" .. field("CurrentCustomizationPartVM") .. " | root=" .. field("RootCustomizationSlotVM")
+                            .. " | switch_to=" .. field("SwitchToSubCategorySlotVM") .. " | active_tab=" .. field("ActiveTab")
+                            .. " | last_slot=" .. field("LastCustomizationSlotAccessed") .. " | character_vm=" .. field("CharacterCustomizationVM"))
+                    end
+                end
+                error("No selected slot on the aux VM",0)
+            end
             vm=object(vm)
             if page then vm=targets.selected(vm,page,root) end
             log("SLOT VM | " .. name(vm) .. " | root=" .. scalar(a.live(a.unwrap(root)) and name(root) or "<none>"))
