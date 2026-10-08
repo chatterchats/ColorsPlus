@@ -1,0 +1,46 @@
+name: Check Nexus changelogs
+
+# Read-only: prints the changelogs Nexus has stored for this mod, so a
+# release's changelog can be verified (the v3 API can add them but not
+# read them back). Publishes nothing.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read changelogs (v1 API)
+        shell: bash
+        env:
+          NEXUSMODS_API_KEY: ${{ secrets.NEXUSMODS_API_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from urllib.error import HTTPError
+          from urllib.request import Request, urlopen
+
+          request = Request(
+              "https://api.nexusmods.com/v1/games/starwarszerocompany/mods/314/changelogs.json",
+              headers={
+                  "apikey": os.environ["NEXUSMODS_API_KEY"].strip(),
+                  "User-Agent": "chatterchats/ColorsPlus changelog check",
+              },
+          )
+          try:
+              with urlopen(request, timeout=30) as response:
+                  data = json.load(response)
+          except HTTPError as error:
+              raise SystemExit(f"{error.code} {error.read().decode('utf-8', 'replace')}")
+          if not data:
+              print("No changelogs stored.")
+          for version, entries in data.items():
+              print(f"Version {version!r}:")
+              for entry in entries:
+                  print(f"  - {entry}")
+          PY
