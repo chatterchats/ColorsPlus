@@ -161,7 +161,7 @@ jobs:
           file_id: ${{ steps.nexus.outputs.file_id }}
           filename: ColorsPlus v${{ steps.release.outputs.version }}.zip
           version: ${{ steps.release.outputs.version }}
-          display_name: Colors+
+          display_name: ColorsPlus  # Nexus file names allow only [A-Za-z0-9 _'().-]
           mod_id: ${{ steps.nexus.outputs.mod_id }}
           primary_mod_manager_download: true
           update_mod_version: true
