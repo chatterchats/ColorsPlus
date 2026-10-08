@@ -258,7 +258,7 @@ function M.new(runtime,a,path,preview)
                         and v[2]:match(VM) and (v[3]:match(PART) or v[3]:match(EMPTY_PART)
                             and rules.empty_editable_slot(v[9])) and v[4]:match(PART)
                         and outer(v[2])==outer(v[3]) and outer(v[2])==outer(v[4]) and v[3]~=v[4]
-                        and v[5]:match("^CustomizationPartDefinition:[%w_]+$")
+                        and v[5]:match("^CustomizationPartDefinition:[%w_%-]+$")
                         and rules.preview_asset(v[9],v[5]) and not is_default(v[5]),
                         "Malformed Default selection recovery")
                     local bound=v[8]=="selected" and worlds.owner(v[6])

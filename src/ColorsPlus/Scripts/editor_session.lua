@@ -70,7 +70,7 @@ function M.new(runtime,a,path)
         assert(worlds.owner(s.owner) and s.vm:match(VM)
             and child(s.owner,s.slot,"CustomizationFragmentInstanceSlot")
             and child(s.owner,s.fragment,"CustomizationFragmentInstanceMaterialColor")
-            and s.part:match("^CustomizationPartDefinition:[%w_]+$")
+            and s.part:match("^CustomizationPartDefinition:[%w_%-]+$")
             and rules.materials(s.materials) and s.page:match("^WBP_Customization_ItemPage_C /[^\r\n]+$"),
             "Untrusted editor recovery identity")
         assert(target_module.valid(s.profile),"Invalid editor target profile")

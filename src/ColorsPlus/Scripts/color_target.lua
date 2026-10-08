@@ -15,10 +15,12 @@ function M.preview_policy(p)
     if p.slot:match("^br%.Customization%.Slot%.Character%.Outfit%.[%w_]+%.Color%.[%w_]+$") then return "armor" end
     return rules.hsv(p) and "hsv" or "color"
 end
-local function asset(s) return type(s)=="string" and s:match("^CustomizationPartDefinition:[%w_]+$") end
+-- Part names may contain hyphens: the story droid BR-1's parts are named
+-- CPD_AST_Legs_BR-1_Tint (observed 2026-10-08). "-" alone still means absent.
+local function asset(s) return type(s)=="string" and s:match("^CustomizationPartDefinition:[%w_%-]+$") end
 function M.valid(p)
     local basic=type(p)=="table" and type(p.slot)=="string" and p.slot:match("^br%.Customization%.Slot%.Character%.[%w_.]+$")
-        and rules.mesh_tag(p.mesh)
+        and type(p.mesh)=="string" and p.mesh:match("^br%.Customization%.Slot%.Character%.[%w_.]+%.Mesh$")
         and rules.parameter(p.parameter)
         and asset(p.asset)
     if not basic then return false end
@@ -50,7 +52,7 @@ function M.valid(p)
     local seen={}
     for _,v in ipairs(t) do
         if type(v)~="table" or type(v.mesh)~="string"
-            or not rules.mesh_tag(v.mesh)
+            or not v.mesh:match("^br%.Customization%.Slot%.Character%.[%w_.]+%.Mesh$")
             or seen[v.mesh] or not (v.asset=="-" or asset(v.asset)) then return false end
         seen[v.mesh]=true
     end

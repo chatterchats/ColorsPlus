@@ -964,7 +964,7 @@ function M.new(runtime, access, recovery_path)
                         and fragment_module.valid_race(profile.skin_race)
                         and target_module.decode_targets(profile,fields[21]))
                     and target_module.valid(profile)
-                    and (fields[11] or ""):match("^CustomizationPartDefinition:[%w_]+$")
+                    and (fields[11] or ""):match("^CustomizationPartDefinition:[%w_%-]+$")
                     and (fields[11]~=fields[5] or target_module.self_preview(profile,fields[5]))
                     and not fields[11]:match("_None$") and blue_count==4 and rules.color(blue_original,profile.slot,profile.parameter)
                     and rules.preview_asset(profile.slot,fields[11],profile.parameter,profile.bundle)
@@ -977,7 +977,7 @@ function M.new(runtime, access, recovery_path)
                     and (fields[8]=="handoff" or fields[8]=="prepared" or fields[8]=="installing" or fields[8]=="owned")
                 if #data <= 32768 and data:sub(-1) == "\n" and generic_ok and worlds.same("owner",fields[2],"preview",fields[3])
                     and clone_name_for(fields[3], fields[4]) and count == 4
-                    and fields[5]:match("^CustomizationPartDefinition:[%w_]+$") and rules.materials(fields[6]) then
+                    and fields[5]:match("^CustomizationPartDefinition:[%w_%-]+$") and rules.materials(fields[6]) then
                     self.pending = {owner=fields[2], preview=fields[3], fragment=fields[4], part=fields[5], materials=fields[6],
                         original=original, phase=fields[8], profile=profile,
                         handoff={container=fields[9],display=fields[10]},

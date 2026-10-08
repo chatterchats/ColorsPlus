@@ -16,7 +16,7 @@ function M.new(a,log)
         local owner=type(s.owner)=="string" and s.owner:match("^[^ ]+ (.+)$")
         if not owner then return false end
         local prefix="CustomizationFragmentInstanceMaterialScalar " .. owner .. "."
-        return type(s.part)=="string" and s.part:match("^CustomizationPartDefinition:[%w_]+$") and s.profile and s.profile.slot==bundle.SKIN
+        return type(s.part)=="string" and s.part:match("^CustomizationPartDefinition:[%w_%-]+$") and s.profile and s.profile.slot==bundle.SKIN
             and bundle.valid_race(s.profile.skin_race) and s.profile.skin_scalar==nil
             and type(s.skin_target)=="string"
             and s.skin_target:sub(1,#prefix)==prefix
