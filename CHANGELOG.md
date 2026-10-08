@@ -9,6 +9,8 @@ Test builds before 1.0 are described in
 
 ## [Unreleased]
 
+## [1.1.0]
+
 ### Added
 
 - Custom colors for droids: head, body and legs colors on astromechs in the
