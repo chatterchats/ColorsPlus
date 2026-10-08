@@ -18,6 +18,8 @@ functions or edits save files, and colors stay after it is removed.
 - **Main-menu character creator** and the **barracks** character editor:
   clothing and armor, hair, skin (including race-specific skin bundles such
   as Zabrak tones), makeup, tattoos, and horn and scar HSV adjustments.
+- **Droids:** head, body and legs colors on astromechs in the creator and
+  the barracks, including the story droid BR-1.
 - **Armory → Customize Weapon:** the Paint Color of blasters. Drafts only
   touch the armory preview, so Location and Paint Finish can be changed
   while the picker is open.

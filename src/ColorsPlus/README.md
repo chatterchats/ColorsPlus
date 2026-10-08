@@ -1,7 +1,7 @@
 # Colors+ v1.0.0 — Custom Color Picker for Star Wars: Zero Company
 
 Tired of picking from the same handful of swatches? Colors+ lets you choose
-**any color you like** for your characters and your blasters.
+**any color you like** for your characters, your droids and your blasters.
 
 Look for the new **CUSTOM COLOR** button under the color choices in the
 main-menu character creator, the barracks, and the armory. It opens a color
@@ -70,6 +70,10 @@ the rainbow bar, or type a color code. **APPLY COLOR** keeps your new color;
   on each. **APPLY COLOR** paints the weapon for real.
 
 Want one of the game's own colors back? Just click its swatch.
+
+Swapping a piece (another jacket, or a different dome on a droid) puts that
+piece's colors back to its own, so choose your pieces first, then your
+colors.
 
 Colors+ works with a mouse only; the buttons can't be reached with a
 controller.

@@ -1,1 +1,1 @@
-Pick any color you want, not just the preset swatches. Adds a Custom Color picker with live preview to the character creator, the barracks and the armory: clothing, armor, hair, skin, makeup, tattoos and blaster paint.
+Pick any color you want, not just the preset swatches. Adds a Custom Color picker with live preview to the character creator, the barracks and the armory: clothing, armor, hair, skin, makeup, tattoos, droids and blaster paint.

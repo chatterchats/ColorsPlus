@@ -9,6 +9,11 @@ Test builds before 1.0 are described in
 
 ## [Unreleased]
 
+### Added
+
+- Custom colors for droids: head, body and legs colors on astromechs in the
+  main-menu creator and the barracks, including the story droid BR-1.
+
 ## [1.0.0]
 
 ### Added
