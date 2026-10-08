@@ -52,7 +52,9 @@ function M.new(runtime, a, inspect_display, inspect_meshes)
         assert(same(object(container).ProxyDataStorage,data),"Handoff storage link changed")
         local display = object(container.ProxyCharacter)
         assert(M.valid_record(a.name(container), a.name(display))
-            and worlds.same("owner", a.name(owner), "container", a.name(container)), "Unsupported handoff container/display")
+            and worlds.same("owner", a.name(owner), "container", a.name(container)),
+            "Unsupported handoff container/display: owner=" .. a.name(owner) .. " | container=" .. a.name(container)
+            .. " | display=" .. a.name(display))
         if record then
             assert(a.name(container) == record.container and a.name(display) == record.display,
                 "Handoff container/display replaced")

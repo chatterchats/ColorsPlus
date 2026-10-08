@@ -5,6 +5,10 @@ local hub="/Game/Game/Maps/Hub/HUB_Root.HUB_Root:PersistentLevel."
 local function owner(level,actor) return "CustomizationInstance " .. level .. actor .. ".CustomizationInstance" end
 -- Owners: the creator's recruit; the hub's live squad members (as observed).
 assert(worlds.owner(owner(main,"Char_Hero_Humanoid_C_0"))=="creator")
+-- The creator's new droid (observed 2026-10-08: Char_Hero_Astromech_C_0 in MainMenu).
+assert(worlds.owner(owner(main,"Char_Hero_Astromech_C_0"))=="creator")
+assert(not worlds.owner(owner(main,"Char_HQ_M-EVO_C_1")),"Creator edits only its recruit")
+assert(not worlds.owner(owner(main,"BP_AstromechWeapon_C_2")),"A droid's weapon is not an owner")
 assert(worlds.owner(owner(hub,"Char_Hero_HAWKS_Control_C_0"))=="hub")
 assert(worlds.owner(owner(hub,"Char_Hero_Humanoid_C_0"))=="hub")
 assert(worlds.owner(owner(hub,"Char_Hero_Astromech_BR-1_C_0"))=="hub")

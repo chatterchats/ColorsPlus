@@ -18,7 +18,7 @@ end
 local function asset(s) return type(s)=="string" and s:match("^CustomizationPartDefinition:[%w_]+$") end
 function M.valid(p)
     local basic=type(p)=="table" and type(p.slot)=="string" and p.slot:match("^br%.Customization%.Slot%.Character%.[%w_.]+$")
-        and type(p.mesh)=="string" and p.mesh:match("^br%.Customization%.Slot%.Character%.[%w_.]+%.Mesh$")
+        and rules.mesh_tag(p.mesh)
         and rules.parameter(p.parameter)
         and asset(p.asset)
     if not basic then return false end
@@ -50,7 +50,7 @@ function M.valid(p)
     local seen={}
     for _,v in ipairs(t) do
         if type(v)~="table" or type(v.mesh)~="string"
-            or not v.mesh:match("^br%.Customization%.Slot%.Character%.[%w_.]+%.Mesh$")
+            or not rules.mesh_tag(v.mesh)
             or seen[v.mesh] or not (v.asset=="-" or asset(v.asset)) then return false end
         seen[v.mesh]=true
     end
@@ -220,7 +220,13 @@ function M.new(a,logger)
                 p.targets[i]={mesh=tag_name,asset=value}
             end
         end
-        assert(M.valid(p),"Unsupported color target description")
+        if not M.valid(p) then
+            local t={}
+            for i,v in ipairs(p.targets or {}) do t[i]=tostring(v.mesh) .. "=" .. tostring(v.asset) end
+            error("Unsupported color target description: slot=" .. tostring(p.slot) .. " | mesh=" .. tostring(p.mesh)
+                .. " | parameter=" .. tostring(p.parameter) .. " | asset=" .. tostring(p.asset)
+                .. " | targets=" .. table.concat(t,","),0)
+        end
         assert(a.text(mesh:GetSlotNameTag().TagName)==p.mesh,"Target mesh slot mismatch")
         return p
     end

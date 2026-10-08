@@ -96,10 +96,16 @@ function M.empty_editable_slot(slot) return M.empty_color_slot(slot) end
 -- UI eligibility is about the displayed selector, not the selected asset's
 -- incidental material fragments. Vanilla Eyes.Color is an eye preset list;
 -- the added iris/sclera tint palettes have their own distinct slot tags.
+-- A mesh slot tag: humanoid meshes end in ".Mesh"; astromech droids number
+-- theirs (".Body.Mesh_0", ".Head.Mesh_2", observed 2026-10-08).
+function M.mesh_tag(s)
+    return type(s)=="string" and (s:match("^br%.Customization%.Slot%.Character%.[%w_.]+%.Mesh$")~=nil
+        or s:match("^br%.Customization%.Slot%.Character%.[%w_.]+%.Mesh_%d+$")~=nil)
+end
 function M.launcher_color_slot(slot)
     return M.empty_color_slot(slot)
         and slot~="br.Customization.Slot.Character.Appearance.Humanoid.Head.Eyes.Color"
-        and not slot:match("%.Mesh$")
+        and not slot:match("%.Mesh$") and not slot:match("%.Mesh_%d+$")
 end
 -- Context events that retire scalar lookup hints: the page, creator or slot
 -- category itself changed (unknown reasons count). Every other event only

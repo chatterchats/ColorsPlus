@@ -7,9 +7,10 @@ local LEVELS={
     creator="/Game/Game/Maps/MainMenu/MainMenu%.MainMenu:PersistentLevel%.",
     hub="/Game/Game/Maps/Hub/HUB_Root%.HUB_Root:PersistentLevel%.",
 }
--- Editable characters. The creator edits its new recruit; the hub edits the
--- selected squad member's live actor (Hawks and recruits observed).
-local OWNERS={creator="Char_Hero_Humanoid_C_%d+",hub="Char_Hero_[%w_%-]+_C_%d+"}
+-- Editable characters. The creator edits its new recruit (a humanoid or an
+-- astromech droid); the hub edits the selected squad member's live actor
+-- (Hawks, recruits and droids observed).
+local OWNERS={creator={"Char_Hero_Humanoid_C_%d+","Char_Hero_Astromech_C_%d+"},hub={"Char_Hero_[%w_%-]+_C_%d+"}}
 local HAWKS_LEVEL="/Game/Game/Maps/StoryMissions/MM_01_010_TheSerolonisJob/MM_01_010_TheSerolonisJob_HawksCustomization%.MM_01_010_TheSerolonisJob_HawksCustomization:PersistentLevel%."
 local DISPLAYS={
     creator="^BP_CustomCharacter_CustomizationProxy_C " .. HAWKS_LEVEL .. "BP_HawksCustomizationProxyCharacter_C_%d+$",
@@ -22,9 +23,13 @@ local function check(name,pattern_for)
     end
 end
 function M.owner(name)
-    return check(name,function(key,level)
-        return "^CustomizationInstance " .. level .. OWNERS[key] .. "%.CustomizationInstance$"
-    end)
+    for i=1,2 do
+        local key=check(name,function(key,level)
+            local actor=OWNERS[key][i]
+            return actor and "^CustomizationInstance " .. level .. actor .. "%.CustomizationInstance$" or "^$"
+        end)
+        if key then return key end
+    end
 end
 function M.preview(name)
     return check(name,function(_,level)
