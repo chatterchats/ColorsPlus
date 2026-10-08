@@ -67,25 +67,10 @@ jobs:
           except ValueError as error:
               raise SystemExit(str(error)) from error
 
-          # The file's description on the Files tab (the changelog input only
-          # reaches the mod's Changelogs tab). Nexus keeps file descriptions
-          # short: whole lines up to the limit, then a pointer to the rest.
-          limit = 255
-          more = "(More in the Changelogs tab.)"
-          description = changelog
-          if len(description) > limit:
-              kept = []
-              for line in changelog.splitlines():
-                  if len("\n".join(kept + [line, more])) > limit:
-                      break
-                  kept.append(line)
-              description = "\n".join(kept + [more]) if kept else changelog[: limit - len(more) - 2].rstrip() + "… " + more
-
           delimiter = f"CHANGELOG_{uuid.uuid4().hex}"
           with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
               output.write(f"version={version}\n")
               output.write(f"changelog<<{delimiter}\n{changelog}\n{delimiter}\n")
-              output.write(f"description<<{delimiter}\n{description}\n{delimiter}\n")
           PY
 
       - name: Run tests
@@ -176,7 +161,6 @@ jobs:
           file_id: ${{ steps.nexus.outputs.file_id }}
           filename: ColorsPlus v${{ steps.release.outputs.version }}.zip
           version: ${{ steps.release.outputs.version }}
-          description: ${{ steps.release.outputs.description }}
           display_name: ColorsPlus  # Nexus file names allow only [A-Za-z0-9 _'().-]
           mod_id: ${{ steps.nexus.outputs.mod_id }}
           primary_mod_manager_download: true
