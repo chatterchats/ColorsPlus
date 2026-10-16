@@ -9,6 +9,11 @@ Test builds before 1.0 are described in
 
 ## [Unreleased]
 
+### Fixed
+
+- Works with the game's 1.2 update: the Custom Color button appears again in
+  the character creator and barracks editor.
+
 ## [1.1.0]
 
 ### Added
