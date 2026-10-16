@@ -91,7 +91,7 @@ function M.new(runtime,a,tint)
         local tiles_path=assert(b.tree:match("^(.+)%.WidgetTree[^.]*$"),"Invalid swatch owner")
         local tiles=obj(find(tiles_path),"selection tiles")
         assert(kind(tiles)=="WBP_Customization_SelectionTiles_C" and tiles:IsVisible()==true
-            and a.text(tiles.CurrentSlotTag.TagName)==b.tag
+            and palettes.tiles_slot_tag(tiles)==b.tag
             and name(obj(tiles.PartsGridList,"parts grid"))==b.grid,"Displayed color zone changed")
         -- The verified native owner already returned this grid. Do not repeat
         -- a full-path global lookup within the same synchronous validation.

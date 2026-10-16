@@ -215,7 +215,7 @@ local palette={stock,other_family,shade}
 local grid=obj("BitReactorTileView",path(page) .. ".Grid",{GetNumItems=function() return #palette end,
     GetItemAt=function(_,i) return palette[i+1] end,GetIndexForItem=function(_,p) for i,v in ipairs(palette) do if v==p then return i-1 end end end})
 local tiles=obj("WBP_Customization_SelectionTiles_C",path(page) .. ".Tiles",
-    {CurrentSlotTag=tag(bundle.SKIN),PartsGridList=grid,IsVisible=function() return true end,GetParent=function() return page end})
+    {SlotTag=tag(bundle.SKIN),PartsGridList=grid,IsVisible=function() return true end,GetParent=function() return page end})
 local panel=obj("WBP_CustomizationSlotPanel_C",path(page) .. ".Panel",{WBP_Customization_SelectionTiles=tiles,IsVisible=function() return true end})
 page.WBP_CustomizationSlotPanel=panel
 page.SlotWidgetSwitcher=obj("CommonActivatableWidgetSwitcher",path(page) .. ".Switcher",{GetActiveWidget=function() return panel end})
@@ -230,6 +230,7 @@ function StaticFindObject(s)
     if v and objects[v.name]==v and not v.invalid then return v end
     for _,o in pairs(objects) do if path(o)==s and not o.invalid then return o end end
 end
+StaticFindObject=helpers.view_models(StaticFindObject)
 function FName(s) assert(on_thread); return s end
 local old_open,old_rename,old_remove=io.open,os.rename,os.remove
 io.open=function(p,mode)
@@ -366,7 +367,7 @@ local function reset(case)
         if case[1]:match("^Ovissian%d*$") then meshes[instance]["br.Customization.Slot.Character.Lekku.Mesh"]=nil end
     end
     selected_tag=case[4] or (case[3] and "br.Customization.Slot.Character.Horns.Color" or bundle.SKIN)
-    vm.SlotTag.TagName=selected_tag; tiles.CurrentSlotTag.TagName=selected_tag
+    vm.SlotTag.TagName=selected_tag; tiles.SlotTag.TagName=selected_tag
     stock.AssetId=asset("CPD_H_SkinTone_" .. case[1] .. "_01")
     shade.AssetId=asset("CPD_H_SkinTone_" .. case[1] .. "_02")
     if route_zabrak then

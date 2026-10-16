@@ -24,6 +24,29 @@ function M.share_modules(scripts)
     end
 end
 
+-- Game 1.2: SelectionTiles expose their slot only through the MDViewModel
+-- library (active_palette.tiles_slot_tag). Wraps a test's StaticFindObject
+-- with the library and slot view model class; a tiles fixture stands in for
+-- its own "Default" slot view model, so it carries SlotTag={TagName=...}.
+function M.view_models(find)
+    local class={IsValid=function() return true end,
+        GetFullName=function() return "Class /Script/BitReactorGame.BitReactorCustomizationSlotViewModel" end,
+        path="/Script/BitReactorGame.BitReactorCustomizationSlotViewModel"}
+    local library={IsValid=function() return true end,
+        GetViewModel=function(_,widget,c,name)
+            if type(name)~="string" then name=name:ToString() end
+            assert(c==class and name=="Default","Unexpected view model lookup")
+            assert(widget:GetFullName():match("^WBP_Customization_SelectionTiles_C "),"View model lookup off a tiles widget")
+            return widget.SlotTag and widget or nil
+        end}
+    FName=FName or function(v) return v end
+    return function(path,...)
+        if path=="/Script/MDViewModel.Default__MDViewModelFunctionLibrary" then return library end
+        if path==class.path then return class end
+        return find(path,...)
+    end
+end
+
 -- color_zone journal(leaf) for tests that keep journals in a files table
 -- under short names. overrides: {[leaf]=name}.
 function M.journal(overrides)

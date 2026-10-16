@@ -1,4 +1,5 @@
 -- Follow displayed palettes into the explicit category tree; never global VMs.
+local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
 local scripts=assert(arg[1])
 local objects,logs={},{}
 local host="/Engine/Transient.GameEngine_0:BP_BrunoGameInstance_C_0."
@@ -15,6 +16,7 @@ local a={unwrap=function(v) return v end,live=function(v) return v and v.IsValid
 function StaticFindObject(path)
     for n,o in pairs(objects) do if n:match("^[^ ]+ (.+)$")==path then return o end end
 end
+StaticFindObject=helpers.view_models(StaticFindObject)
 function FindAllOf() error("No global VM/palette scan") end
 local function vm(n,tag)
     return obj("BitReactorCustomizationSlotViewModel",host .. "BitReactorCustomizationSlotViewModel_" .. n,
@@ -38,7 +40,7 @@ local items={selected,other}
 local grid=obj("BitReactorTileView","/Game/Test.Grid",{GetNumItems=function() return #items end,
     GetItemAt=function(_,i) return items[i+1] end,
     GetIndexForItem=function(_,v) for i,item in ipairs(items) do if item==v then return i-1 end end end})
-local tiles=obj("WBP_Customization_SelectionTiles_C","/Game/Test.Tiles",{CurrentSlotTag=color.SlotTag,PartsGridList=grid})
+local tiles=obj("WBP_Customization_SelectionTiles_C","/Game/Test.Tiles",{SlotTag=color.SlotTag,PartsGridList=grid})
 local panel=obj("WBP_CustomizationSlotPanel_C","/Game/Test.Panel",{WBP_Customization_SelectionTiles=tiles})
 local switcher=obj("CommonActivatableWidgetSwitcher","/Game/Test.Switcher",{GetActiveWidget=function() return panel end})
 local page=obj("WBP_Customization_ItemPage_C","/Game/Test.Page",{SlotWidgetSwitcher=switcher,
@@ -56,8 +58,8 @@ do
     grid.GetItemAt=getter
 end
 assert(target.selected(color,page.full,nil)==color,"Existing correct selection needs no tree override")
-tiles.CurrentSlotTag=tips.SlotTag; assert(resolve()==tips,"Must follow exact root/tip palette tag")
-tiles.CurrentSlotTag=color.SlotTag
+tiles.SlotTag=tips.SlotTag; assert(resolve()==tips,"Must follow exact root/tip palette tag")
+tiles.SlotTag=color.SlotTag
 local function refuse(change,undo,expected)
     change(); local ok,err=pcall(resolve); undo()
     assert(not ok and tostring(err):find(expected,1,true),tostring(err))
@@ -65,9 +67,9 @@ end
 -- Diamond-shaped graph: the same color VM is reachable via Style and root.
 style.CustomizationChildSlotViewModels={color,tips}
 assert(resolve()==color,"Shared color candidates are not ambiguous")
-tiles.CurrentSlotTag=tips.SlotTag; assert(resolve()==tips)
+tiles.SlotTag=tips.SlotTag; assert(resolve()==tips)
 assert(logs[#logs]:find("shared_references=2",1,true))
-tiles.CurrentSlotTag=color.SlotTag
+tiles.SlotTag=color.SlotTag
 root.CustomizationChildSlotViewModels={color,style,tips,style}
 assert(resolve()==color,"Shared references must work regardless of child order")
 root.CustomizationChildSlotViewModels={style,color,tips}
@@ -83,9 +85,9 @@ root.CustomizationChildSlotViewModels={style,color,tips}
 -- Reopening must still find the exact displayed slot, without looping.
 style.CustomizationChildSlotViewModels={style}
 assert(resolve()==color)
-tiles.CurrentSlotTag=tips.SlotTag; assert(resolve()==tips)
+tiles.SlotTag=tips.SlotTag; assert(resolve()==tips)
 assert(logs[#logs]:find("back_edges=1",1,true))
-tiles.CurrentSlotTag=color.SlotTag
+tiles.SlotTag=color.SlotTag
 assert(resolve()==color and resolve()==color,"Repeated reopen with self-reference")
 style.CustomizationChildSlotViewModels={color}; color.CustomizationChildSlotViewModels={style}
 assert(resolve()==color,"Multi-node back-edge must terminate")
@@ -179,12 +181,12 @@ do
     color.EquippedCustomizationPartViewModel=selected; tips.EquippedCustomizationPartViewModel=selected
 end
 refuse(function() tiles.hidden=true end,function() tiles.hidden=nil end,"found 0")
-refuse(function() tiles.CurrentSlotTag={TagName="br.Customization.Slot.Character.Unrelated.Color"} end,
-    function() tiles.CurrentSlotTag=color.SlotTag end,"missing from category tree")
+refuse(function() tiles.SlotTag={TagName="br.Customization.Slot.Character.Unrelated.Color"} end,
+    function() tiles.SlotTag=color.SlotTag end,"missing from category tree")
 refuse(function() page.inactive=true end,function() page.inactive=nil end,"no longer active")
 local count=grid.GetNumItems
-refuse(function() grid.GetNumItems=function() tiles.CurrentSlotTag=tips.SlotTag; return #items end end,
-    function() grid.GetNumItems=count; tiles.CurrentSlotTag=color.SlotTag end,"changed during slot resolution")
+refuse(function() grid.GetNumItems=function() tiles.SlotTag=tips.SlotTag; return #items end end,
+    function() grid.GetNumItems=count; tiles.SlotTag=color.SlotTag end,"changed during slot resolution")
 assert(resolve()==color)
 -- Reproduce the reported Face Shape auxiliary / Skin Tone palette mismatch.
 root.SlotTag={TagName="br.Customization.Slot.Character.Appearance.Humanoid.Head.Face"}
@@ -192,7 +194,7 @@ style.SlotTag={TagName=root.SlotTag.TagName .. ".Mesh"}
 color.SlotTag={TagName=root.SlotTag.TagName .. ".SkinTone"}
 root.CustomizationChildSlotViewModels={style,color}
 style.CustomizationChildSlotViewModels={style}
-tiles.CurrentSlotTag=color.SlotTag
+tiles.SlotTag=color.SlotTag
 assert(resolve()==color,"Skin Tone must reopen past Face Shape back-edge")
 assert(logs[#logs]:find("back_edges=1",1,true))
 assert(resolve()==color,"Repeated Skin Tone reopen must succeed")

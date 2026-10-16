@@ -1,4 +1,5 @@
 local scripts=assert(arg[1])
+local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
 local objects,classes,jobs,logs={},{},{},{}
 local shared={}
 ModRef={GetSharedVariable=function(_,key) return shared[key] end,
@@ -72,6 +73,7 @@ function StaticFindObject(path,outer,relative)
     end
     for _,o in pairs(objects) do if o.path==path then return o end end
 end
+StaticFindObject=helpers.view_models(StaticFindObject)
 function StaticConstructObject(class,outer,n)
     if class.path==fail_construct then error("construction failed") end
     return object(class.path:match("%.([^%.]+)$"),outer.path .. "." .. n)
@@ -134,7 +136,7 @@ local header=object("TextBlock",page.path .. ".WidgetTree_4.SlotHeader")
 local tag="br.Customization.Slot.Character.Hair.Hair.Color.Primary"
 local vm=object("BitReactorCustomizationSlotViewModel","/Engine/Transient.GameEngine_0:BP_BrunoGameInstance_C_0.BitReactorCustomizationSlotViewModel_7")
 vm.SlotTag={TagName=tag}; vm.GetFragments=function() return {} end
-tiles.CurrentSlotTag={TagName=tag}
+tiles.SlotTag={TagName=tag}
 local pc=object("PlayerController","/Game/Test.PlayerController_0"); pc.bShowMouseCursor=true
 local heading_class_path="/Game/Game/UI/Strategy/Customization/Widgets/New/WBP_Customization_SlotSubItemName.WBP_Customization_SlotSubItemName_C"
 local heading_class=object("WidgetBlueprintGeneratedClass",heading_class_path)
@@ -492,7 +494,7 @@ local queued=jobs["color-ui:open"].fn
 -- Slot change retires a launcher before bounded installation runs: installation
 -- request generation must remain independent of the retired poll generation.
 tag="br.Customization.Slot.Character.Hair.Hair.Color.Secondary"
-vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
+vm.SlotTag.TagName=tag; tiles.SlotTag.TagName=tag
 ui.context_changed("UpdateCurrentCustomizationSlotVM")
 run("color-ui:poll"); assert(not ui.binding and not ui.root_name)
 queued(); assert(opens==before)
@@ -534,7 +536,7 @@ do
     for _,has_fragment in ipairs({false,true}) do
         vm.GetFragments=function() return has_fragment and {fragment} or {} end
         for _,slot in ipairs(rejected) do
-            tag=slot; vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
+            tag=slot; vm.SlotTag.TagName=tag; tiles.SlotTag.TagName=tag
             assert(not pcall(ui.prepare_picker),"Preset/style grids must never offer Custom Color: " .. slot)
             assert(not ui.root_name and not ui.binding and #overlay.children==1 and grid.visibility==0)
         end
@@ -543,7 +545,7 @@ do
     for _,part in ipairs({"Helmet","Torso","Arms","Legs","Boots"}) do
         for _,zone in ipairs({"Primary","Secondary","Tertiary"}) do
             tag="br.Customization.Slot.Character.Outfit." .. part .. ".Color." .. zone
-            vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
+            vm.SlotTag.TagName=tag; tiles.SlotTag.TagName=tag
             assert(ui.reconcile().tag==tag,"Actual armor color palettes must remain available, including Default")
             ui.close("next armor palette")
         end
@@ -551,14 +553,14 @@ do
     runtime.perf=assert(loadfile(scripts .. "/performance_log.lua"))().new(runtime)
     for _,slot in ipairs(rejected) do
         tag="br.Customization.Slot.Character.Outfit.Torso.Color.Primary"
-        vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
+        vm.SlotTag.TagName=tag; tiles.SlotTag.TagName=tag
         ui.reconcile()
         launch_click(); run("color-ui:launch")
         assert(jobs["color-ui:open"])
         assert(runtime.perf.window and runtime.perf.window.phase=="queued" and not jobs["perf:expiry"],
             "Button press must start capture before the deferred opening")
         local opens_before=opens
-        tag=slot; vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
+        tag=slot; vm.SlotTag.TagName=tag; tiles.SlotTag.TagName=tag
         run("color-ui:open")
         assert(not runtime.perf.window and not jobs["perf:summary"],"Rejected queued launch must end capture")
         assert(opens==opens_before,"Queued palette clicks must not open after switching to a preset/style grid")
@@ -578,13 +580,13 @@ for _,slot in ipairs({"br.Customization.Slot.Character.Appearance.Humanoid.Head.
     "br.Customization.Slot.Character.Appearance.Humanoid.Head.Eyes.IrisInner",
     "br.Customization.Slot.Character.Appearance.Humanoid.Head.Eyes.IrisTint",
     "br.Customization.Slot.Character.Appearance.Humanoid.Head.Eyelash.Color"}) do
-    tag=slot; vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
+    tag=slot; vm.SlotTag.TagName=tag; tiles.SlotTag.TagName=tag
     assert(ui.reconcile().tag==tag,"Supported eye/lash colors must get the launcher even while empty")
     ui.close("next cosmetic")
 end
 for _,slot in ipairs({"br.Customization.Slot.Character.Appearance.Humanoid.FacialDetails.Group.Vitiligo.Tint",
     "br.Customization.Slot.Character.Appearance.Humanoid.FacialDetails.Group.Scar.Look"}) do
-    tag=slot; vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
+    tag=slot; vm.SlotTag.TagName=tag; tiles.SlotTag.TagName=tag
     local binding=ui.reconcile()
     assert(not binding.manual and ui.root_name and ui.button_name and jobs["color-ui:poll"])
     assert(#overlay.children==2 and ui.validate_picker(binding),"Vitiligo/scar launchers must keep verified native ancestry")
@@ -598,7 +600,7 @@ end
 -- Raw scar HSV controls preserve native values instead of converting them to
 -- sRGB, rendering an impossible hex swatch, or rounding untouched channels.
 tag="br.Customization.Slot.Character.Appearance.Humanoid.FacialDetails.Group.Scar.Look"
-vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
+vm.SlotTag.TagName=tag; tiles.SlotTag.TagName=tag
 view.open("hsv_shift")
 assert(view.hsv_shift and not view.hsv and not view.swatch and #view.hsv_shift.channels==3)
 assert(#view.buttons==2 and find(view.status).visibility==1 and find(view.status).text=="")
@@ -635,12 +637,12 @@ native,local_action=view.read(); assert(native==nil and local_action=="cancel")
 view.close(); assert(not view.hsv_shift and not view.input_mode and ui.binding and #overlay.children==2)
 ui.close("HSV test ended")
 tag="br.Customization.Slot.Character.Appearance.Humanoid.FacialDetails.Group.Scar.Strength"
-vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
+vm.SlotTag.TagName=tag; tiles.SlotTag.TagName=tag
 assert(not pcall(ui.prepare_picker),"Manual override must refuse unrelated scalar slots")
 -- The launcher band: reserved while a launcher shows, restored on
 -- retirement, but grid padding another mod changed after us is theirs. The
 -- swatch cap (which creator overhauls keep re-applying) is never written.
-tag="br.Customization.Slot.Character.Hair.Hair.Color.Primary"; vm.SlotTag.TagName=tag; tiles.CurrentSlotTag.TagName=tag
+tag="br.Customization.Slot.Character.Hair.Hair.Color.Primary"; vm.SlotTag.TagName=tag; tiles.SlotTag.TagName=tag
 ui.close("band baseline"); grid.Slot:SetPadding({Left=0,Top=0,Right=0,Bottom=0})
 local cap_writes=0; local cap_set=grid_box.SetMaxDesiredHeight
 grid_box.SetMaxDesiredHeight=function(self,v) cap_writes=cap_writes+1; cap_set(self,v) end

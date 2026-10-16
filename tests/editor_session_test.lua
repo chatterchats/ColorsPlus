@@ -88,7 +88,7 @@ local grid=obj("BitReactorTileView /Game/Test.Grid",{
     GetNumItems=function() return #palette end,GetItemAt=function(_,i) return palette[i+1] end,
     GetIndexForItem=function(_,p) for i,v in ipairs(palette) do if p==v then return i-1 end end end})
 local tiles=obj("WBP_Customization_SelectionTiles_C /Game/Test.Tiles",{
-    CurrentSlotTag={TagName=ACCENT},PartsGridList=grid,IsVisible=function() return true end})
+    SlotTag={TagName=ACCENT},PartsGridList=grid,IsVisible=function() return true end})
 local panel=obj("WBP_CustomizationSlotPanel_C /Game/Test.Panel",{
     WBP_Customization_SelectionTiles=tiles,IsVisible=function() return true end})
 page.WBP_CustomizationSlotPanel=panel
@@ -97,6 +97,7 @@ function StaticFindObject(path)
     assert(on_thread)
     for n,v in pairs(objects) do if n:match("^[^ ]+ (.+)$")==path and not v.invalid then return v end end
 end
+StaticFindObject=helpers.view_models(StaticFindObject)
 function FindAllOf(class)
     assert(on_thread)
     local found={}
@@ -313,7 +314,7 @@ for _,case in ipairs({
     {"br.Customization.Slot.Character.Appearance.Humanoid.BodyArt.Tattoo.Color","br.Customization.Slot.Character.Appearance.Humanoid.Head.Face.Mesh","Tattoo Color","MI_Head",false},
     {"br.Customization.Slot.Character.Appearance.Humanoid.BodyArt.Tattoo.Color","br.Customization.Slot.Character.Appearance.Humanoid.Head.Face.Mesh","Tattoo Color","MI_Head",true},
 }) do
-    ACCENT,MESH=case[1],case[2]; vm.SlotTag.TagName=ACCENT; tiles.CurrentSlotTag.TagName=ACCENT
+    ACCENT,MESH=case[1],case[2]; vm.SlotTag.TagName=ACCENT; tiles.SlotTag.TagName=ACCENT
     fragment.MaterialTarget.MaterialParameterName=case[3]
     fragment.MaterialTarget.MaterialSlotNames={case[4]}; fragment.MaterialTarget.SlotNameTagsToApply.GameplayTags={{TagName=MESH}}
     horns_present=case[5]

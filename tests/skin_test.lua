@@ -188,7 +188,7 @@ local palette={stock,other_family,shade}
 local grid=obj("BitReactorTileView",path(page) .. ".Grid",{GetNumItems=function() return #palette end,
     GetItemAt=function(_,i) return palette[i+1] end,GetIndexForItem=function(_,p) for i,v in ipairs(palette) do if v==p then return i-1 end end end})
 local tiles=obj("WBP_Customization_SelectionTiles_C",path(page) .. ".Tiles",
-    {CurrentSlotTag=tag(bundle.SKIN),PartsGridList=grid,IsVisible=function() return true end,GetParent=function() return page end})
+    {SlotTag=tag(bundle.SKIN),PartsGridList=grid,IsVisible=function() return true end,GetParent=function() return page end})
 local panel=obj("WBP_CustomizationSlotPanel_C",path(page) .. ".Panel",{WBP_Customization_SelectionTiles=tiles,IsVisible=function() return true end})
 page.WBP_CustomizationSlotPanel=panel
 page.SlotWidgetSwitcher=obj("CommonActivatableWidgetSwitcher",path(page) .. ".Switcher",{GetActiveWidget=function() return panel end})
@@ -199,6 +199,7 @@ function FindAllOf(classname)
     return found
 end
 function StaticFindObject(s) for _,v in pairs(objects) do if path(v)==s and not v.invalid then return v end end end
+StaticFindObject=helpers.view_models(StaticFindObject)
 function FName(s) assert(on_thread); return s end
 local old_open,old_rename,old_remove=io.open,os.rename,os.remove
 io.open=function(p,mode)

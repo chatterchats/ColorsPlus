@@ -14,6 +14,17 @@ function M.new(a,logger)
     local function name(v) return a.name(obj(v)) end
     local function kind(v) return name(v):match("^([^ ]+) ") end
     local function field(v,k) return obj(a.prop(obj(v),k)) end
+    -- Game 1.2 dropped the tiles' CurrentSlotTag copy; read the slot view
+    -- model the tiles Blueprint itself uses (MDViewModel "Default").
+    function self.tiles_slot_tag(tiles)
+        -- A class default object: a.live() rejects Default__ names by design.
+        local lib=StaticFindObject("/Script/MDViewModel.Default__MDViewModelFunctionLibrary")
+        assert(lib and lib:IsValid()==true,"View model library unavailable")
+        local class=obj(StaticFindObject("/Script/BitReactorGame.BitReactorCustomizationSlotViewModel"))
+        local vm=a.unwrap(lib:GetViewModel(obj(tiles),class,FName("Default")))
+        if not a.live(vm) then return "<unavailable>" end
+        return a.text(a.prop(a.prop(vm,"SlotTag"),"TagName"))
+    end
     local function exact_page(full)
         assert(type(full)=="string" and full:match("^WBP_Customization_ItemPage_C /[^\r\n]+$"),"Invalid palette page identity")
         local page=a.unwrap((a.find or StaticFindObject)(full:match("^[^ ]+ (.+)$")))
@@ -49,7 +60,7 @@ function M.new(a,logger)
             if v:IsVisible()~=true then log("HIDDEN | " .. route .. " | " .. full); return end
             local cls=kind(v)
             if cls=="WBP_Customization_SelectionTiles_C" then
-                local current=a.text(a.prop(a.prop(v,"CurrentSlotTag"),"TagName"))
+                local current=self.tiles_slot_tag(v)
                 log("TILES | " .. route .. " | slot=" .. current .. " | " .. full)
                 if current==slot_tag or use_displayed then
                     assert(current:match("^br%.Customization%.Slot%.Character%.[%w_.]+$"),"Invalid displayed slot tag")

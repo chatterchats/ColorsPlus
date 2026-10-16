@@ -1,4 +1,5 @@
 local scripts=assert(arg[1])
+local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
 local objects,logs={},{}
 local function obj(kind,label,fields)
     local o=fields or {}; o.full=kind .. " /Game/Test." .. label
@@ -21,9 +22,10 @@ function StaticFindObject(path)
     if fail_lookup then return end
     for n,o in pairs(objects) do if n:match("^[^ ]+ (.+)$")==path then return o end end
 end
+StaticFindObject=helpers.view_models(StaticFindObject)
 local tag="br.Customization.Slot.Character.Hair.Hair.Color.Primary"
 local grid=obj("BitReactorTileView","Grid")
-local tiles=obj("WBP_Customization_SelectionTiles_C","Tiles",{CurrentSlotTag={TagName=tag},PartsGridList=grid})
+local tiles=obj("WBP_Customization_SelectionTiles_C","Tiles",{SlotTag={TagName=tag},PartsGridList=grid})
 local simple=obj("WBP_CustomizationSlotPanel_C","Simple",{WBP_Customization_SelectionTiles=tiles})
 local children={tiles}
 local list=obj("BitReactorStackBox","List",{GetAllChildren=function() return children end})
@@ -44,7 +46,7 @@ local displayed_grid,displayed_tag=resolver.resolve(page.full,"br.Customization.
 assert(displayed_grid==grid and displayed_tag==tag,"Simple panel exposes its displayed color slot")
 assert(not pcall(resolver.resolve,page.full,"br.Customization.Slot.Character.Hair.Hair.Mesh"),"Exact palette lookup must not retarget")
 -- Inactive panel and globally visible stale palettes cannot contend with root.
-local stale=obj("WBP_Customization_SelectionTiles_C","Stale",{CurrentSlotTag=tiles.CurrentSlotTag,
+local stale=obj("WBP_Customization_SelectionTiles_C","Stale",{SlotTag=tiles.SlotTag,
     PartsGridList=obj("BitReactorTileView","StaleGrid")})
 active=combined; assert(resolve()==grid)
 assert(not pcall(resolver.resolve,page.full,"br.Customization.Slot.Character.Hair.Hair.Mesh",true),"Do not infer focus on a combined panel")
@@ -52,7 +54,7 @@ active=slotlist; assert(resolve()==grid)
 -- Known container wrappers within an owned list, never arbitrary widget trees.
 local border=obj("Border","Border",{GetAllChildren=function() return {tiles} end})
 children={border}; assert(resolve()==grid)
-local other=obj("WBP_Customization_SelectionTiles_C","Other",{CurrentSlotTag={TagName="other"},PartsGridList=stale.PartsGridList})
+local other=obj("WBP_Customization_SelectionTiles_C","Other",{SlotTag={TagName="other"},PartsGridList=stale.PartsGridList})
 children={other,tiles}; assert(resolve()==grid)
 local function refuse(change,undo,expected)
     change(); local ok,err=pcall(resolve); assert(not ok and tostring(err):find(expected,1,true),tostring(err)); undo()
@@ -64,7 +66,8 @@ refuse(function() children={}; for i=1,65 do children[i]=tiles end end,function(
 refuse(function() page.inactive=true end,function() page.inactive=nil end,"no longer active")
 refuse(function() page.SlotWidgetSwitcher=nil end,function() page.SlotWidgetSwitcher=switcher end,"object unavailable")
 refuse(function() page.WBP_Customization_SlotList=combined end,function() page.WBP_Customization_SlotList=slotlist end,"differs from page reference")
-refuse(function() tiles.CurrentSlotTag={TagName="changed"} end,function() tiles.CurrentSlotTag={TagName=tag} end,"found 0")
+refuse(function() tiles.SlotTag={TagName="changed"} end,function() tiles.SlotTag={TagName=tag} end,"found 0")
+refuse(function() tiles.SlotTag=nil end,function() tiles.SlotTag={TagName=tag} end,"found 0")
 refuse(function() slotlist.hidden=true end,function() slotlist.hidden=nil end,"found 0")
 local getter=switcher.GetActiveWidget; local calls=0
 refuse(function() switcher.GetActiveWidget=function() calls=calls+1; return calls==1 and slotlist or simple end end,

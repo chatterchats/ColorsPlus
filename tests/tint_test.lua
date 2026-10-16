@@ -158,6 +158,7 @@ end
 function StaticFindObject(path)
     for name, value in pairs(objects) do if name:match("^[^ ]+ (.+)$") == path then return value end end
 end
+StaticFindObject=helpers.view_models(StaticFindObject)
 FName = newproxy(true)
 getmetatable(FName).__call = function(_, value)
     assert(game_thread)
@@ -331,7 +332,7 @@ do
         material.MaterialParameterName=case[2]; material.MaterialSlotNames=array({case[3]})
         material.SlotNameTagsToApply.GameplayTags=array({tag(base .. ".Mesh")})
         if case[5] then material.SlotNameTagsToApply.GameplayTags=array({tag(base .. ".Mesh"),tag(saved.horn_tag)}) end
-        tiles.CurrentSlotTag=slot.SlotTag; stale.CurrentSlotTag=slot.SlotTag
+        tiles.SlotTag=slot.SlotTag; stale.SlotTag=slot.SlotTag
         -- Real failure: Aux remains at Style while the simple panel displays
         -- hair/lipstick Color. The Default selection and preview engine must agree.
         slot.CustomizationChildSlotViewModels=array({})
@@ -558,9 +559,9 @@ do
             assert(not container.IsPreviewing)
             display_color=original; proxy_fragment=new_clone(original)
         end
-        StaticFindObject=function(p)
+        StaticFindObject=helpers.view_models(function(p)
             for _,v in pairs(objects) do if v:GetFullName():match("^[^ ]+ (.+)$")==p then return v end end
-        end
+        end)
         os.rename=function(from,to)
             assert(files[from]~=nil and files[to]==nil); files[to],files[from]=files[from],nil; return true
         end

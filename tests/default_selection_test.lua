@@ -56,7 +56,7 @@ local grid=object("BitReactorTileView /Game/Test.Grid",{
     GetIndexForItem=function(_,p) for i,v in ipairs(palette) do if v==p then return i-1 end end end,
 })
 local widget=object("WBP_Customization_SelectionTiles_C /Game/Test.Tiles",{
-    CurrentSlotTag={TagName=ACCENT},PartsGridList=grid,IsVisible=function(self) return not self.hidden end,
+    SlotTag={TagName=ACCENT},PartsGridList=grid,IsVisible=function(self) return not self.hidden end,
 })
 local lists={widget}
 function widget:GetParent() return page end
@@ -74,6 +74,7 @@ end
 function StaticFindObject(p)
     for n,v in pairs(objects) do if n:match("^[^ ]+ (.+)$")==p and not v.invalid then return v end end
 end
+StaticFindObject=helpers.view_models(StaticFindObject)
 function FName(s) return s end
 io.open=function(p,mode)
     if mode=="r" and files[p]==nil then return nil,p .. ": No such file or directory",2 end
