@@ -9,6 +9,8 @@ Test builds before 1.0 are described in
 
 ## [Unreleased]
 
+## [1.1.1]
+
 ### Fixed
 
 - Works with the game's 1.2 update: the Custom Color button appears again in
