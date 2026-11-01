@@ -9,6 +9,11 @@ Test builds before 1.0 are described in
 
 ## [Unreleased]
 
+### Fixed
+
+- The Custom Color picker opens for Hawks when starting a new campaign. The
+  button appeared in that character creator, but clicking it did nothing.
+
 ## [1.1.1]
 
 ### Fixed

@@ -7,12 +7,13 @@ local function owner(level,actor) return "CustomizationInstance " .. level .. ac
 assert(worlds.owner(owner(main,"Char_Hero_Humanoid_C_0"))=="creator")
 -- The creator's new droid (observed 2026-10-08: Char_Hero_Astromech_C_0 in MainMenu).
 assert(worlds.owner(owner(main,"Char_Hero_Astromech_C_0"))=="creator")
-assert(not worlds.owner(owner(main,"Char_HQ_M-EVO_C_1")),"Creator edits only its recruit")
+assert(not worlds.owner(owner(main,"Char_HQ_M-EVO_C_1")),"Creator edits only its own character")
 assert(not worlds.owner(owner(main,"BP_AstromechWeapon_C_2")),"A droid's weapon is not an owner")
 assert(worlds.owner(owner(hub,"Char_Hero_HAWKS_Control_C_0"))=="hub")
 assert(worlds.owner(owner(hub,"Char_Hero_Humanoid_C_0"))=="hub")
 assert(worlds.owner(owner(hub,"Char_Hero_Astromech_BR-1_C_0"))=="hub")
-assert(not worlds.owner(owner(main,"Char_Hero_HAWKS_Control_C_0")),"Creator edits only its recruit")
+-- A new campaign's creator edits Hawks (observed 2026-11-01: Char_Hero_HAWKS_Control_C_0 in MainMenu).
+assert(worlds.owner(owner(main,"Char_Hero_HAWKS_Control_C_0"))=="creator")
 assert(not worlds.owner(owner(hub,"BP_CustomizationProxyCharacter_C_0")),"Display proxy is not an owner")
 assert(not worlds.owner(owner(hub,"BP_CustomizationPreviewProxyCharacter_C_1")),"Preview proxy is not an owner")
 assert(not worlds.owner("CustomizationInstance /Game/Game/GameData/Narrative/Conversations/con/SEQ.SEQ:MovieScene_0.Char_Hero_HAWKS_Control_0.CustomizationInstance"))
