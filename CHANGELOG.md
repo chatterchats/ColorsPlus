@@ -9,6 +9,8 @@ Test builds before 1.0 are described in
 
 ## [Unreleased]
 
+## [1.1.2]
+
 ### Fixed
 
 - The Custom Color picker opens for Hawks when starting a new campaign. The
