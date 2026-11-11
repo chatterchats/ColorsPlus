@@ -2,6 +2,11 @@ name: Release to Nexus Mods
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: "Skip the Lua tests (they need apt for LuaJIT); run tools/run-tests.sh locally first."
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -74,6 +79,7 @@ jobs:
           PY
 
       - name: Run tests
+        if: ${{ !inputs.skip_tests }}
         shell: bash
         run: |
           sudo apt-get update -qq
