@@ -9,6 +9,11 @@ Test builds before 1.0 are described in
 
 ## [Unreleased]
 
+### Changed
+
+- Mark game builds 25898267 and 26445778 as tested in the mod manager
+  metadata, replacing the older builds.
+
 ## [1.1.2]
 
 ### Fixed
