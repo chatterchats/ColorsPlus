@@ -1,6 +1,6 @@
 # Colors+ implementation strategy review
 
-Review date: **October 4, 2026 (America/New_York)**. Scope: architecture assessment of the active **Colors+Probe v0.2.113**, not a migration or release. Repository: `/run/media/chats/e0057d4a-fe46-43eb-a837-db51979c500f/ZComMods/Colors+`.
+Review date: **October 4, 2026 (America/New_York)**. Scope: architecture assessment of the active **Colors+Probe v0.2.113**, not a migration or release. Repository: `/run/media/chats/0c7bd812-03b4-405c-9602-31282b68fd64/Projects/ZeroCompany/Mods/Colors+`.
 
 ## Recommendation and confidence
 
