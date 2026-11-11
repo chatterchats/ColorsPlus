@@ -1,4 +1,4 @@
-# Colors+ v1.1.2 — Custom Color Picker for Star Wars: Zero Company
+# Colors+ v1.1.3 — Custom Color Picker for Star Wars: Zero Company
 
 Tired of picking from the same handful of swatches? Colors+ lets you choose
 **any color you like** for your characters, your droids and your blasters.
