@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local objects,lists,logs={},{},{}
 local host="/Engine/Transient.GameEngine_0:BP_BrunoGameInstance_C_0.WBP_OverallUILayout_C_15.WidgetTree_16"
 local function widget(class,path)

@@ -1,5 +1,5 @@
 -- Visibility ownership and same-process recovery, with no disk or game writes.
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local module=assert(loadfile(scripts .. "/palette_visibility.lua"))()
 local old_mod,old_find=ModRef,StaticFindObject
 local objects,shared,writes,events={}, {},0,{}

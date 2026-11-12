@@ -1,5 +1,5 @@
--- Run: tools/run-tests.sh probe
-local scripts = assert(arg[1], "pass probe Scripts directory")
+-- Run: make test T=probe_test
+local scripts = (arg[1] or "src/ColorsPlus/Scripts")
 local messages, hooks, commands, queue, cancelled = {}, {}, {}, {}, {}
 local next_id, blueprint_ready, native_unhooks, console_count = 0, false, 0, 0
 local original_print, original_open = print, io.open

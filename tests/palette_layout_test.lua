@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local layout=assert(loadfile(scripts .. "/palette_layout.lua"))()
 local function close(a,b) return math.abs(a-b)<1e-6 end
 

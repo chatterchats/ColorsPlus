@@ -1,9 +1,9 @@
--- Run: tools/run-tests.sh droid_target
+-- Run: make test T=droid_target_test
 -- Astromech droid color targets. The story droid BR-1's parts carry a hyphen
 -- (observed in the barracks, 2026-10-08):
 --   slot=...Astromech.Legs.Color.Primary | mesh=...Astromech.Legs.Mesh
 --   parameter=Color 01 | asset=CustomizationPartDefinition:CPD_AST_Legs_BR-1_Tint
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local target=assert(loadfile(scripts .. "/color_target.lua"))()
 local rules=assert(loadfile(scripts .. "/color_rules.lua"))()
 local DROID="br.Customization.Slot.Character.Appearance.Astromech."

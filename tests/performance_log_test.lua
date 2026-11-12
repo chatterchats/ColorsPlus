@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local jobs,commands,logs={},{},{}
 local now,clock_calls=0,0
 local runtime={log=function(s) logs[#logs+1]=s end}

@@ -2,7 +2,7 @@
 
 How Colors+ edits a color, and why it is shaped this way. The mod lives in
 `src/ColorsPlus/Scripts`; tests
-in `tests/` (`tools/run-tests.sh`).
+in `tests/` (`make test`).
 
 ## Overview
 

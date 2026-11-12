@@ -1,6 +1,4 @@
-/debug/
 /dist/
-/*.zip
 *.log
 __pycache__/
 *.py[cod]
@@ -8,6 +6,11 @@ __pycache__/
 Thumbs.db
 *.swp
 *.tmp
+
+# Written by MXM while the mod is linked into the game
+values.lua
+
+# Recovery journals written while the mod is linked into the game. README.txt
+# ships so the folder exists after extraction (Lua cannot create it).
 /src/ColorsPlus/Recovery/*
-# Ships in every package so the journal folder exists after extraction.
 !/src/ColorsPlus/Recovery/README.txt

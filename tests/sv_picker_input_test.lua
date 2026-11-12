@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local objects={}
 local function widget(name)
     local o={}

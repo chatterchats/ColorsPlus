@@ -1,6 +1,6 @@
 -- Real editor-session + Default-selection modules; engine and hover backend fake.
--- Run: tools/run-tests.sh editor_session
-local scripts=assert(arg[1])
+-- Run: make test T=editor_session_test
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
 helpers.share_modules(scripts)
 local zones=assert(loadfile(scripts .. "/color_zone.lua"))()

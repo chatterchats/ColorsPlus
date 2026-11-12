@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local module=assert(loadfile(scripts .. "/live_picker.lua"))()
 local rgb=assert(loadfile(scripts .. "/rgb_input.lua"))()
 local jobs,logs={},{}

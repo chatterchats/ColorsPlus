@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local buttons=assert(loadfile(scripts .. "/button_class.lua"))()
 local loaded,loads,logs=false,0,{}
 local class={IsValid=function() return true end}

@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local factory=assert(loadfile(scripts .. "/logging.lua"))()
 local old_date,old_open,old_print=os.date,io.open,print
 local lines,closed={},0

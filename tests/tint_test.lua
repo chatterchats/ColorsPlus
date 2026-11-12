@@ -1,5 +1,5 @@
--- Run: tools/run-tests.sh tint
-local scripts = assert(arg[1])
+-- Run: make test T=tint_test
+local scripts = (arg[1] or "src/ColorsPlus/Scripts")
 local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
 helpers.share_modules(scripts)
 local original_open = io.open

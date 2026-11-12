@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local worlds=assert(loadfile(scripts .. "/editor_worlds.lua"))()
 local main="/Game/Game/Maps/MainMenu/MainMenu.MainMenu:PersistentLevel."
 local hub="/Game/Game/Maps/Hub/HUB_Root.HUB_Root:PersistentLevel."

@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local m=assert(loadfile(scripts .. "/color_math.lua"))()
 local function equals(a,b) assert(a.R==b.R and a.G==b.G and a.B==b.B) end
 for _,rgb in ipairs({{R=0,G=0,B=0},{R=255,G=255,B=255},{R=128,G=128,B=128},

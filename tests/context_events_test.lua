@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local events=assert(loadfile(scripts .. "/context_events.lua"))()
 local order,logs={},{}
 local runtime={log=function(s) logs[#logs+1]=s end}

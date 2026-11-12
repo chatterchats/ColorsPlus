@@ -1,5 +1,5 @@
--- Run: tools/run-tests.sh known_instances
-local scripts=assert(arg[1])
+-- Run: make test T=known_instances_test
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local known_module=assert(loadfile(scripts .. "/known_instances.lua"))()
 local objects,lists,finds,scans={},{},0,0
 local function obj(class,path,fields)

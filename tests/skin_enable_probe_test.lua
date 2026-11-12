@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local module=assert(loadfile(scripts .. "/skin_enable_probe.lua"))()
 local objects,jobs,logs={},{},{}
 local function obj(n,fields)

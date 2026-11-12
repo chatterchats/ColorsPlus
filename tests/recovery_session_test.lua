@@ -1,5 +1,5 @@
 -- Session provenance is tested without engine calls or real filesystem writes.
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local guard=assert(loadfile(scripts .. "/recovery_session.lua"))()
 local original={open=io.open,rename=os.rename,remove=os.remove,mod=ModRef}
 local files,shared,logs,fail={}, {}, {}

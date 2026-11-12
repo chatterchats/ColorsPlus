@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local module=assert(loadfile(scripts .. "/color_target.lua"))()
 local FACE="br.Customization.Slot.Character.Appearance.Humanoid.Head.Face.Mesh"
 local HORNS="br.Customization.Slot.Character.Horns.Mesh"

@@ -1,6 +1,6 @@
 -- Follow displayed palettes into the explicit category tree; never global VMs.
 local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local objects,logs={},{}
 local host="/Engine/Transient.GameEngine_0:BP_BrunoGameInstance_C_0."
 local function obj(kind,path,fields)

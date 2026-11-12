@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local module=assert(loadfile(scripts .. "/display_handoff.lua"))()
 local function obj(n,fields) local v=fields or {}; v.n=n; return v end
 local a={unwrap=function(v) return v end,live=function(v) return v and not v.invalid end,

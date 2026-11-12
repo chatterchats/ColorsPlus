@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local objects,classes={},{}
 local current_thread=true
 local fail_construct,fail_remove

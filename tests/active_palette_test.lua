@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local helpers=dofile((arg[0]:match("^(.*[/\\])") or "") .. "helpers.lua")
 local objects,logs={},{}
 local function obj(kind,label,fields)

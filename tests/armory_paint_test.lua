@@ -1,5 +1,5 @@
--- Run: tools/run-tests.sh armory_paint
-local scripts=assert(arg[1])
+-- Run: make test T=armory_paint_test
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local factory=assert(loadfile(scripts .. "/armory_paint.lua"))()
 local objects,lists,logs={},{},{}
 local function obj(full,fields)

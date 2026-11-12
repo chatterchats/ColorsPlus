@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local module=assert(loadfile(scripts .. "/multi_editor.lua"))()
 local jobs,workers,proxies,logs={},{},{},{}
 local runtime={skin_enable={sentinel=true},log=function(s) logs[#logs+1]=s end}

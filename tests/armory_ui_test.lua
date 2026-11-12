@@ -1,5 +1,5 @@
--- Run: tools/run-tests.sh armory_ui
-local scripts=assert(arg[1])
+-- Run: make test T=armory_ui_test
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local factory=assert(loadfile(scripts .. "/armory_ui.lua"))()
 local objects,lists,logs,jobs,hooks,scans={},{},{},{},{},{}
 local function register(o) objects[o.full:match("^[^ ]+ (.+)$")]=o; local c=o.full:match("^([^ ]+) "); lists[c]=lists[c] or {}; table.insert(lists[c],o); return o end

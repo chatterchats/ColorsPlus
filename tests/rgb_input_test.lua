@@ -1,5 +1,5 @@
--- Run: tools/run-tests.sh rgb_input
-local input = assert(loadfile(assert(arg[1]) .. "/rgb_input.lua"))()
+-- Run: make test T=rgb_input_test
+local input = assert(loadfile((arg[1] or "src/ColorsPlus/Scripts") .. "/rgb_input.lua"))()
 local function near(a,b) assert(math.abs(a-b) < 1e-9, tostring(a) .. " ~= " .. tostring(b)) end
 local c, label = input.parse(" 255, 128, 32\r\n")
 assert(label == "255,128,32" and c.A == 1)

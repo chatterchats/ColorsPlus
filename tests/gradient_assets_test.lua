@@ -1,4 +1,4 @@
-local scripts=assert(arg[1])
+local scripts=(arg[1] or "src/ColorsPlus/Scripts")
 local assets=assert(loadfile(scripts .. "/gradient_assets.lua"))()
 local objects,imports={},0
 local fail=false
