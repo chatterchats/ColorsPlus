@@ -1,6 +1,6 @@
 // Deterministic RGBA assets; no image packages or external downloads required.
 // Usage: node tools/generate-picker-gradients.mjs [--check] [Assets directory]
-import {deflateSync} from 'node:zlib';
+import {deflateSync, inflateSync} from 'node:zlib';
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
@@ -34,8 +34,21 @@ function png(width, height, pixel) {
     assert(rgba.length === 4 && rgba.every(v => Number.isInteger(v) && v >= 0 && v <= 255));
     raw.set(rgba, y * (1 + width * 4) + 1 + x * 4);
   }
-  return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), chunk('IHDR', header),
+  const bytes = Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), chunk('IHDR', header),
     chunk('IDAT', deflateSync(raw, {level: 9})), chunk('IEND', Buffer.alloc(0))]);
+  return Object.assign(bytes, {header, raw});
+}
+// The header and the inflated pixels of a PNG with one IDAT chunk. --check compares these, not
+// the file bytes: deflate output differs between zlib builds (zlib-ng on Fedora, zlib on Ubuntu).
+function decode(file) {
+  const chunks = {};
+  for (let at = 8; at < file.length;) {
+    const size = file.readUInt32BE(at), type = file.toString('latin1', at + 4, at + 8);
+    assert(!(type in chunks), `PNG has more than one ${type} chunk`);
+    chunks[type] = file.subarray(at + 8, at + 8 + size);
+    at += 12 + size;
+  }
+  return {header: chunks.IHDR, raw: inflateSync(chunks.IDAT)};
 }
 function hue(x) {
   const h = x / 1023 * 6, sector = Math.floor(h) % 6, f = h - Math.floor(h);
@@ -55,7 +68,10 @@ const assets = {'saturation.png':png(256,4,x=>saturation(x)),
 if (!check) mkdirSync(output, {recursive:true});
 for (const [name, bytes] of Object.entries(assets)) {
   const path = join(output, name);
-  if (check) assert(readFileSync(path).equals(bytes), `Generated asset differs: ${path}`);
+  if (check) {
+    const found = decode(readFileSync(path));
+    assert(found.header.equals(bytes.header) && found.raw.equals(bytes.raw), `Generated asset differs: ${path}`);
+  }
   else writeFileSync(path, bytes);
 }
 console.log(`${check ? 'Verified' : 'Generated'} three picker gradients (${Object.values(assets).reduce((n,b)=>n+b.length,0)} bytes)`);
